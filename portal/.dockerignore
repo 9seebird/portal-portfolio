@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+data/
+data_test/
+data_probe/
+.env
+.git/
+ai-report/
+_to_delete/
+deploy/
+*.md

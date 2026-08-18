@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>누리코스메틱 IT 매뉴얼 포털</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --border:#e3e8ef; --text:#1f2937; --sub:#6b7280;
+    --accent:#2563eb; --accent-light:#eff6ff; --red:#dc2626; --amber-light:#fffbeb;
+    --radius:12px;
+    --shadow:0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg:0 10px 30px rgba(0,0,0,.12);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.55;}
+  a{color:var(--accent);}
+  .wrap{max-width:1400px;margin:0 auto;padding:22px 22px 80px;}
+
+  header.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+  .brand{display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .brand-badge{width:38px;height:38px;border-radius:9px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;}
+  .brand h1{font-size:18px;margin:0;}
+  .brand p{margin:0;color:var(--sub);font-size:12px;}
+  .top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  /* 포털로 돌아가는 길. 버튼들과 같은 모양이되 조금 흐리게 둔다 —
+     이 화면에서 할 일이 아니라 나가는 문이기 때문이다. */
+  .backportal{font-family:inherit;cursor:pointer;border:1px solid var(--border);
+    background:var(--card);color:var(--sub);border-radius:8px;padding:8px 13px;
+    font-size:13px;text-decoration:none;transition:background .12s,color .12s;}
+  .backportal:hover{background:#f3f4f6;color:var(--text);}
+
+  button{font-family:inherit;cursor:pointer;border:1px solid var(--border);background:var(--card);
+    color:var(--text);border-radius:8px;padding:8px 13px;font-size:13px;transition:background .12s;}
+  button:hover{background:#f3f4f6;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  button.primary:hover{background:#1d4ed8;}
+  button.ghost{border-color:transparent;background:transparent;color:var(--sub);}
+  button.ghost:hover{background:#f3f4f6;}
+  button.danger{color:var(--red);}
+  button.small{padding:4px 9px;font-size:12px;border-radius:6px;}
+  button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+
+  .editbar{
+    display:none;background:var(--amber-light);border:1px solid #fde68a;border-radius:10px;
+    padding:9px 14px;margin-bottom:16px;font-size:12.5px;color:#92400e;
+  }
+  body.editing .editbar{display:block;}
+  .edit-only{display:none;}
+  body.editing .edit-only{display:inline-flex;}
+  body.editing .edit-only-block{display:block;}
+  .view-only{display:inline-flex;}
+  body.editing .view-only{display:none;}
+
+  /* ---- home ---- */
+  .home-hero{margin-bottom:18px;}
+  .home-hero h2{font-size:22px;margin:0 0 5px;}
+  .home-hero p{margin:0;color:var(--sub);font-size:13.5px;}
+  .manual-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;}
+  .manual-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:20px;cursor:pointer;transition:transform .12s,box-shadow .12s;
+    display:flex;flex-direction:column;gap:9px;position:relative;}
+  .manual-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
+  body.editing .manual-card{cursor:default;}
+  body.editing .manual-card:hover{transform:none;box-shadow:var(--shadow);}
+  .manual-card .icon{width:44px;height:44px;border-radius:10px;background:var(--accent-light);
+    color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;}
+  .manual-card h3{font-size:16px;margin:0;}
+  .manual-card p{margin:0;color:var(--sub);font-size:12.5px;flex:1;}
+  .manual-card .meta{font-size:12px;color:var(--accent);font-weight:600;}
+  .card-tools{display:none;gap:4px;position:absolute;top:10px;right:10px;}
+  body.editing .card-tools{display:flex;}
+  .add-tile{border:1px dashed var(--border);border-radius:var(--radius);background:transparent;
+    color:var(--sub);font-size:13px;padding:24px;display:none;align-items:center;justify-content:center;}
+  body.editing .add-tile{display:flex;}
+  .add-tile:hover{background:var(--card);color:var(--accent);border-color:var(--accent);}
+
+  /* ---- manual detail ---- */
+  .manual-header{margin-bottom:16px;}
+  .manual-header h2{font-size:23px;margin:0 0 4px;}
+  .manual-header p{margin:0;color:var(--sub);font-size:13.5px;}
+  .manual-layout{display:grid;grid-template-columns:230px 1fr;gap:26px;align-items:start;}
+  @media (max-width:900px){.manual-layout{grid-template-columns:1fr;}}
+  .toc{position:sticky;top:18px;background:var(--card);border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;max-height:calc(100vh - 40px);overflow:auto;}
+  .toc h4{font-size:11px;color:var(--sub);margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;}
+  .toc a{display:block;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--text);
+    text-decoration:none;margin-bottom:2px;}
+  .toc a:hover{background:var(--accent-light);color:var(--accent);}
+
+  .section-block{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px 24px;margin-bottom:18px;scroll-margin-top:18px;}
+  .section-head{display:flex;align-items:center;gap:9px;margin-bottom:14px;
+    padding-bottom:11px;border-bottom:1px solid var(--border);}
+  .section-head h3{font-size:17px;margin:0;flex:1;min-width:0;}
+  .drag-handle{cursor:grab;color:var(--sub);padding:2px 6px;font-size:15px;user-select:none;
+    flex-shrink:0;line-height:1;letter-spacing:-1px;border-radius:4px;display:none;}
+  body.editing .drag-handle{display:inline-block;}
+  .drag-handle:hover{background:#f3f4f6;color:var(--accent);}
+  .drag-handle:active{cursor:grabbing;}
+  .section-block.dragging,.step-row.dragging,.img-wrap.dragging{opacity:.4;}
+  .section-block.drop-before{box-shadow:0 -3px 0 0 var(--accent),var(--shadow);}
+  .section-block.drop-after{box-shadow:0 3px 0 0 var(--accent),var(--shadow);}
+  .step-row.drop-before{box-shadow:inset 0 2px 0 0 var(--accent);}
+  .step-row.drop-after{box-shadow:inset 0 -2px 0 0 var(--accent);}
+  .img-wrap.drop-before{box-shadow:0 -3px 0 0 var(--accent);}
+  .img-wrap.drop-after{box-shadow:0 3px 0 0 var(--accent);}
+
+  .block-group{margin-bottom:22px;}
+  .block-group:last-child{margin-bottom:0;}
+  .block-tools{display:none;gap:6px;margin-bottom:8px;padding:6px 8px;background:#f8fafc;
+    border:1px dashed var(--border);border-radius:8px;align-items:center;}
+  body.editing .block-tools{display:flex;}
+  .block-tools .label{font-size:11.5px;color:var(--sub);flex:1;}
+
+  .step-list{list-style:none;margin:0 0 14px;padding:0;counter-reset:none;}
+  .step-row{display:flex;align-items:flex-start;gap:8px;padding:5px 4px;border-radius:6px;
+    font-size:14.5px;transition:box-shadow .1s,opacity .1s;}
+  .step-row:hover{background:#fafbfc;}
+  .step-num{flex-shrink:0;min-width:22px;height:22px;border-radius:6px;background:var(--accent-light);
+    color:var(--accent);font-size:12px;font-weight:700;display:flex;align-items:center;
+    justify-content:center;margin-top:2px;padding:0 5px;}
+  .step-text{flex:1;outline:none;padding:1px 3px;border-radius:4px;min-width:0;word-break:break-word;}
+  body.editing .step-text{border:1px solid transparent;}
+  body.editing .step-text:hover{border-color:var(--border);}
+  .step-text:focus{background:#fff;box-shadow:0 0 0 2px var(--accent-light);}
+  .step-del{display:none;color:var(--sub);border:none;background:transparent;font-size:12px;
+    padding:2px 6px;flex-shrink:0;}
+  body.editing .step-del{display:inline-block;}
+  .step-del:hover{color:var(--red);}
+
+  /* 이미지는 '높이'를 기준으로 맞춘다.
+     가로로 긴 표든 세로로 긴 메뉴든 비슷한 높이가 되어 한눈에 들어오고,
+     작은 이미지는 옆으로 나란히 붙어 세로 공간을 아낀다. */
+  .img-list{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;}
+  .img-wrap{position:relative;transition:box-shadow .1s,opacity .1s;border-radius:8px;
+    max-width:100%;}
+  .step-image{display:block;width:auto;height:auto;max-width:100%;
+    max-height:var(--img-h,420px);
+    border:1px solid var(--border);border-radius:8px;cursor:zoom-in;background:#fff;}
+  .img-size-s{--img-h:230px;}
+  .img-size-m{--img-h:420px;}
+  .img-size-l{--img-h:680px;}
+  .img-size-full{--img-h:none;}
+  .img-size-full .step-image{max-height:none;}
+
+  .size-picker{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);}
+  .size-picker button{padding:3px 9px;font-size:12px;border-radius:6px;}
+  .img-tools{display:none;position:absolute;top:8px;right:8px;gap:4px;background:rgba(255,255,255,.94);
+    border-radius:8px;padding:4px;box-shadow:var(--shadow);}
+  body.editing .img-tools{display:flex;}
+
+  .contact-note{margin-top:10px;font-size:12.5px;color:var(--sub);background:var(--accent-light);
+    border-radius:8px;padding:11px 15px;}
+  .footer-note{color:var(--sub);font-size:12px;text-align:center;margin-top:32px;}
+  .empty-hint{border:1px dashed var(--border);border-radius:var(--radius);padding:26px;
+    text-align:center;color:var(--sub);font-size:13px;}
+
+  /* 오른쪽 아래 스크롤 버튼 — 갈 수 있는 방향만 나타난다 */
+  .scroll-nav{position:fixed;right:22px;bottom:22px;z-index:900;
+    display:flex;flex-direction:column;gap:8px;}
+  .scroll-nav button{
+    width:44px;height:44px;padding:0;border-radius:50%;background:var(--card);
+    border:1px solid var(--border);box-shadow:var(--shadow-lg);
+    font-size:17px;line-height:1;color:var(--sub);
+    display:none;align-items:center;justify-content:center;
+  }
+  .scroll-nav button.show{display:flex;}
+  .scroll-nav button:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
+  @media (max-width:900px){.scroll-nav{right:12px;bottom:12px;}}
+
+  .lightbox{position:fixed;inset:0;background:rgba(15,23,42,.88);display:none;align-items:center;
+    justify-content:center;z-index:1000;padding:26px;cursor:zoom-out;}
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+  input[type=file]{display:none;}
+
+  /* 우리말은 낱말(어절) 사이에서 끊는다. 기본값은 영어 기준이라
+     한 글자만 다음 줄로 뚝 떨어진다. */
+  body, p, td, th, li, label{ word-break:keep-all; overflow-wrap:break-word; }
+  p, .hint, .sub{ text-wrap:pretty; }
+
+  /* ── 톱니 메뉴 ──────────────────────────────────────────
+     가끔 쓰는 것들을 여기 넣는다. 챗 화면의 톱니와 같은 자리·같은 모양이라
+     화면마다 다시 익힐 것이 없다. */
+  .gearwrap{position:relative}
+  .gear{width:36px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;
+    color:var(--sub);border-radius:9px}
+  .gear:hover{color:var(--text)}
+  .gearmenu{display:none;position:absolute;right:0;top:calc(100% + 7px);z-index:950;
+    min-width:210px;background:var(--card);border:1px solid var(--border);
+    border-radius:11px;box-shadow:var(--shadow-lg);padding:7px}
+  .gearmenu.open{display:block}
+  .gearmenu .mlabel{font-size:11px;color:var(--sub);padding:5px 9px 3px;font-weight:650}
+  .gearmenu .size-picker{display:flex;gap:5px;padding:0 9px 7px}
+  .gearmenu .size-picker button{flex:1;padding:5px 0;font-size:12px;border-radius:7px}
+  .gearmenu .msep{height:1px;background:var(--border);margin:5px 0}
+  .gearmenu .mitem{display:block;width:100%;text-align:left;border:0;background:none;
+    padding:9px 10px;border-radius:8px;font-size:13px;color:var(--text);
+    text-decoration:none;cursor:pointer;font-family:inherit}
+  .gearmenu .mitem:hover{background:var(--accent-light)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand" id="homeBtn">
+      <div class="brand-badge">IT</div>
+      <div>
+        <h1 id="siteTitle">누리코스메틱 IT 매뉴얼 포털</h1>
+        <p id="siteSubtitle">업무 시스템 사용법을 한 곳에서 확인하세요</p>
+      </div>
+    </div>
+    <!-- 버튼을 늘어놓지 않는다.
+         늘 쓰는 것(나가기·목록으로)만 밖에 두고, 가끔 쓰는 것(이미지 크기·
+         편집·가져오기)은 톱니 안으로 넣는다. 버튼이 여섯 개 늘어서 있으면
+         정작 필요한 것을 고르는 데 시간이 걸린다. -->
+    <div class="top-actions">
+      <a class="backportal" href="/">← 포탈로</a>
+      <button id="backBtn" style="display:none;">← 목록으로</button>
+      <button class="primary edit-only" id="saveBtn">저장 (manuals.js 받기)</button>
+      <div class="gearwrap">
+        <button class="gear" id="gear" title="설정" aria-label="설정">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.4.55.71.66H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <div class="gearmenu" id="gearmenu">
+          <div class="mlabel">이미지 크기</div>
+          <div class="size-picker" id="sizePicker">
+            <button data-size="s">작게</button>
+            <button data-size="m">보통</button>
+            <button data-size="l">크게</button>
+          </div>
+          <div class="msep"></div>
+          <button class="mitem" id="editToggle">편집 모드</button>
+          <!-- PPT 로 가져오기는 담당자에게만 보인다. 화면이 뜰 때
+               가져오기 앱에 한 번 물어보고, 통과하면 그때 넣는다. -->
+          <a class="mitem" id="importLink" href="/manual-import/"
+             style="display:none">PPT 로 가져오기</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="editbar">
+    <b>편집 모드</b> — 글자를 직접 클릭해서 고치고, <b>⠿</b>를 끌어 순서를 바꾸세요.
+    다 하면 <b>저장</b>을 눌러 받은 <code>manuals.js</code>를 서버의 <code>data/</code> 폴더에 덮어쓰면 반영됩니다.
+    (저장 전까지는 이 화면에만 반영된 상태예요.)
+  </div>
+
+  <div id="homeView" class="panel active"></div>
+  <div id="manualView" class="panel"></div>
+
+  <div class="footer-note">누리코스메틱 IT 매뉴얼 포털 · 사내 참고용</div>
+</div>
+
+<div class="scroll-nav" id="scrollNav">
+  <button id="toTopBtn" title="맨 위로">▲</button>
+  <button id="toBottomBtn" title="맨 아래로">▼</button>
+</div>
+
+<div class="lightbox" id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+
+<script src="data/manuals.js"></script>
+<script>
+/* ============ 상태 ============ */
+const DATA = (window.MANUAL_DATA && JSON.parse(JSON.stringify(window.MANUAL_DATA)))
+             || {site:{title:'IT 매뉴얼 포털',subtitle:''}, manuals:[]};
+let EDITING = false;
+let drag = null;   // {kind, ...위치정보}
+
+/* ============ 유틸 ============ */
+function esc(s){
+  return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function linkify(s){
+  return esc(s).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+/* 이미지 항목은 "경로" 또는 {src, size} 두 형태를 모두 허용한다.
+   (기존 파일과 호환되도록) size: s | m | l | full, 없으면 사이트 기본값 사용 */
+function imgEntry(e){
+  return (typeof e === 'string') ? {src:e, size:null} : {src:e.src||'', size:e.size||null};
+}
+function imgSrc(ref){
+  return (ref||'').startsWith('data:') ? ref : 'images/' + ref;
+}
+const SIZE_LABEL={s:'작게', m:'보통', l:'크게', full:'원본'};
+const SIZE_ORDER=['s','m','l','full'];
+function siteSize(){ return DATA.site?.imageSize || 'm'; }
+function clearDrop(){
+  document.querySelectorAll('.drop-before,.drop-after')
+    .forEach(el=>el.classList.remove('drop-before','drop-after'));
+}
+/* arr[from]을 toIdx(제거 전 기준) 위치로 옮긴다 */
+function reorder(arr, from, to){
+  if(from===to || from+1===to) return;
+  const [m]=arr.splice(from,1);
+  arr.splice(from<to?to-1:to, 0, m);
+}
+function findManual(id){ return DATA.manuals.find(m=>m.id===id); }
+function slugify(s){
+  const base=(s||'').trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g,'-').replace(/^-|-$/g,'');
+  return base || ('manual-'+(DATA.manuals.length+1));
+}
+
+/* 드래그 가능한 요소에 공통 배선 */
+function wireDrag(el, handle, kind, getIndex, onDrop, matches){
+  handle.addEventListener('mousedown', ()=>{ el.draggable = true; });
+  handle.addEventListener('mouseup', ()=>{ el.draggable = false; });
+  el.addEventListener('dragstart', e=>{
+    e.stopPropagation();
+    drag = Object.assign({kind, index:getIndex()}, matches());
+    e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('text/plain', kind);
+    requestAnimationFrame(()=>el.classList.add('dragging'));
+  });
+  el.addEventListener('dragend', ()=>{
+    el.classList.remove('dragging'); el.draggable=false; clearDrop(); drag=null;
+  });
+  el.addEventListener('dragover', e=>{
+    if(!drag || drag.kind!==kind) return;
+    const ctx = matches();
+    for(const k in ctx){ if(drag[k]!==ctx[k]) return; }
+    e.preventDefault(); e.stopPropagation();
+    e.dataTransfer.dropEffect='move';
+    const r=el.getBoundingClientRect();
+    clearDrop();
+    el.classList.add((e.clientY-r.top) < r.height/2 ? 'drop-before':'drop-after');
+  });
+  el.addEventListener('dragleave', ()=>el.classList.remove('drop-before','drop-after'));
+  el.addEventListener('drop', e=>{
+    if(!drag || drag.kind!==kind) return;
+    const ctx = matches();
+    for(const k in ctx){ if(drag[k]!==ctx[k]) return; }
+    e.preventDefault(); e.stopPropagation();
+    const r=el.getBoundingClientRect();
+    const before=(e.clientY-r.top) < r.height/2;
+    onDrop(drag.index, getIndex() + (before?0:1));
+    drag=null; render();
+  });
+}
+
+function editableText(el, get, set){
+  el.contentEditable = EDITING ? 'true' : 'false';
+  el.spellcheck = false;
+  el.addEventListener('blur', ()=>{
+    const v = el.textContent.trim();
+    set(v || get());
+    if(!v) el.textContent = get();
+  });
+  el.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
+  });
+}
+
+/* ============ 홈 ============ */
+function renderHome(){
+  const view=document.getElementById('homeView');
+  view.innerHTML='';
+
+  const hero=document.createElement('div');
+  hero.className='home-hero';
+  hero.innerHTML='<h2>매뉴얼 목록</h2><p>확인하고 싶은 시스템을 클릭하면 단계별 화면과 함께 사용법을 볼 수 있어요.</p>';
+  view.appendChild(hero);
+
+  if(!DATA.manuals.length && !EDITING){
+    const e=document.createElement('div');
+    e.className='empty-hint'; e.textContent='아직 등록된 매뉴얼이 없습니다.';
+    view.appendChild(e); return;
+  }
+
+  const grid=document.createElement('div');
+  grid.className='manual-grid';
+
+  DATA.manuals.forEach((m,i)=>{
+    const card=document.createElement('div');
+    card.className='manual-card';
+    card.innerHTML=`
+      <div class="card-tools">
+        <span class="drag-handle" title="끌어서 순서 변경">⠿</span>
+        <button class="small ghost danger" title="매뉴얼 삭제">삭제</button>
+      </div>
+      <div class="icon"></div>
+      <h3></h3><p></p>
+      <div class="meta">${m.sections.length}개 항목 보기 →</div>`;
+
+    const icon=card.querySelector('.icon');
+    const h3=card.querySelector('h3');
+    const p=card.querySelector('p');
+    icon.textContent=m.icon || (m.title||'?').slice(0,1);
+    h3.textContent=m.title||'(제목 없음)';
+    p.textContent=m.subtitle||'';
+
+    if(EDITING){
+      editableText(icon, ()=>m.icon||'?', v=>{ m.icon=v.slice(0,2); });
+      editableText(h3, ()=>m.title||'(제목 없음)', v=>{ m.title=v; });
+      editableText(p, ()=>m.subtitle||'', v=>{ m.subtitle=v; });
+      card.querySelector('.danger').onclick=ev=>{
+        ev.stopPropagation();
+        if(confirm(`"${m.title}" 매뉴얼을 삭제할까요?\n(이미지 파일은 폴더에 그대로 남습니다)`)){
+          DATA.manuals.splice(i,1); render();
+        }
+      };
+      wireDrag(card, card.querySelector('.drag-handle'), 'manual',
+        ()=>i, (from,to)=>reorder(DATA.manuals,from,to), ()=>({}));
+    } else {
+      card.onclick=()=>{ location.hash='manual/'+m.id; };
+    }
+    grid.appendChild(card);
+  });
+
+  const add=document.createElement('button');
+  add.className='add-tile';
+  add.textContent='+ 새 매뉴얼 추가';
+  add.onclick=()=>{
+    const t=prompt('새 매뉴얼 이름을 입력하세요 (예: 그룹웨어 사용 매뉴얼)');
+    if(!t) return;
+    let id=slugify(t), n=2;
+    while(DATA.manuals.some(m=>m.id===id)){ id=slugify(t)+'-'+(n++); }
+    DATA.manuals.push({id, icon:t.slice(0,1), title:t, subtitle:'', contactNote:'', sections:[]});
+    render();
+  };
+  grid.appendChild(add);
+  view.appendChild(grid);
+}
+
+/* ============ 매뉴얼 상세 ============ */
+function renderManual(id){
+  const view=document.getElementById('manualView');
+  view.innerHTML='';
+  const m=findManual(id);
+  if(!m){
+    view.innerHTML='<div class="empty-hint">매뉴얼을 찾을 수 없습니다.</div>';
+    return;
+  }
+
+  const head=document.createElement('div');
+  head.className='manual-header';
+  head.innerHTML='<h2></h2><p></p>';
+  head.querySelector('h2').textContent=m.title||'';
+  head.querySelector('p').textContent=m.subtitle||'';
+  if(EDITING){
+    editableText(head.querySelector('h2'), ()=>m.title||'', v=>{m.title=v;});
+    editableText(head.querySelector('p'), ()=>m.subtitle||'', v=>{m.subtitle=v;});
+  }
+  view.appendChild(head);
+
+  const layout=document.createElement('div');
+  layout.className='manual-layout';
+
+  const toc=document.createElement('nav');
+  toc.className='toc';
+  toc.innerHTML='<h4>목차</h4>'+m.sections.map((s,i)=>
+    `<a href="#manual/${esc(m.id)}/${i}">${esc(s.title)}</a>`).join('');
+  layout.appendChild(toc);
+
+  const content=document.createElement('div');
+  m.sections.forEach((sec,si)=>content.appendChild(buildSection(m,sec,si)));
+
+  const addSec=document.createElement('button');
+  addSec.className='add-tile edit-only-block';
+  addSec.style.width='100%';
+  addSec.textContent='+ 새 항목(Menu) 추가';
+  addSec.onclick=()=>{
+    const t=prompt('새 항목 이름 (예: Menu 9. 비밀번호 초기화)');
+    if(!t) return;
+    m.sections.push({title:t, blocks:[{steps:[], images:[]}]});
+    render();
+  };
+  content.appendChild(addSec);
+
+  if(m.contactNote || EDITING){
+    const note=document.createElement('div');
+    note.className='contact-note';
+    note.textContent='💬 '+(m.contactNote||'문의 안내를 입력하세요');
+    if(EDITING){
+      editableText(note, ()=>'💬 '+(m.contactNote||''),
+        v=>{ m.contactNote=v.replace(/^💬\s*/,''); });
+    }
+    content.appendChild(note);
+  }
+
+  layout.appendChild(content);
+  view.appendChild(layout);
+}
+
+function buildSection(m, sec, si){
+  const box=document.createElement('div');
+  box.className='section-block';
+  box.id=`manual-${m.id}-${si}`;
+
+  const head=document.createElement('div');
+  head.className='section-head';
+  head.innerHTML='<span class="drag-handle" title="끌어서 순서 변경">⠿</span><h3></h3>';
+  const h3=head.querySelector('h3');
+  h3.textContent=sec.title||'';
+  if(EDITING){
+    editableText(h3, ()=>sec.title||'', v=>{sec.title=v;});
+    const del=document.createElement('button');
+    del.className='small ghost danger edit-only';
+    del.textContent='항목 삭제';
+    del.onclick=()=>{
+      if(confirm(`"${sec.title}" 항목을 삭제할까요?`)){ m.sections.splice(si,1); render(); }
+    };
+    head.appendChild(del);
+    wireDrag(box, head.querySelector('.drag-handle'), 'section',
+      ()=>si, (from,to)=>reorder(m.sections,from,to), ()=>({manualId:m.id}));
+  }
+  box.appendChild(head);
+
+  // 항목 안의 단계묶음들: 번호는 항목 전체에서 연속으로 매긴다
+  let counter=1;
+  sec.blocks.forEach((block,bi)=>{
+    const group=document.createElement('div');
+    group.className='block-group';
+
+    if(EDITING){
+      const tools=document.createElement('div');
+      tools.className='block-tools';
+      tools.innerHTML=`<span class="label">단계묶음 ${bi+1}</span>`;
+      const addStep=document.createElement('button');
+      addStep.className='small'; addStep.textContent='+ 설명 줄';
+      addStep.onclick=()=>{ block.steps.push('새 설명을 입력하세요'); render(); };
+      const addImg=document.createElement('button');
+      addImg.className='small'; addImg.textContent='+ 이미지';
+      addImg.onclick=()=>pickImage(block);
+      const delBlock=document.createElement('button');
+      delBlock.className='small ghost danger'; delBlock.textContent='묶음 삭제';
+      delBlock.onclick=()=>{
+        if(confirm('이 단계묶음을 삭제할까요?')){
+          sec.blocks.splice(bi,1);
+          if(!sec.blocks.length) sec.blocks.push({steps:[],images:[]});
+          render();
+        }
+      };
+      tools.append(addStep, addImg, delBlock);
+      group.appendChild(tools);
+    }
+
+    if(block.steps.length){
+      const ol=document.createElement('ul');
+      ol.className='step-list';
+      block.steps.forEach((step,ti)=>{
+        const num=counter++;
+        ol.appendChild(buildStep(m, sec, si, block, bi, step, ti, num));
+      });
+      group.appendChild(ol);
+    }
+
+    if(block.images.length){
+      const list=document.createElement('div');
+      list.className='img-list';
+      block.images.forEach((ref,ii)=>{
+        list.appendChild(buildImage(m, si, block, bi, ref, ii));
+      });
+      group.appendChild(list);
+    }
+
+    box.appendChild(group);
+  });
+
+  if(EDITING){
+    const addBlock=document.createElement('button');
+    addBlock.className='small';
+    addBlock.style.marginTop='10px';
+    addBlock.textContent='+ 단계묶음 추가';
+    addBlock.onclick=()=>{ sec.blocks.push({steps:[],images:[]}); render(); };
+    box.appendChild(addBlock);
+  }
+  return box;
+}
+
+function buildStep(m, sec, si, block, bi, step, ti, num){
+  const row=document.createElement('li');
+  row.className='step-row';
+
+  const handle=document.createElement('span');
+  handle.className='drag-handle'; handle.title='끌어서 순서 변경'; handle.textContent='⠿';
+
+  const n=document.createElement('span');
+  n.className='step-num'; n.textContent=num;
+
+  const txt=document.createElement('div');
+  txt.className='step-text';
+  if(EDITING){
+    txt.textContent=step;
+    editableText(txt, ()=>block.steps[ti], v=>{ block.steps[ti]=v; });
+  } else {
+    txt.innerHTML=linkify(step);
+  }
+
+  const del=document.createElement('button');
+  del.className='step-del'; del.textContent='삭제';
+  del.onclick=()=>{ block.steps.splice(ti,1); render(); };
+
+  row.append(handle,n,txt,del);
+  if(EDITING){
+    wireDrag(row, handle, 'step', ()=>ti,
+      (from,to)=>reorder(block.steps,from,to),
+      ()=>({manualId:m.id, si, bi}));
+  }
+  return row;
+}
+
+function buildImage(m, si, block, bi, entry, ii){
+  const {src, size} = imgEntry(entry);
+  const eff = size || siteSize();
+
+  const wrap=document.createElement('div');
+  wrap.className='img-wrap img-size-'+eff;
+
+  const img=document.createElement('img');
+  img.className='step-image';
+  img.src=imgSrc(src);
+  img.loading='lazy';
+  img.alt='설명 이미지';
+  img.onerror=()=>{
+    wrap.innerHTML=`<div class="empty-hint">이미지를 찾을 수 없습니다: ${esc(src)}</div>`;
+  };
+  // 원본보다 1.3배 넘게 확대하면 흐려지므로 폭 상한을 건다.
+  // 인라인 스타일이 CSS를 덮으므로 min()으로 '칸 밖으로 안 넘침'도 같이 건다.
+  img.onload=()=>{
+    if(img.naturalWidth){
+      img.style.maxWidth = `min(100%, ${Math.round(img.naturalWidth*1.3)}px)`;
+    }
+    updateScrollNav();   // 이미지가 늦게 뜨면 페이지 길이가 달라진다
+  };
+  if(!EDITING) img.onclick=()=>openLightbox(img.src);
+  wrap.appendChild(img);
+
+  if(EDITING){
+    const tools=document.createElement('div');
+    tools.className='img-tools';
+    const handle=document.createElement('span');
+    handle.className='drag-handle'; handle.title='끌어서 순서 변경'; handle.textContent='⠿';
+    handle.style.display='inline-block';
+
+    const sz=document.createElement('button');
+    sz.className='small';
+    sz.textContent = size ? SIZE_LABEL[eff] : '기본';
+    sz.title='이 이미지만 크기 바꾸기 (기본 → 작게 → 보통 → 크게 → 원본)';
+    sz.onclick=()=>{
+      const cur = size===null ? -1 : SIZE_ORDER.indexOf(eff);
+      const next = cur+1 >= SIZE_ORDER.length ? null : SIZE_ORDER[cur+1];
+      block.images[ii] = next===null ? src : {src, size:next};
+      render();
+    };
+
+    const del=document.createElement('button');
+    del.className='small ghost danger'; del.textContent='삭제';
+    del.onclick=()=>{ block.images.splice(ii,1); render(); };
+
+    tools.append(handle,sz,del);
+    wrap.appendChild(tools);
+    wireDrag(wrap, handle, 'image', ()=>ii,
+      (from,to)=>reorder(block.images,from,to),
+      ()=>({manualId:m.id, si, bi}));
+  }
+  return wrap;
+}
+
+/* 이미지 추가: 폴더 경로 입력 또는 파일 선택(파일에 직접 담김) */
+function pickImage(block){
+  const how=confirm('이미지를 어떻게 넣을까요?\n\n[확인] 내 PC에서 파일 선택 (manuals.js 안에 담깁니다)\n[취소] images 폴더의 파일명 직접 입력 (권장)');
+  if(!how){
+    const p=prompt('images 폴더 기준 경로를 입력하세요\n예) worksai/02_1.jpg');
+    if(p) { block.images.push(p.trim()); render(); }
+    return;
+  }
+  const input=document.getElementById('imgInput');
+  input.onchange=()=>{
+    const f=input.files[0];
+    if(!f){ return; }
+    if(f.size > 1024*1024){
+      if(!confirm(`이 이미지는 ${Math.round(f.size/1024)}KB 입니다.\nmanuals.js 파일이 그만큼 커집니다. 계속할까요?\n(images 폴더에 넣고 경로로 참조하는 쪽을 권장합니다)`)){
+        input.value=''; return;
+      }
+    }
+    const r=new FileReader();
+    r.onload=()=>{ block.images.push(r.result); input.value=''; render(); };
+    r.readAsDataURL(f);
+  };
+  input.click();
+}
+
+/* ============ 라이트박스 ============ */
+function openLightbox(src){
+  document.getElementById('lightboxImg').src=src;
+  document.getElementById('lightbox').classList.add('open');
+}
+document.getElementById('lightbox').addEventListener('click',()=>{
+  document.getElementById('lightbox').classList.remove('open');
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') document.getElementById('lightbox').classList.remove('open');
+});
+
+/* ============ 저장 ============ */
+function saveFile(){
+  const js='// 누리코스메틱 IT 매뉴얼 포털 - 내용 파일\n'
+    +'// 포털의 "편집 모드"에서 수정 후 저장하면 이 파일이 새로 만들어집니다.\n'
+    +'// 직접 편집해도 됩니다. (이미지 경로는 images/ 폴더 기준)\n'
+    +'window.MANUAL_DATA = '+JSON.stringify(DATA,null,2)+';\n';
+  const blob=new Blob([js],{type:'text/javascript;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='manuals.js';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ============ 라우팅 ============ */
+function render(){
+  const hash=location.hash.replace(/^#/,'');
+  const [view,id,secIdx]=hash.split('/');
+  const homeView=document.getElementById('homeView');
+  const manualView=document.getElementById('manualView');
+  const backBtn=document.getElementById('backBtn');
+
+  document.getElementById('siteTitle').textContent=DATA.site?.title||'IT 매뉴얼 포털';
+  document.getElementById('siteSubtitle').textContent=DATA.site?.subtitle||'';
+  applySizePicker();
+  requestAnimationFrame(updateScrollNav);
+
+  if(view==='manual' && id){
+    renderManual(id);
+    homeView.classList.remove('active');
+    manualView.classList.add('active');
+    backBtn.style.display='';
+    if(secIdx!==undefined){
+      requestAnimationFrame(()=>{
+        const el=document.getElementById(`manual-${id}-${secIdx}`);
+        if(el) el.scrollIntoView({block:'start'});
+      });
+    }
+  } else {
+    renderHome();
+    manualView.classList.remove('active');
+    homeView.classList.add('active');
+    backBtn.style.display='none';
+  }
+}
+
+/* 이미지 크기: 보는 사람이 바로 바꿀 수 있고, 편집 모드에서 저장하면 기본값이 된다.
+   저장하지 않아도 각자 브라우저에는 선택이 기억된다. */
+function applySizePicker(){
+  const cur=siteSize();
+  document.querySelectorAll('#sizePicker button')
+    .forEach(b=>b.classList.toggle('on', b.dataset.size===cur));
+}
+document.getElementById('sizePicker').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-size]');
+  if(!b) return;
+  DATA.site=DATA.site||{};
+  DATA.site.imageSize=b.dataset.size;
+  try{ localStorage.setItem('manualImageSize', b.dataset.size); }catch(_){}
+  render();
+});
+try{
+  const saved=localStorage.getItem('manualImageSize');
+  if(saved){ DATA.site=DATA.site||{}; DATA.site.imageSize=saved; }
+}catch(_){}
+
+/* 오른쪽 아래 위/아래 이동 버튼.
+   갈 수 있는 방향만 보여줘서 짧은 페이지에선 아예 나타나지 않는다. */
+const toTopBtn=document.getElementById('toTopBtn');
+const toBottomBtn=document.getElementById('toBottomBtn');
+toTopBtn.onclick=()=>window.scrollTo({top:0, behavior:'smooth'});
+
+/* 아래로 갈 때는 한 번에 안 끝난다.
+   내려가는 동안 지연 로딩 이미지가 떠서 페이지가 계속 길어지기 때문에,
+   '실제로 바닥에 닿고 + 길이도 더 안 늘어날' 때까지 계속 따라간다. */
+let chaseTimer=null;
+toBottomBtn.onclick=()=>{
+  clearInterval(chaseTimer);
+  let lastH=-1, stable=0, elapsed=0;
+  chaseTimer=setInterval(()=>{
+    const h=document.documentElement.scrollHeight;
+    const max=h-window.innerHeight;
+    const atBottom=(max-window.scrollY) < 4;
+
+    if(h===lastH && atBottom){
+      if(++stable >= 2){ clearInterval(chaseTimer); updateScrollNav(); return; }
+    } else {
+      stable=0;
+    }
+    lastH=h;
+    window.scrollTo({top:h, behavior:'smooth'});
+
+    if((elapsed+=250) > 8000){ clearInterval(chaseTimer); updateScrollNav(); }
+  }, 250);
+};
+// 사용자가 직접 스크롤하면 따라가기 중단
+window.addEventListener('wheel', ()=>clearInterval(chaseTimer), {passive:true});
+window.addEventListener('touchstart', ()=>clearInterval(chaseTimer), {passive:true});
+
+function updateScrollNav(){
+  const y=window.scrollY;
+  const max=document.documentElement.scrollHeight - window.innerHeight;
+  const scrollable = max > 300;          // 스크롤할 게 별로 없으면 숨김
+  toTopBtn.classList.toggle('show', scrollable && y > 250);
+  toBottomBtn.classList.toggle('show', scrollable && y < max - 250);
+}
+window.addEventListener('scroll', updateScrollNav, {passive:true});
+window.addEventListener('resize', updateScrollNav);
+
+document.getElementById('homeBtn').onclick=()=>{ location.hash=''; };
+document.getElementById('backBtn').onclick=()=>{ location.hash=''; };
+document.getElementById('saveBtn').onclick=saveFile;
+/* ── 톱니 메뉴 ───────────────────────────────────────────────
+   버튼을 헤더에 늘어놓지 않고 여기 담는다. 바깥을 누르거나 Esc 로 닫힌다. */
+const gear=document.getElementById('gear');
+const gearmenu=document.getElementById('gearmenu');
+gear.onclick=e=>{ e.stopPropagation(); gearmenu.classList.toggle('open'); };
+gearmenu.onclick=e=>{ e.stopPropagation(); };
+document.addEventListener('click',()=>gearmenu.classList.remove('open'));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') gearmenu.classList.remove('open'); });
+
+/* ── PPT 로 가져오기는 담당자에게만 ─────────────────────────
+   이 화면은 정적 파일이라 누가 보고 있는지 스스로 알지 못한다. 그래서
+   가져오기 앱에 한 번 물어본다. 담당자가 아니면 그 앱이 403 을 주고,
+   그러면 메뉴에 아예 넣지 않는다.
+
+   이건 화면을 정리하는 장치이지 자물쇠가 아니다. 진짜 막는 것은
+   가져오기 앱 쪽이다 (require_admin). 버튼을 감췄다고 안전해지지 않는다. */
+fetch('/manual-import/api/me',{cache:'no-store'})
+  .then(r=>r.ok?r.json():null)
+  .then(j=>{ if(j&&j.user&&j.user.role==='admin')
+               document.getElementById('importLink').style.display='block'; })
+  .catch(()=>{});   // 가져오기 앱이 안 떠 있으면 그냥 없는 대로 둔다
+
+document.getElementById('editToggle').onclick=function(){
+  EDITING=!EDITING;
+  document.body.classList.toggle('editing',EDITING);
+  this.classList.toggle('on',EDITING);
+  this.textContent=EDITING?'편집 끝내기':'편집 모드';
+  gearmenu.classList.remove('open');
+  render();
+};
+window.addEventListener('hashchange',render);
+
+const fi=document.createElement('input');
+fi.type='file'; fi.id='imgInput'; fi.accept='image/*';
+document.body.appendChild(fi);
+
+if(!window.MANUAL_DATA){
+  document.getElementById('homeView').innerHTML=
+    '<div class="empty-hint">내용 파일(data/manuals.js)을 불러오지 못했습니다.<br>'
+    +'index.html과 같은 위치에 <code>data</code> 폴더가 있는지 확인해 주세요.</div>';
+} else {
+  render();
+}
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

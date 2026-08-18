@@ -1,0 +1,2024 @@
+:root {
+  color-scheme: light;
+  /* 챗 포털(static/chat.html)과 같은 글꼴·색을 쓴다.
+     직원 입장에서는 같은 포털 안에서 화면만 바뀌는 것이므로,
+     글꼴과 색이 달라지면 다른 사이트로 넘어온 것처럼 느껴진다. */
+  font-family: "Pretendard", "맑은 고딕", "Malgun Gothic",
+               -apple-system, system-ui, sans-serif;
+  font-size: 14px;               /* 기본 16px 은 업무 화면에 크다 */
+  --border: #e8e8ea;
+  --panel: #ffffff;
+  --ink: #1f2023;
+  --muted: #6b6d76;
+  --muted-2: #9b9da6;
+  --accent: #1f4e79;             /* 챗 포털의 남색 */
+  --accent-strong: #17395a;
+  --accent-weak: #eaf1f8;
+  --bg: #ffffff;
+  --side: #f7f7f8;               /* 사이드바 바탕 */
+  --shadow: 0 1px 2px rgba(16, 17, 20, .05), 0 6px 20px rgba(16, 17, 20, .05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: block;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+body.app-mode {
+  display: grid;
+  grid-template-columns: 244px 1fr;
+  /* stretch 로 두면 사이드바가 본문 길이만큼 늘어난다.
+     그러면 맨 아래 "포털로 돌아가기" 가 페이지 맨 밑으로 밀려나서,
+     목록이 긴 화면(직원별 현황·자산 등록)에서는 보이지 않는다.
+     start 로 두고 사이드바 자체를 화면 높이에 고정한다. */
+  align-items: start;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  border-radius: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: white;
+  color: var(--accent);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+
+.danger {
+  border-color: #b13b3b;
+  background: #b13b3b;
+  color: white;
+}
+
+.danger:hover:not(:disabled) {
+  background: #8f2f2f;
+}
+
+input,
+select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 38px;
+  padding: 0 10px;
+  background: white;
+  min-width: 0;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid rgba(18, 107, 92, 0.18);
+  border-color: var(--accent);
+}
+
+.mono {
+  font-family: "Consolas", "D2Coding", monospace;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------ 사이드바 */
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--side);
+  padding: 18px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* 화면 높이에 고정하고, 메뉴가 많아지면 가운데만 스크롤한다.
+     그래야 아래 사용자 칸이 어느 화면에서든 같은 자리에 있다. */
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 2px;
+  flex: 0 0 auto;
+}
+
+/* 좁은 화면에서만 나오는 메뉴 여닫기 단추.
+   넓은 화면에서는 메뉴가 늘 보이므로 이 단추가 있을 이유가 없다. */
+.nav-toggle {
+  display: none;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 17px;
+  height: 2px;
+  margin: 3px auto;
+  border-radius: 2px;
+  background: var(--muted);
+  transition: 0.16s;
+}
+
+/* 열리면 위아래 줄이 모여 ×가 된다. 「지금 열려 있다」를
+   글자 없이 알리는 가장 짧은 방법이다. */
+body.nav-open .nav-toggle span:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+body.nav-open .nav-toggle span:nth-child(2) { opacity: 0; }
+body.nav-open .nav-toggle span:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+
+.brand strong {
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.2px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.brand small {
+  display: block;
+  color: var(--muted-2);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+nav {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  /* 가운데만 늘어나고 넘치면 여기서만 스크롤한다 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.nav-item {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: 0.13s;
+}
+
+.nav-item:hover {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.nav-item.active {
+  background: var(--accent-weak);
+  color: var(--accent);
+  font-weight: 650;
+}
+
+/* 아래 사용자 칸 — 챗 포털의 좌측 하단과 같은 모양 */
+.login-box {
+  display: grid;
+  gap: 7px;
+  margin: 0 -12px;
+  padding: 11px 14px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--side);
+  flex: 0 0 auto;
+}
+
+.login-box strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-2);
+  letter-spacing: 0.01em;
+}
+
+.login-box button {
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+}
+
+/* ------------------------------------------------------------ 로그인 */
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(18, 107, 92, 0.10), transparent 38%),
+    var(--bg);
+}
+
+.login-card {
+  width: min(100%, 360px);
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  display: grid;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+
+.login-card h1 {
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.login-status {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ 레이아웃 */
+
+.main {
+  min-width: 0;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 8px 0;
+  min-height: 42px;
+  background: var(--bg);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
+
+.admin-hint {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e2c36b;
+  border-radius: 8px;
+  background: #fff8df;
+  color: #6d5400;
+  font-size: 13px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar input {
+  flex: 1 1 260px;
+  max-width: 380px;
+}
+
+.toolbar select {
+  flex: 0 0 auto;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.metric,
+.table-wrap,
+.form-grid {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(30, 38, 51, 0.03);
+}
+
+.metric {
+  padding: 18px;
+}
+
+.metric span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 30px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.form-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ------------------------------------------------------------ 직원별 현황: 접이식 한 줄 */
+
+.rowlist {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+/* 한 줄 요약 행과 헤더가 같은 grid를 쓰므로 컬럼이 정확히 맞아떨어진다. */
+.rowlist-head,
+.row {
+  display: grid;
+  grid-template-columns: 40px 88px minmax(96px, 0.7fr) minmax(150px, 1fr) minmax(130px, 1fr) 92px 130px 108px 64px;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 14px;
+}
+
+.rowlist-head {
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.row-group + .row-group {
+  border-top: 1px solid var(--border);
+}
+
+.row {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.row:hover {
+  background: #f8fbfa;
+}
+
+.row.selected,
+.row-group.open > .row {
+  background: var(--accent-weak);
+}
+
+.row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caret {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cell-empno {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.status {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #eef1f4;
+  text-align: center;
+}
+
+.status.ACTIVE,
+.status.IN_USE {
+  color: #126b5c;
+  background: var(--accent-weak);
+}
+
+.status.INACTIVE,
+.status.DISPOSED {
+  color: #8a3f2a;
+  background: #fae9df;
+}
+
+.status.STORAGE {
+  color: #3f5a8a;
+  background: #e6edf8;
+}
+
+.status.REPAIR {
+  color: #8a6d2a;
+  background: #f8f0dc;
+}
+
+/* 펼친 영역: 여기서 지급 · 회수 · IP · SW를 모두 처리한다 */
+
+.panel-body {
+  padding: 12px 14px 14px 42px;
+  border-top: 1px solid var(--border);
+  background: #fbfcfd;
+  display: grid;
+  gap: 10px;
+}
+
+.asset-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.asset-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.asset-head .muted {
+  font-size: 13px;
+}
+
+.tag {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  background: #f4f6f9;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.asset-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.asset-line label {
+  width: 34px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.asset-line .value {
+  min-width: 110px;
+  font-size: 14px;
+}
+
+.asset-line select {
+  min-height: 32px;
+  max-width: 240px;
+  font-size: 13px;
+}
+
+.asset-line button,
+.asset-head button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 200px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: white;
+  padding: 3px 4px 3px 10px;
+  font-size: 13px;
+}
+
+.chip-x {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  min-height: 20px;
+  width: 20px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.chip-x:hover:not(:disabled) {
+  background: #fae9df;
+  color: #8a3f2a;
+}
+
+.panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.give {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.give select {
+  min-width: 260px;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.give button,
+.panel-foot > button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.empty {
+  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.pagination {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 12px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  background: linear-gradient(to top, var(--bg) 62%, rgba(243, 245, 247, 0));
+}
+
+.pagination button {
+  min-height: 32px;
+}
+
+/* ------------------------------------------------------------ 표 */
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+th {
+  color: var(--muted);
+  font-size: 12px;
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+}
+
+tbody tr:hover {
+  background: #f8fbfa;
+}
+
+/* 정렬 바는 표 머리글을 누를 수 있는 넓은 화면에서는 필요 없다 */
+.sort-bar {
+  display: none;
+}
+
+/* 정렬 가능한 머리글 */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  color: var(--ink);
+}
+
+th.sorted {
+  color: var(--accent);
+}
+
+.sort-ind {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+tr.editing {
+  background: var(--accent-weak);
+}
+
+tr.editing input,
+tr.editing select {
+  min-height: 32px;
+  max-width: 150px;
+  font-size: 13px;
+}
+
+td.actions {
+  display: flex;
+  gap: 6px;
+}
+
+td.actions button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+/* IP·소프트웨어 화면. 2단으로 두면 작업 버튼이 있는 표가 잘려서 세로로 쌓는다. */
+.split {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.split.active {
+  display: grid;
+}
+
+/* ------------------------------------------------------------ 관리형 표: 펼침 + 수정 + 삭제 */
+
+.managed .caret-col {
+  width: 28px;
+  padding-right: 0;
+}
+
+.managed .managed-row {
+  cursor: pointer;
+}
+
+.caret {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.managed-row.open {
+  background: var(--accent-weak);
+}
+
+.detail-row td {
+  white-space: normal;
+  background: #fbfdfc;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.detail dt {
+  color: var(--muted);
+}
+
+.detail dd {
+  margin: 0;
+}
+
+.detail-list {
+  margin: 0;
+  padding-left: 16px;
+}
+
+td.empty {
+  text-align: center;
+  padding: 22px;
+}
+
+/* ------------------------------------------------------------ 자산 편집 폼 (자산 등록 · 직원별 현황 공용) */
+
+.asset-edit {
+  padding: 4px 0;
+}
+
+.asset-edit .form-grid {
+  border: 0;
+  box-shadow: none;
+  background: none;
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 표 안(tr.editing)에서도 폼 입력칸이 좁아지지 않도록 우선순위를 높인다 */
+.asset-edit .field input,
+.asset-edit .field select {
+  min-height: 34px;
+  max-width: none;
+  width: 100%;
+}
+
+.asset-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.asset-block.editing {
+  background: var(--accent-weak);
+}
+
+/* 편집 중인 행은 폼이 표 전체 폭을 쓴다 */
+tr.editing td {
+  white-space: normal;
+}
+
+/* ------------------------------------------------------------ 차트 */
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.chart-card {
+  margin: 0;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.chart-card figcaption {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+/* 스택 막대: 세그먼트 사이를 표면색으로 2px 띄워 경계를 색 대비에 의존하지 않게 한다 */
+.stack {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+}
+
+.stack-seg {
+  border-radius: 4px;
+  min-width: 4px;
+}
+
+.legend {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.legend-label {
+  color: var(--ink);
+}
+
+.legend-value {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ 기타 */
+
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  background: #1e2633;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+body.is-loading::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  z-index: 100;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: loadingSlide 1.1s ease-in-out infinite;
+}
+
+@keyframes loadingSlide {
+  0% { background-position: -40% 0; }
+  100% { background-position: 140% 0; }
+}
+
+.floating-scroll {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  gap: 8px;
+  z-index: 20;
+}
+
+.floating-scroll button {
+  min-width: 44px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(30, 38, 51, 0.18);
+}
+
+@media (max-width: 1100px) {
+  .rowlist-head,
+  .row {
+    grid-template-columns: 32px 80px minmax(80px, 0.7fr) minmax(110px, 1fr) minmax(100px, 1fr) 70px 110px 96px 56px;
+    gap: 8px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 860px) {
+  body.app-mode {
+    grid-template-columns: 1fr;
+  }
+
+  /* ★ 사이드바 → 위쪽 막대 + 햄버거
+     넓은 화면용 .sidebar 에는 height:100vh 가 붙어 있다. 메뉴를
+     화면 높이에 고정해 두려는 것인데, 좁은 화면에서 그대로 두면
+     메뉴 열 개 아래로 화면 한 장만큼의 빈 자리가 생기고 사용자
+     칸("demo · 담당자")이 저 아래로 밀려난다. 폰에서 첫 화면이
+     통째로 메뉴였던 이유가 이것이다.
+
+     그래서 높이를 내용에 맡기고(height:auto), 브랜드와 햄버거만
+     한 줄로 남긴다. 메뉴는 body.nav-open 일 때만 그 아래로 펼친다. */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+  }
+
+  .brand { flex: 1 1 auto; min-width: 0; padding: 0; }
+  .nav-toggle { display: block; }
+
+  nav {
+    /* 접힌 상태가 기본이다. 폰에서 처음 보이는 것은 대시보드여야지
+       메뉴여서는 안 된다. */
+    display: none;
+    flex: 0 0 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    max-height: 60vh;
+    padding: 4px 0 8px;
+  }
+
+  body.nav-open nav { display: grid; }
+
+  .nav-item { padding: 11px 12px; font-size: 14px; }
+
+  /* 사용자 칸도 메뉴와 함께 여닫는다. 늘 띄워 두면 막대가 두 줄이 된다. */
+  .login-box { display: none; margin: 0; }
+  body.nav-open .login-box { display: grid; flex: 0 0 100%; }
+
+  /* 위쪽 막대가 둘이 되지 않게. 사이드바가 sticky top:0 인데 .topbar 도
+     sticky top:0 이라, 스크롤하면 z-index 가 낮은 .topbar 가 사이드바
+     뒤로 숨는다. 좁은 화면에서는 고정을 풀어 그냥 같이 밀려 올라가게 둔다. */
+  .topbar { position: static; }
+
+  /* ── 권한 화면 ────────────────────────────────────────────
+     카드 모드에서 이름표를 그리는 것은 td::before 의 data-label 이다.
+     사람 칸과 저장 칸은 이름표가 필요 없으므로 끈다. */
+  .perm-name::before { display: none; }
+
+  /* 체크상자는 17px 이라 손끝으로 맞히기 어렵다. 칸 전체를 눌러도
+     되도록 넓히고 상자 자체도 키운다. */
+  .perm-check { justify-content: space-between; padding: 10px 0; }
+  .perm-check input[type="checkbox"] { width: 22px; height: 22px; flex: 0 0 auto; }
+  .perm-check::before { flex: 1 1 auto; width: auto; color: var(--text); font-size: 13.5px; }
+
+  /* 저장은 카드 하나의 마무리다. 폭을 채워 눌러야 할 곳으로 보이게 한다. */
+  .perm-name + .perm-check { border-top: 1px solid var(--border); }
+  td.actions .secondary { width: 100%; min-height: 38px; }
+
+  .split.active {
+    display: block;
+  }
+
+  .rowlist-head {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: 20px 1fr auto;
+    grid-template-areas: "caret name status";
+    row-gap: 4px;
+  }
+
+  /* 카드 모드에서는 번호·이름·상태만 남긴다.
+     칸 순서: 1 번호 · 2 사번 · 3 이름 · 4 부서 · 5 자산 · 6 라이선스 ·
+              7 IP · 8 내선 · 9 상태 */
+  .row > span:nth-child(2),
+  .row > span:nth-child(4),
+  .row > span:nth-child(5),
+  .row > span:nth-child(6),
+  .row > span:nth-child(7),
+  .row > span:nth-child(8) {
+    display: none;
+  }
+
+  .panel-body {
+    padding-left: 14px;
+  }
+
+  /* 요약 카드는 2열로 좁혀 그래프가 화면 안에 빨리 들어오게 한다 */
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .metric {
+    padding: 12px;
+  }
+
+  .metric strong {
+    font-size: 22px;
+  }
+
+  /* 카드 모드에서는 표 머리글이 숨겨지므로 정렬 바로 대신한다 */
+  .sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .sort-bar > span {
+    color: var(--muted);
+    font-size: 12px;
+    flex: none;
+  }
+
+  .sort-bar select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sort-bar button {
+    flex: none;
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  /* 좁은 화면에서 표는 가로 스크롤 대신 행 하나가 카드 하나가 된다.
+     각 칸의 항목명은 td의 data-label에서 가져온다. */
+  .table-wrap {
+    overflow: visible;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  table {
+    display: block;
+    min-width: 0;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  tbody tr {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+  }
+
+  td {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 0;
+    white-space: normal;
+  }
+
+  td + td {
+    border-top: 1px solid var(--border);
+  }
+
+  td::before {
+    content: attr(data-label);
+    flex: none;
+    width: 88px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  td.actions {
+    justify-content: flex-end;
+  }
+
+  td.actions::before {
+    display: none;
+  }
+
+  tr.editing input,
+  tr.editing select {
+    max-width: none;
+    flex: 1;
+  }
+
+  /* 펼침 표시는 카드 모서리로 뺀다 */
+  .managed tbody tr {
+    position: relative;
+  }
+
+  .managed .caret-col {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    padding: 0;
+    border: 0;
+  }
+
+  .managed .caret-col::before {
+    display: none;
+  }
+
+  .detail-row td::before {
+    display: none;
+  }
+
+  /* 편집행은 폼 하나가 통째로 들어가므로 항목명 자리를 비운다 */
+  tr.editing td {
+    display: block;
+  }
+
+  tr.editing td::before {
+    display: none;
+  }
+
+  .detail {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .detail dt {
+    margin-top: 6px;
+  }
+
+  td.empty {
+    justify-content: center;
+  }
+
+  td.empty::before {
+    display: none;
+  }
+}
+
+
+/* ---------------- 직원 상세 드로어 (GLPI 방식: 목록은 읽기, 작업은 상세에서) */
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 38, 51, 0.34);
+  z-index: 40;
+}
+
+/* 화면 가운데 모달. 높이를 내용에 맞춰서, 자산 1대인 직원을 열어도
+   빈 공간이 생기지 않는다. 내용이 많으면 본문만 스크롤된다. */
+.drawer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(680px, 94vw);
+  max-height: 86vh;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(20, 28, 40, 0.24);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 20px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-head h3 {
+  margin: 0 0 2px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.drawer-head .spacer { flex: 1; }
+
+.icon-btn {
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.icon-btn:hover { background: var(--bg); color: var(--ink); }
+
+.drawer-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drawer-foot {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.d-sec > header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.d-sec > header h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.d-sec > header .count { color: var(--accent); }
+.d-sec > header .spacer { flex: 1; }
+
+/* 텍스트형 작은 버튼 — 평소엔 조용히, 필요할 때만 눈에 띈다 */
+.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.link:hover { background: var(--accent-weak); }
+.link.danger-link { color: #b3402f; }
+.link.danger-link:hover { background: #fdecea; }
+
+.d-asset {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.d-asset-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 평소엔 옅게, 카드에 마우스를 올리면 또렷하게.
+   완전히 숨기면 터치 기기에서 영영 못 찾으므로 opacity 0 은 쓰지 않는다. */
+.d-asset-top .hover-actions { opacity: 0.45; transition: opacity 0.12s; }
+.d-asset:hover .hover-actions,
+.d-asset:focus-within .hover-actions { opacity: 1; }
+@media (hover: none) {
+  .d-asset-top .hover-actions { opacity: 1; }
+}
+
+.d-asset .sub {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 3px 0 0;
+}
+
+.d-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+
+.d-meta .k { color: var(--muted); }
+
+.lic-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.lic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+.lic-chip .chip-x { opacity: 0; }
+.lic-chip:hover .chip-x { opacity: 1; }
+
+/* 필요할 때만 펼쳐지는 선택 상자 */
+.picker {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 6px 0 10px;
+}
+
+.picker select { flex: 1; min-width: 0; }
+
+.d-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 2px;
+}
+
+
+.rownum { color: var(--muted); font-size: 12px; }
+
+.d-assets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.d-assets .d-asset { margin-bottom: 0; }
+
+/* 자산 카드 안의 항목표. 라벨을 왼쪽 한 줄에 고정해서 눈이 따라가기 쉽게. */
+.d-fields {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  align-items: start;
+}
+
+.d-fields dt {
+  color: var(--muted);
+  font-weight: 600;
+  padding-top: 2px;
+}
+
+.d-fields dd {
+  margin: 0;
+  min-width: 0;
+  /* 긴 소프트웨어 이름이 잘리지 않고 줄바꿈되게 */
+  overflow-wrap: anywhere;
+}
+
+.d-fields dd.chipwrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* flex 안에서 칩이 찌그러져 글자가 잘리던 문제 */
+.d-fields .chip {
+  flex: 0 0 auto;
+  max-width: 100%;
+  font-size: 12.5px;
+  padding: 2px 4px 2px 9px;
+}
+
+@media (max-width: 760px) {
+  .drawer {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100vw;
+    max-height: 92vh;
+    border-radius: 14px 14px 0 0;
+  }
+  .drawer-foot { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .d-fields { grid-template-columns: 1fr; gap: 2px; }
+  .d-fields dt { padding-top: 6px; }
+}
+
+/* 좁은 화면에서 목록은 가로 스크롤로 살린다 (완전한 모바일 대응은 추후) */
+.rowlist { overflow-x: auto; }
+@media (max-width: 700px) {
+  .rowlist-head, .row { min-width: 640px; }
+}
+
+
+/* 직원 명단 인라인 수정 */
+tr.editing td input {
+  width: 100%;
+  min-width: 70px;
+  padding: 5px 7px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+
+/* ---------------- 자리 배치 (엑셀 배치도를 격자로) */
+
+/* 열 개수는 층마다 다르므로 --cols 를 JS 에서 넣어준다. */
+.seat-map {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 19), minmax(0, 1fr));
+  grid-auto-rows: 58px;
+  gap: 4px;
+  background: #eef1f5;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  /* 좁은 화면에서는 찌그러뜨리지 말고 가로로 밀어서 본다.
+     19칸이라 이보다 좁으면 이름이 다 잘린다. */
+  min-width: 1150px;
+}
+
+/* 배치도는 폭이 고정이라 화면이 좁으면 감싸서 스크롤 */
+#seats { overflow-x: auto; }
+
+.seat {
+  border-radius: 8px;
+  padding: 5px 7px;
+  font-size: 12px;
+  line-height: 1.25;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.seat strong {
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat small {
+  color: var(--muted);
+  font-size: 10.5px;
+  /* 오른쪽 아래 자산 개수 배지와 겹치지 않게 */
+  padding-right: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seat.desk {
+  background: #fff;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.seat.desk.seated { border-color: #bcd7c8; background: #f5fbf7; }
+.seat.desk.empty { background: #fafbfc; border-style: dashed; }
+.seat.desk:hover { box-shadow: 0 2px 8px rgba(20, 28, 40, 0.12); }
+
+/* 엑셀에 (●) 로 표시돼 있던 자리 = 직책자 */
+.seat.desk.marked {
+  border-color: var(--accent);
+  border-left-width: 3px;
+}
+
+
+.seat.desk.marked::after {
+  content: "직";
+  position: absolute;
+  /* 오른쪽 위는 '자리 비우기(×)', 오른쪽 아래는 자산 개수 배지가 쓴다.
+     비어 있는 왼쪽 아래로 보낸다. 오른쪽 위에 두면 가상 요소가 클릭을
+     가로채서 직책자 자리만 비울 수 없게 된다. */
+  bottom: 3px;
+  left: 4px;
+  pointer-events: none;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 3px;
+  padding: 2px 3px;
+}
+
+.seat.room {
+  background: #e7ebf1;
+  border: 1px solid #d3dae4;
+  color: var(--muted);
+  align-items: center;
+  text-align: center;
+  font-weight: 600;
+}
+
+.seat.label {
+  background: transparent;
+  color: var(--muted);
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 우리말은 낱말 안에서 끊지 않는다.
+   기본값은 영어 기준이라 "경영지원팀" 이 "경영관리 / 팀" 으로 갈라져서,
+   글자 하나가 아래로 떨어진다. 칸보다 길면 살짝 줄여서 한 줄에 담는다. */
+.seat.label span,
+.seat.room span {
+  word-break: keep-all;
+  overflow-wrap: normal;
+  hyphens: none;
+  letter-spacing: -.02em;
+  /* 칸 너비에 맞춰 줄어든다 — 다섯 글자까지는 한 줄에 들어간다 */
+  font-size: clamp(9.5px, 2.2cqw, 11.5px);
+}
+.seat.label, .seat.room { container-type: inline-size; }
+
+.seat-badge {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  pointer-events: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  background: var(--accent-weak);
+  border-radius: 999px;
+  padding: 0 5px;
+}
+
+.seat-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  width: 18px;
+  height: 18px;
+  /* 전역 button 규칙의 min-height:38px 를 풀지 않으면 버튼이 칸 절반을 덮는다.
+     투명해도 클릭은 가로채므로 자리를 눌러도 아무 반응이 없게 된다. */
+  min-height: 0;
+  padding: 0;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+}
+
+/* 안 보일 때는 클릭도 받지 않는다 */
+.seat.desk:hover .seat-x { opacity: 1; pointer-events: auto; }
+.seat-x:hover:not(:disabled) { background: #fae9df; color: #8a3f2a; }
+
+.seat.picking {
+  background: #fff;
+  border: 1px solid var(--accent);
+  z-index: 2;
+  /* 선택 상자는 한 칸보다 넓어야 이름이 보인다 */
+  min-width: 190px;
+}
+
+.seat.picking select { width: 100%; font-size: 11.5px; padding: 2px 4px; }
+.seat-actions { display: flex; gap: 2px; }
+.seat-actions .link { font-size: 11px; padding: 1px 4px; }
+
+/* 검색 중에는 맞는 칸만 또렷하게 */
+.seat-map.searching .seat { opacity: 0.28; }
+.seat-map.searching .seat.hit {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 층 선택 버튼 */
+.seg { display: inline-flex; gap: 2px; background: #eef1f5; border-radius: 8px; padding: 2px; }
+
+.seg-btn {
+  border: 0;
+  background: transparent;
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.seg-btn.on { background: #fff; color: var(--ink); box-shadow: var(--shadow); }
+
+.seat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 범례의 각 항목을 flex 로 두면 네모와 글자가 정확히 가운데로 맞는다. */
+.seat-legend > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.seat-legend .sw {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  /* 위쪽에 있는 전역 .empty { padding: 14px } 같은 규칙이 끼어들면
+     이 네모만 30px 로 부풀어 줄이 틀어진다. 여기서 못을 박아둔다. */
+  box-sizing: border-box;
+  padding: 0;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  margin-right: 5px;
+}
+
+.seat-legend .sw.seated { background: #f5fbf7; border: 1px solid #bcd7c8; }
+.seat-legend .sw.empty { background: #fafbfc; border: 1px dashed var(--border); }
+.seat-legend .sw.room { background: #e7ebf1; border: 1px solid #d3dae4; }
+.seat-legend .sw.hit { background: #fff; border: 2px solid var(--accent); }
+.seat-legend .sw.boss { background: var(--accent); }
+
+
+/* ---------------- 확인창 (브라우저 기본 confirm 대체) */
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 38, 51, 0.38);
+  z-index: 60;              /* 상세 모달(41)보다 위 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirm-box {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(20, 28, 40, 0.28);
+  padding: 22px 22px 16px;
+}
+
+.confirm-box p {
+  margin: 0 0 18px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-line;    /* 줄바꿈을 문구에서 그대로 살린다 */
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+
+/* ---------------- 편집 모달 (자산 등록 · 직원 명단) */
+
+.edit-modal { width: min(620px, 94vw); }
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.edit-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edit-grid .field > span {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* 사번처럼 고칠 수 없는 값 */
+.edit-grid .ro {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--muted);
+}
+
+.drawer-foot .spacer { flex: 1; }
+
+/* 목록에서 누를 수 있는 행 */
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: #f8fbfa; }
+
+@media (max-width: 760px) {
+  .edit-grid { grid-template-columns: 1fr; }
+}
+
+
+/* 가로로 줄여도 첫 칸(사용자)은 붙잡아 둔다 */
+.table-wrap { overflow-x: auto; }
+
+th.sticky-col,
+td.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--panel);
+  font-weight: 600;
+  /* 스크롤로 다른 칸이 밑을 지나갈 때 경계가 보이게 */
+  box-shadow: 1px 0 0 var(--border);
+}
+
+th.sticky-col { background: #f8fafc; z-index: 3; }
+tr.clickable:hover td.sticky-col { background: #f8fbfa; }
+
+
+.edit-grid .field .hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+
+/* 목록에서 고르거나 직접 적는 칸 */
+.combo-input { margin-top: 5px; }
+
+
+/* 직원별 현황 머리글도 눌러서 정렬 */
+.rowlist-head .sortable {
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.rowlist-head .sortable:hover { color: var(--accent); }
+.rowlist-head .sorted { color: var(--accent); }
+.rowlist-head .sort-ind { font-size: 9px; }
+
+/* 값 정리 표 */
+.spec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.spec-table th, .spec-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.spec-table th { color: var(--muted); font-size: 12px; font-weight: 600; }
+.spec-table .num { text-align: right; white-space: nowrap; }
+.spec-table select { width: 100%; min-width: 150px; }
+.spec-table button { min-height: 32px; padding: 0 10px; font-size: 12.5px; }
+.spec-table + p { margin-bottom: 0; }
+#specTabs { margin-bottom: 12px; }
+
+
+.edit-modal.wide { width: min(760px, 96vw); }
+.spec-table select { min-width: 120px; }
+
+
+/* 모달 안의 부가 정보(설치된 자산, 라이선스 보유자 등) */
+.edit-extra {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+
+/* ---------------- 배치 편집 모드 */
+
+#seatEditBtn.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* 편집 중에만 나타나는 '놓을 자리'. 평소에는 아예 그리지 않는다. */
+.slot {
+  border: 1px dashed #cfd8e3;
+  border-radius: 6px;
+  background: #fff;
+  opacity: 0.5;
+  cursor: copy;
+}
+
+.slot:hover { opacity: 1; border-color: var(--accent); }
+.slot.over { opacity: 1; background: var(--accent-weak); border-color: var(--accent); border-style: solid; }
+
+.seat-map.editing .seat { cursor: grab; }
+.seat-map.editing .seat.dragging { opacity: 0.35; cursor: grabbing; }
+
+/* 편집 중에는 자리를 눌러 사람을 보는 동작이 방해되므로 안내를 띄운다 */
+.seat-map.editing { outline: 2px dashed var(--accent); outline-offset: 3px; }
+
+
+/* 내선 칸은 번호 아래에 전화기 IP 가 한 줄 더 붙는다. 기본 크기로 두면 잘린다. */
+.row .cell-ext small {
+  display: block;
+  font-size: 10.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+
+/* 드로어의 내선번호 한 줄 */
+.ext-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  background: #fff;
+  font-size: 14px;
+}
+
+.ext-line strong { font-size: 15px; }
+.ext-line .spacer { flex: 1; }
+
+
+/* 자료 넣기 모달의 건너뛴 줄 목록 */
+.skip-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--muted);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.check input { min-height: 0; width: 16px; height: 16px; }
+
+#importFile {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+
+/* 소프트웨어 고르기 — 한 번에 여러 개 */
+.sw-pick {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 8px;
+  background: #fbfcfd;
+}
+
+.sw-search { width: 100%; min-height: 34px; font-size: 13px; }
+
+.sw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 10px;
+  max-height: 210px;
+  overflow-y: auto;
+  margin: 8px 0;
+}
+
+.sw-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sw-item:hover { background: var(--accent-weak); }
+.sw-item input { min-height: 0; width: 15px; height: 15px; flex: 0 0 auto; }
+.sw-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sw-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.sw-foot .spacer { flex: 1; }
+.sw-foot button { min-height: 32px; padding: 0 12px; font-size: 13px; }
+
+
+
+/* ── 나가는 문 ──────────────────────────────────────────────
+   다른 앱들과 같은 자리·같은 모양으로 맞춘다. 앱마다 다른 데 있으면
+   쓰는 사람이 그때그때 찾아야 한다. */
+.topbar-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.topbar .backportal{
+  flex:0 0 auto; white-space:nowrap; font-size:13px; text-decoration:none;
+  color:var(--muted); background:var(--panel);
+  border:1px solid var(--border); border-radius:8px; padding:7px 13px;
+  transition:background .12s, color .12s;
+}
+.topbar .backportal:hover{background:var(--side); color:var(--ink)}
+
+/* 배치도 칸의 「고치기」 연필. 편집 모드에서만 그려진다.
+   평소에 떠 있으면 배치도를 보기만 하려는 사람에게 방해가 된다. */
+.seat .seat-pen {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; padding: 0; line-height: 1;
+  font-size: 11px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  opacity: 0; transition: opacity .12s;
+}
+.seat:hover .seat-pen { opacity: 1; }
+.seat .seat-pen:hover { color: var(--accent); border-color: var(--accent); }

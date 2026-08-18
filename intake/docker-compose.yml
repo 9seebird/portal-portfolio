@@ -1,0 +1,36 @@
+# =====================================================================
+# 앱 입고 점검 — 앱을 포털에 붙이기 전에 규칙에 맞는지 확인해 준다
+#
+# 다른 앱과 다른 점: **이 앱은 사람이 만든 것을 검사한다.**
+# 그래서 체험판에서는 올리기를 받지 않고, 미리 넣어 둔 예시 셋 중 고르게 한다
+# (.env 의 DEMO_MODE=1). 아무나 zip 을 올려 서버에서 푸는 길을 공개된 곳에
+# 열어 둘 이유가 없다. 사내에서는 그대로 올려서 쓴다.
+#
+# 점검 규칙은 rules/check-intake.sh 하나뿐이다. 화면도 사내판도 그 한 파일을 본다.
+# 규칙을 두 벌로 두면 「화면은 통과라는데 내 PC 에선 ✗」가 난다.
+#
+# ./data 볼륨이 없다. 일부러 없다 — 검사하고 결과만 내고 지운다.
+# =====================================================================
+name: demo-intake
+services:
+  intake:
+    build: .
+    container_name: demo-intake
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "8080"
+    networks:
+      - demo-net
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  demo-net:
+    external: true

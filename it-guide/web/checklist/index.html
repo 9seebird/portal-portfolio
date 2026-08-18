@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>누리코스메틱 IT 운영 체크리스트</title>
+<style>
+  :root{
+    --bg:#f5f7fa;
+    --card:#ffffff;
+    --border:#e3e8ef;
+    --text:#1f2937;
+    --sub:#6b7280;
+    --accent:#2563eb;
+    --accent-light:#eff6ff;
+    --green:#16a34a;
+    --green-light:#f0fdf4;
+    --red:#dc2626;
+    --red-light:#fef2f2;
+    --amber:#d97706;
+    --amber-light:#fffbeb;
+    --radius:12px;
+    --shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    line-height:1.5;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 80px;}
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;
+    margin-bottom:20px;
+  }
+  header.top h1{font-size:22px;margin:0 0 4px;}
+  header.top p{margin:0;color:var(--sub);font-size:13px;}
+  /* 제목·설명·편집 버튼은 한 덩어리로 왼쪽에.
+     오른쪽 위 구석은 '포탈로' 만 차지한다. */
+  header.top .head-main{flex:1 1 auto;min-width:0;}
+  .save-bar{
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+    margin-top:12px;
+  }
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--text);
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:13px;
+    transition:background .15s,border-color .15s;
+  }
+  button:hover{background:#f3f4f6;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  button.primary:hover{background:#1d4ed8;}
+  button.ghost{border-color:transparent;background:transparent;color:var(--sub);}
+  button.ghost:hover{background:#f3f4f6;}
+  button.danger{color:var(--red);}
+  button.small{padding:4px 8px;font-size:12px;border-radius:6px;}
+  /* 포털로 돌아가는 길. href="/" 하나면 된다 — 프록시가 / 를 포털로 넘긴다. */
+  .backportal{font-family:inherit;cursor:pointer;border:1px solid var(--border);
+    background:var(--card);color:var(--sub);border-radius:6px;padding:4px 8px;
+    font-size:12px;text-decoration:none;transition:background .12s,color .12s;
+    flex:0 0 auto;white-space:nowrap;}
+  .backportal:hover{background:#f3f4f6;color:var(--text);}
+
+  nav.tabs{
+    display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;
+    border-bottom:1px solid var(--border);
+  }
+  nav.tabs button{
+    border:none;background:transparent;border-radius:8px 8px 0 0;
+    padding:10px 16px;font-size:14px;color:var(--sub);font-weight:500;
+    border-bottom:2px solid transparent;margin-bottom:-1px;
+  }
+  nav.tabs button.active{color:var(--accent);border-bottom:2px solid var(--accent);background:var(--accent-light);}
+  nav.tabs button:hover:not(.active){background:#f3f4f6;}
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .period-header{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+    margin-bottom:14px;
+  }
+  .period-header h2{font-size:18px;margin:0;}
+  .progress-wrap{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);min-width:200px;}
+  .progress-track{flex:1;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;min-width:100px;}
+  .progress-fill{height:100%;background:var(--green);border-radius:999px;transition:width .2s;}
+
+  .section-card{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px;
+    transition:box-shadow .1s, opacity .1s;
+  }
+  .section-card.dragging{opacity:.4;}
+  .section-card.drop-before{box-shadow:0 -3px 0 0 var(--accent), var(--shadow);}
+  .section-card.drop-after{box-shadow:0 3px 0 0 var(--accent), var(--shadow);}
+  .section-card .section-head{
+    display:flex;align-items:center;gap:10px;margin-bottom:10px;
+  }
+  .section-title-row{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
+  .section-card .section-head h3{font-size:15px;margin:0;color:var(--text);flex:1;min-width:0;}
+  .drag-handle{
+    cursor:grab;color:var(--sub);padding:2px 6px;font-size:15px;user-select:none;flex-shrink:0;
+    line-height:1;letter-spacing:-1px;border-radius:4px;
+  }
+  .drag-handle:hover{background:#f3f4f6;color:var(--accent);}
+  .drag-handle:active{cursor:grabbing;}
+  .item-row{
+    display:flex;align-items:flex-start;gap:6px;padding:6px 4px;border-radius:6px;
+    transition:box-shadow .1s, opacity .1s;
+  }
+  .item-row:hover{background:#fafbfc;}
+  .item-row.dragging{opacity:.4;}
+  .item-row.drop-before{box-shadow:inset 0 2px 0 0 var(--accent);}
+  .item-row.drop-after{box-shadow:inset 0 -2px 0 0 var(--accent);}
+  .item-drag-handle{
+    opacity:0;cursor:grab;color:var(--sub);padding:2px 3px;font-size:13px;flex-shrink:0;
+    user-select:none;margin-top:3px;line-height:1;letter-spacing:-1px;border-radius:4px;
+  }
+  .item-row:hover .item-drag-handle{opacity:1;}
+  .item-drag-handle:hover{background:#f3f4f6;color:var(--accent);}
+  .item-drag-handle:active{cursor:grabbing;}
+  .item-row input[type="checkbox"]{margin-top:3px;width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
+  .item-text{
+    flex:1;outline:none;padding:2px 4px;border-radius:4px;font-size:14px;min-height:20px;
+  }
+  .item-text:focus{background:#fff;box-shadow:0 0 0 2px var(--accent-light);}
+  .item-row.done .item-text{color:var(--sub);text-decoration:line-through;}
+  .item-del{opacity:0;color:var(--sub);border:none;background:transparent;font-size:14px;padding:2px 6px;flex-shrink:0;}
+  .item-row:hover .item-del{opacity:1;}
+  .item-del:hover{color:var(--red);}
+  .section-head-actions{display:flex;align-items:center;flex-shrink:0;}
+
+  .add-item-row{display:flex;gap:6px;margin-top:8px;}
+  .add-item-row input{
+    flex:1;border:1px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;
+  }
+  .add-item-row input:focus{outline:none;border-color:var(--accent);border-style:solid;}
+
+  .add-section-btn{
+    width:100%;padding:10px;border:1px dashed var(--border);border-radius:var(--radius);
+    background:transparent;color:var(--sub);font-size:13px;margin-bottom:20px;
+  }
+  .add-section-btn:hover{background:var(--card);color:var(--accent);border-color:var(--accent);}
+
+  /* vendor table */
+  table.vendor-table{
+    width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--radius);
+    overflow:hidden;box-shadow:var(--shadow);table-layout:fixed;
+  }
+  table.vendor-table th{
+    background:#f8fafc;text-align:left;font-size:12px;color:var(--sub);font-weight:600;
+    padding:10px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
+  }
+  table.vendor-table td{
+    padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;
+    word-break:break-word;overflow-wrap:anywhere;
+  }
+  table.vendor-table tr:last-child td{border-bottom:none;}
+  table.vendor-table textarea{
+    display:block;width:100%;border:1px solid transparent;background:transparent;
+    padding:6px;font-size:13px;line-height:1.45;border-radius:6px;font-family:inherit;
+    color:var(--text);resize:none;overflow:hidden;min-height:32px;
+    white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;
+  }
+  table.vendor-table textarea:hover{border-color:var(--border);}
+  table.vendor-table textarea:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 2px var(--accent-light);}
+  .vendor-del-cell{text-align:center;width:3%;}
+  .vendor-hint{font-size:12px;color:var(--sub);margin:0 0 10px;}
+
+  .add-vendor-btn{margin-top:10px;}
+
+  /* 좁은 화면에서는 표 대신 업체별 카드로 전환 */
+  @media (max-width:900px){
+    table.vendor-table{display:block;background:transparent;box-shadow:none;border-radius:0;}
+    table.vendor-table thead{display:none;}
+    table.vendor-table tbody,
+    table.vendor-table tr,
+    table.vendor-table td{display:block;width:100%;}
+    table.vendor-table tr{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      box-shadow:var(--shadow);padding:8px 10px 10px;margin-bottom:12px;position:relative;
+    }
+    table.vendor-table td{border-bottom:none;padding:4px 0;}
+    table.vendor-table td::before{
+      content:attr(data-label);display:block;font-size:11px;font-weight:600;
+      color:var(--sub);margin-bottom:2px;
+    }
+    table.vendor-table td.vendor-del-cell{
+      position:absolute;top:8px;right:8px;width:auto;padding:0;
+    }
+    table.vendor-table td.vendor-del-cell::before{content:none;}
+  }
+
+  .ref-block{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px;
+  }
+  .ref-block h3{font-size:15px;margin:0 0 8px;}
+  .ref-block h4{font-size:13px;margin:12px 0 6px;color:var(--accent);}
+  .ref-block ul{margin:0;padding-left:20px;font-size:13.5px;color:var(--text);}
+  .ref-block ol{margin:0;padding-left:20px;font-size:13.5px;color:var(--text);}
+  .ref-block li{margin-bottom:4px;}
+  .ref-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:720px){.ref-grid{grid-template-columns:1fr;}}
+
+  .hint{
+    font-size:12px;color:var(--sub);background:var(--amber-light);border:1px solid #fde68a;
+    padding:8px 12px;border-radius:8px;margin-bottom:16px;
+  }
+  .footer-note{color:var(--sub);font-size:12px;text-align:center;margin-top:30px;}
+  input[type="file"]{display:none;}
+
+  /* 우리말은 낱말(어절) 사이에서 끊는다. 기본값은 영어 기준이라
+     한 글자만 다음 줄로 뚝 떨어진다. */
+  body, p, td, th, li, label{ word-break:keep-all; overflow-wrap:break-word; }
+  p, .hint, .sub{ text-wrap:pretty; }
+
+/* 손끝은 마우스 포인터가 아니다.
+   이 화면들의 작은 단추는 높이가 23~27px 이었다. 마우스로는 정확히
+   맞히지만 손가락 접촉면은 그보다 훨씬 넓어서, 폰에서는 옆 것이
+   눌리거나 아무것도 안 눌린다. 애플·구글 지침은 44~48px 인데
+   촘촘한 도구 줄이 헐거워지므로 여기서는 36px 로 맞춘다.
+   글자 크기는 그대로 두고 눌리는 넓이만 키운다. */
+@media (max-width:760px){
+  button,.btn{min-height:36px}
+  button.small{min-height:34px;padding:6px 10px}
+  /* 항목 지우는 × 는 줄 안에 들어가야 해서 예외로 둔다 */
+  .item-del,.drag-handle{min-height:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="head-main">
+      <h1>누리코스메틱 IT 운영 · 유지보수 체크리스트</h1>
+      <p>업로드된 문서를 기준으로 정리한 주기별 업무 체크리스트 &amp; 유지보수 업체 관리 페이지입니다.</p>
+      <div class="save-bar">
+        <button class="ghost small" id="uncheckBtn" title="이 브라우저의 체크 표시를 모두 지웁니다. 항목 내용은 그대로입니다">체크 전부 해제</button>
+        <button class="ghost small" id="resetBtn" title="처음 기본값으로 되돌립니다">기본값 초기화</button>
+        <button class="small" id="loadBtn" title="이전에 저장해둔 백업(JSON) 파일을 불러옵니다">백업 불러오기</button>
+        <input type="file" id="fileInput" accept="application/json">
+        <button class="primary small" id="saveBtn" title="현재 수정 내용을 새 HTML 파일로 저장합니다. 받은 파일을 index.html 로 덮어쓰면 반영됩니다">변경사항 저장</button>
+      </div>
+    </div>
+    <a class="backportal" href="/">← 포탈로</a>
+  </header>
+
+  <div class="hint">
+    <b>체크 표시는 이 브라우저에만 남습니다.</b> 눌러 두면 다음에 열어도 그대로 있고, 다른 사람 화면에는 번지지 않습니다. 새 달이 시작되면 <b>“체크 전부 해제”</b> 로 한 번에 지우세요.<br>
+    <b>항목을 추가·삭제·수정</b>한 것은 자동 저장되지 않습니다. <b>“변경사항 저장”</b> 으로 파일을 받아 <code>it-guide/web/checklist/index.html</code> 에 덮어써야 모두에게 반영됩니다.
+    (또는 “백업 불러오기”로 예전에 저장한 파일을 열어 이 화면에 불러올 수 있습니다.)
+    섹션·항목 왼쪽의 <b>⠿</b> 손잡이를 마우스로 눌러 끌면 순서를 바꿀 수 있어요.
+  </div>
+
+  <nav class="tabs">
+    <button data-tab="adhoc" class="active">수시</button>
+    <button data-tab="daily">매일</button>
+    <button data-tab="monthly">월간</button>
+    <button data-tab="quarterly">분기</button>
+    <button data-tab="yearly">연간</button>
+    <button data-tab="vendors">업체 관리</button>
+    <button data-tab="reference">참고자료</button>
+  </nav>
+
+  <div id="panels"></div>
+
+  <div class="footer-note">누리코스메틱 IT 업무 정리 문서 기반 · 사내 참고용</div>
+</div>
+
+<script id="app-data" type="application/json">
+{
+  "checklists": {
+    "adhoc": [
+      {
+        "title": "운영 점검",
+        "items": [
+          {
+            "text": "서버 리소스 확인"
+          },
+          {
+            "text": "백업 점검"
+          },
+          {
+            "text": "보안 업데이트 여부 확인"
+          },
+          {
+            "text": "장애 이력 정리"
+          }
+        ]
+      },
+      {
+        "title": "사용자 관련 업무",
+        "items": [
+          {
+            "text": "신규 입사자 발생시 계정 생성 (MS, NAS, SAP은 사용자만)"
+          },
+          {
+            "text": "퇴사자 계정 비활성화 (SAP, MS, NAS)"
+          },
+          {
+            "text": "권한 과다 여부 확인"
+          },
+          {
+            "text": "공유 계정 확인"
+          }
+        ]
+      }
+    ],
+    "daily": [
+      {
+        "title": "사용자 문의 대응",
+        "items": [
+          {
+            "text": "AWS 인스턴스 확인"
+          },
+          {
+            "text": "그룹웨어 접속 / 오류 확인"
+          },
+          {
+            "text": "SAP 접속 확인"
+          },
+          {
+            "text": "네트워크 확인"
+          },
+          {
+            "text": "스팸 메일 신고 확인"
+          },
+          {
+            "text": "NAS 접속 확인"
+          },
+          {
+            "text": "카스퍼스키 확인"
+          }
+        ]
+      },
+      {
+        "title": "장애 대응",
+        "items": [
+          {
+            "text": "업체 연락 - 업체 관리 탭 참고"
+          },
+          {
+            "text": "로그 확인"
+          },
+          {
+            "text": "서비스 재시작"
+          },
+          {
+            "text": "사용자 공지"
+          }
+        ]
+      }
+    ],
+    "monthly": [
+      {
+        "title": "SAP 운영 보고",
+        "items": [
+          {
+            "text": "월간 운영 현황 보고서 작성"
+          },
+          {
+            "text": "장애 현황 정리"
+          },
+          {
+            "text": "처리 건수 정리"
+          }
+        ]
+      },
+      {
+        "title": "비용 정산",
+        "items": [
+          {
+            "text": "유지보수 비용 (대성ITS)"
+          },
+          {
+            "text": "AWS/클라우드 비용 (대성ITS)"
+          },
+          {
+            "text": "라이선스 비용 (세움테크 발생시)"
+          },
+          {
+            "text": "웍스 AI 비용 (코어AI)"
+          },
+          {
+            "text": "네트워크 점검 비용 (넷링크)"
+          },
+          {
+            "text": "PC 렌탈 비용 (한빛렌탈)"
+          }
+        ]
+      },
+      {
+        "title": "백업 점검",
+        "items": [
+          {
+            "text": "복구 테스트"
+          },
+          {
+            "text": "백업 용량 확인"
+          },
+          {
+            "text": "NAS 상태 확인"
+          }
+        ]
+      },
+      {
+        "title": "보안 점검",
+        "items": [
+          {
+            "text": "백신 업데이트"
+          },
+          {
+            "text": "계정 점검"
+          },
+          {
+            "text": "접근 권한 점검"
+          }
+        ]
+      }
+    ],
+    "quarterly": [
+      {
+        "title": "계약 및 예산 점검",
+        "items": [
+          {
+            "text": "유지보수 계약 상태 확인"
+          },
+          {
+            "text": "예산 사용률 확인"
+          },
+          {
+            "text": "추가 예산 필요 여부 검토"
+          }
+        ]
+      },
+      {
+        "title": "보안 점검",
+        "items": [
+          {
+            "text": "취약점 점검"
+          },
+          {
+            "text": "방화벽 정책 점검"
+          },
+          {
+            "text": "VPN 계정 점검"
+          }
+        ]
+      },
+      {
+        "title": "자산 점검",
+        "items": [
+          {
+            "text": "PC 자산 현황"
+          },
+          {
+            "text": "라이선스 현황"
+          },
+          {
+            "text": "장비 교체 대상 확인"
+          }
+        ]
+      }
+    ],
+    "yearly": [
+      {
+        "title": "예산 수립",
+        "items": [
+          {
+            "text": "차년도 IT 예산 작성"
+          },
+          {
+            "text": "유지보수 비용 예측"
+          },
+          {
+            "text": "신규 장비 예산"
+          },
+          {
+            "text": "라이선스 갱신 비용"
+          }
+        ]
+      },
+      {
+        "title": "계약 갱신",
+        "items": [
+          {
+            "text": "SAP 유지보수"
+          },
+          {
+            "text": "그룹웨어 유지보수"
+          },
+          {
+            "text": "보안 솔루션"
+          },
+          {
+            "text": "인터넷 회선"
+          },
+          {
+            "text": "클라우드 계약"
+          }
+        ]
+      },
+      {
+        "title": "자산 관리",
+        "items": [
+          {
+            "text": "노후 장비 교체"
+          },
+          {
+            "text": "재고 정리"
+          },
+          {
+            "text": "폐기 처리"
+          }
+        ]
+      },
+      {
+        "title": "감사 대응",
+        "items": [
+          {
+            "text": "계정 권한 이력"
+          },
+          {
+            "text": "접근 로그"
+          },
+          {
+            "text": "자산 현황"
+          },
+          {
+            "text": "보안 정책"
+          }
+        ]
+      }
+    ]
+  },
+  "vendors": [
+    {
+      "name": "대성ITS",
+      "area": "SAP, EA, 그룹웨어(GW), ITO 유지보수",
+      "contract": "2025.03 ~ 2027.02",
+      "manager": "",
+      "phone": "",
+      "email": "",
+      "note": "예산 문구: \"ITO 유지보수료 (SAP,EA,GW)\""
+    }
+  ]
+}
+</script>
+
+<script>
+const PERIOD_LABELS = {adhoc:"수시", daily:"매일", monthly:"월간", quarterly:"분기", yearly:"연간"};
+let APP_DATA = JSON.parse(document.getElementById('app-data').textContent);
+
+/* ---------- 체크 표시는 이 브라우저에만 남는다 ----------
+
+   예전에는 체크 상태(done)가 APP_DATA 에 들어가서, 저장하면 파일에
+   같이 박혔다. 그러면 한 사람이 체크하고 저장한 것이 **모두의 화면에**
+   체크된 채로 보인다. 인수인계처럼 둘 이상이 쓰면 바로 부딪힌다.
+   ("이거 내가 한 건가? 저 사람이 한 건가?")
+
+   항목 내용은 모두가 함께 보는 것이 맞고, 체크 표시는 각자의 것이다.
+   그래서 내용은 파일에, 체크는 브라우저에 나눠 둔다.
+
+   무엇으로 짝을 짓나 — 주기 + 구역 이름 + 항목 글자.
+   순서를 바꿔도 체크가 따라간다. 다만 **항목 글자를 고치면 체크는
+   풀린다.** 번호로 묶으면 순서만 바꿔도 엉뚱한 항목이 체크되므로
+   이쪽이 낫다고 보았다. */
+const CHECK_KEY = 'nuricos.checklist.done.v1';
+let CHECKS = {};
+try { CHECKS = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}'); } catch(e) { CHECKS = {}; }
+
+function checkId(period, sec, item){
+  return period + '|' + (sec && sec.title || '') + '|' + (item && item.text || '');
+}
+function isDone(period, sec, item){ return !!CHECKS[checkId(period, sec, item)]; }
+function setDone(period, sec, item, on){
+  const k = checkId(period, sec, item);
+  if(on) CHECKS[k] = true; else delete CHECKS[k];
+  try { localStorage.setItem(CHECK_KEY, JSON.stringify(CHECKS)); } catch(e) {}
+}
+function clearChecks(){
+  CHECKS = {};
+  try { localStorage.removeItem(CHECK_KEY); } catch(e) {}
+}
+let dragSource = null; // {type:'section'|'item', period, sIdx, iIdx?}
+
+function clearDropIndicators(){
+  document.querySelectorAll('.drop-before,.drop-after').forEach(el => el.classList.remove('drop-before','drop-after'));
+}
+
+// Moves arr[fromIdx] so it ends up at position toIdx (toIdx measured against the
+// array BEFORE removal, e.g. "insert before current index N" -> toIdx = N).
+function reorderArray(arr, fromIdx, toIdx){
+  if(fromIdx === toIdx || fromIdx + 1 === toIdx) return;
+  const [moved] = arr.splice(fromIdx, 1);
+  let insertAt = toIdx;
+  if(fromIdx < toIdx) insertAt -= 1;
+  arr.splice(insertAt, 0, moved);
+}
+
+function escapeHtml(s){
+  return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- render ---------- */
+
+function render(){
+  renderPanels();
+  bindTabSwitching();
+  // 주소에 #daily 같은 것이 붙어 있으면 그 탭부터 연다
+  const activeTab = tabFromHash()
+    || document.querySelector('nav.tabs button.active')?.dataset.tab
+    || 'daily';
+  showTab(activeTab, false);
+}
+
+function renderPanels(){
+  const container = document.getElementById('panels');
+  container.innerHTML = '';
+  Object.keys(PERIOD_LABELS).forEach(period => {
+    container.appendChild(buildPeriodPanel(period));
+  });
+  container.appendChild(buildVendorPanel());
+  container.appendChild(buildReferencePanel());
+}
+
+function countProgress(period){
+  const sections = APP_DATA.checklists[period];
+  let total = 0, done = 0;
+  sections.forEach(s => s.items.forEach(i => { total++; if(isDone(period, s, i)) done++; }));
+  return {total, done};
+}
+
+function buildPeriodPanel(period){
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.id = 'panel-' + period;
+
+  const {total, done} = countProgress(period);
+  const pct = total ? Math.round(done/total*100) : 0;
+
+  const header = document.createElement('div');
+  header.className = 'period-header';
+  header.innerHTML = `
+    <h2>${PERIOD_LABELS[period]} 체크리스트</h2>
+    <div class="progress-wrap">
+      <span>${done}/${total} 완료</span>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <span>${pct}%</span>
+    </div>`;
+  panel.appendChild(header);
+
+  APP_DATA.checklists[period].forEach((section, sIdx) => {
+    panel.appendChild(buildSectionCard(period, section, sIdx));
+  });
+
+  const addSectionBtn = document.createElement('button');
+  addSectionBtn.className = 'add-section-btn';
+  addSectionBtn.textContent = '+ 새 항목 그룹(섹션) 추가';
+  addSectionBtn.onclick = () => {
+    const title = prompt('새 섹션 이름을 입력하세요 (예: 백업 점검)');
+    if(!title) return;
+    APP_DATA.checklists[period].push({title, items:[]});
+    render();
+  };
+  panel.appendChild(addSectionBtn);
+
+  return panel;
+}
+
+function buildSectionCard(period, section, sIdx){
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  card.dataset.period = period;
+  card.dataset.sIdx = sIdx;
+
+  const head = document.createElement('div');
+  head.className = 'section-head';
+  head.innerHTML = `<div class="section-title-row"><span class="drag-handle" title="드래그하여 섹션 순서 변경">⠿</span><h3></h3></div>`;
+  const h3 = head.querySelector('h3');
+  const dragHandle = head.querySelector('.drag-handle');
+  h3.textContent = section.title;
+  h3.contentEditable = 'true';
+  h3.spellcheck = false;
+  h3.addEventListener('blur', () => {
+    APP_DATA.checklists[period][sIdx].title = h3.textContent.trim() || section.title;
+  });
+
+  dragHandle.addEventListener('mousedown', () => { card.draggable = true; });
+  dragHandle.addEventListener('mouseup', () => { card.draggable = false; });
+  card.addEventListener('dragstart', (e) => {
+    dragSource = {type:'section', period, sIdx};
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'section');
+    requestAnimationFrame(() => card.classList.add('dragging'));
+  });
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+    card.draggable = false;
+    clearDropIndicators();
+    dragSource = null;
+  });
+  card.addEventListener('dragover', (e) => {
+    if(!dragSource || dragSource.type !== 'section' || dragSource.period !== period) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = card.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    clearDropIndicators();
+    card.classList.add(before ? 'drop-before' : 'drop-after');
+  });
+  card.addEventListener('dragleave', () => {
+    card.classList.remove('drop-before', 'drop-after');
+  });
+  card.addEventListener('drop', (e) => {
+    if(!dragSource || dragSource.type !== 'section' || dragSource.period !== period) return;
+    e.preventDefault();
+    const rect = card.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    const targetIdx = sIdx + (before ? 0 : 1);
+    reorderArray(APP_DATA.checklists[period], dragSource.sIdx, targetIdx);
+    dragSource = null;
+    render();
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'section-head-actions';
+
+  const delSectionBtn = document.createElement('button');
+  delSectionBtn.className = 'small ghost danger';
+  delSectionBtn.textContent = '섹션 삭제';
+  delSectionBtn.onclick = () => {
+    if(confirm(`"${section.title}" 섹션을 삭제할까요?`)){
+      APP_DATA.checklists[period].splice(sIdx,1);
+      render();
+    }
+  };
+  actions.appendChild(delSectionBtn);
+  head.appendChild(actions);
+  card.appendChild(head);
+
+  section.items.forEach((item, iIdx) => {
+    card.appendChild(buildItemRow(period, sIdx, item, iIdx));
+  });
+
+  const addRow = document.createElement('div');
+  addRow.className = 'add-item-row';
+  const input = document.createElement('input');
+  input.placeholder = '새 업무 입력 후 Enter';
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && input.value.trim()){
+      APP_DATA.checklists[period][sIdx].items.push({text: input.value.trim(), done:false});
+      render();
+      focusPanel(period);
+    }
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'small';
+  addBtn.textContent = '추가';
+  addBtn.onclick = () => {
+    if(input.value.trim()){
+      APP_DATA.checklists[period][sIdx].items.push({text: input.value.trim(), done:false});
+      render();
+      focusPanel(period);
+    }
+  };
+  addRow.appendChild(input);
+  addRow.appendChild(addBtn);
+  card.appendChild(addRow);
+
+  return card;
+}
+
+function buildItemRow(period, sIdx, item, iIdx){
+  const row = document.createElement('div');
+  row.className = 'item-row' + (isDone(period, APP_DATA.checklists[period][sIdx], item) ? ' done' : '');
+
+  const dragHandle = document.createElement('span');
+  dragHandle.className = 'item-drag-handle';
+  dragHandle.title = '드래그하여 항목 순서 변경';
+  dragHandle.textContent = '⠿';
+  dragHandle.addEventListener('mousedown', () => { row.draggable = true; });
+  dragHandle.addEventListener('mouseup', () => { row.draggable = false; });
+  row.addEventListener('dragstart', (e) => {
+    dragSource = {type:'item', period, sIdx, iIdx};
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'item');
+    requestAnimationFrame(() => row.classList.add('dragging'));
+  });
+  row.addEventListener('dragend', () => {
+    row.classList.remove('dragging');
+    row.draggable = false;
+    clearDropIndicators();
+    dragSource = null;
+  });
+  row.addEventListener('dragover', (e) => {
+    if(!dragSource || dragSource.type !== 'item' || dragSource.period !== period || dragSource.sIdx !== sIdx) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = row.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    clearDropIndicators();
+    row.classList.add(before ? 'drop-before' : 'drop-after');
+  });
+  row.addEventListener('dragleave', () => {
+    row.classList.remove('drop-before', 'drop-after');
+  });
+  row.addEventListener('drop', (e) => {
+    if(!dragSource || dragSource.type !== 'item' || dragSource.period !== period || dragSource.sIdx !== sIdx) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = row.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    const targetIdx = iIdx + (before ? 0 : 1);
+    reorderArray(APP_DATA.checklists[period][sIdx].items, dragSource.iIdx, targetIdx);
+    dragSource = null;
+    render();
+  });
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  const sec = APP_DATA.checklists[period][sIdx];
+  cb.checked = isDone(period, sec, item);
+  cb.onchange = () => {
+    // 파일이 아니라 이 브라우저에 남긴다. 남의 화면은 그대로다.
+    setDone(period, sec, item, cb.checked);
+    row.classList.toggle('done', cb.checked);
+    updateProgressBar(period);
+  };
+
+  const text = document.createElement('div');
+  text.className = 'item-text';
+  text.contentEditable = 'true';
+  text.spellcheck = false;
+  text.textContent = item.text;
+  text.addEventListener('blur', () => {
+    APP_DATA.checklists[period][sIdx].items[iIdx].text = text.textContent.trim() || item.text;
+  });
+
+  const del = document.createElement('button');
+  del.className = 'item-del';
+  del.textContent = '삭제';
+  del.onclick = () => {
+    APP_DATA.checklists[period][sIdx].items.splice(iIdx,1);
+    render();
+  };
+
+  row.appendChild(dragHandle);
+  row.appendChild(cb);
+  row.appendChild(text);
+  row.appendChild(del);
+  return row;
+}
+
+function updateProgressBar(period){
+  const {total, done} = countProgress(period);
+  const pct = total ? Math.round(done/total*100) : 0;
+  const panel = document.getElementById('panel-'+period);
+  const wrap = panel.querySelector('.progress-wrap');
+  wrap.innerHTML = `
+    <span>${done}/${total} 완료</span>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <span>${pct}%</span>`;
+}
+
+function focusPanel(period){ /* no-op placeholder for potential focus restoration */ }
+
+/* ---------- vendors ---------- */
+
+function buildVendorPanel(){
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.id = 'panel-vendors';
+
+  panel.innerHTML = `<div class="period-header"><h2>유지보수 업체 관리</h2></div>
+    <p class="vendor-hint">칸에 입력한 내용은 길이에 맞춰 자동으로 줄바꿈되고 칸 높이가 늘어납니다. 칸 안에서 Enter를 누르면 줄을 바꿀 수 있습니다.</p>`;
+
+  const table = document.createElement('table');
+  table.className = 'vendor-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th style="width:13%">업체명</th>
+        <th style="width:19%">담당 영역</th>
+        <th style="width:12%">계약 기간</th>
+        <th style="width:9%">담당자</th>
+        <th style="width:11%">연락처</th>
+        <th style="width:15%">이메일</th>
+        <th style="width:18%">비고</th>
+        <th class="vendor-del-cell"></th>
+      </tr>
+    </thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+
+  APP_DATA.vendors.forEach((v, idx) => {
+    tbody.appendChild(buildVendorRow(v, idx));
+  });
+
+  panel.appendChild(table);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-vendor-btn';
+  addBtn.textContent = '+ 업체 추가';
+  addBtn.onclick = () => {
+    APP_DATA.vendors.push({name:'', area:'', contract:'', manager:'', phone:'', email:'', note:''});
+    render();
+  };
+  panel.appendChild(addBtn);
+
+  return panel;
+}
+
+/* 내용 길이에 맞춰 칸 높이를 자동으로 늘려준다.
+   숨겨진 패널에서는 scrollHeight가 0이므로 탭이 보일 때 다시 호출해야 한다. */
+function autoGrow(ta){
+  ta.style.height = 'auto';
+  const h = ta.scrollHeight;
+  if(h <= 0) return;               // 아직 화면에 안 보이는 상태
+  const borders = ta.offsetHeight - ta.clientHeight;  // box-sizing:border-box 보정
+  ta.style.height = (h + borders) + 'px';
+}
+function autoGrowVendorFields(){
+  document.querySelectorAll('.vendor-table textarea').forEach(autoGrow);
+}
+
+function buildVendorRow(v, idx){
+  const tr = document.createElement('tr');
+  const fields = [
+    ['name','업체명'], ['area','담당 영역'], ['contract','계약 기간'],
+    ['manager','담당자'], ['phone','연락처'], ['email','이메일'], ['note','비고']
+  ];
+  fields.forEach(([key, placeholder]) => {
+    const td = document.createElement('td');
+    td.dataset.label = placeholder;
+    const field = document.createElement('textarea');
+    field.rows = 1;
+    field.value = v[key] || '';
+    field.placeholder = placeholder;
+    field.title = v[key] || '';
+    field.addEventListener('input', () => {
+      APP_DATA.vendors[idx][key] = field.value;
+      field.title = field.value;
+      autoGrow(field);
+    });
+    td.appendChild(field);
+    tr.appendChild(td);
+  });
+  const delTd = document.createElement('td');
+  delTd.className = 'vendor-del-cell';
+  const delBtn = document.createElement('button');
+  delBtn.className = 'small ghost danger';
+  delBtn.textContent = '×';
+  delBtn.title = '업체 삭제';
+  delBtn.onclick = () => {
+    if(confirm(`"${v.name || '이 업체'}"를 삭제할까요?`)){
+      APP_DATA.vendors.splice(idx,1);
+      render();
+    }
+  };
+  delTd.appendChild(delBtn);
+  tr.appendChild(delTd);
+  return tr;
+}
+
+/* ---------- reference (static, from source document) ---------- */
+
+function buildReferencePanel(){
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  panel.id = 'panel-reference';
+  panel.innerHTML = `
+    <div class="period-header"><h2>참고자료 (원본 문서 정리)</h2></div>
+
+    <div class="ref-block">
+      <h3>장애 발생 시 기본 업무 흐름</h3>
+      <ol>
+        <li>사용자 문의 접수</li>
+        <li>영향 범위 확인</li>
+        <li>공통 장애인지 확인</li>
+        <li>서버/네트워크 상태 확인</li>
+        <li>로그 확인</li>
+        <li>유지보수 업체 연락</li>
+        <li>임시 조치</li>
+        <li>사용자 공지</li>
+        <li>원인 분석</li>
+        <li>재발 방지 정리</li>
+      </ol>
+    </div>
+
+    <div class="ref-grid">
+      <div class="ref-block">
+        <h3>입사(인수인계) 시 최우선 확인 사항</h3>
+        <ul>
+          <li>유지보수 업체 연락처</li>
+          <li>서버 목록 / 주요 시스템 목록</li>
+          <li>VPN 사용 여부</li>
+          <li>백업 방식</li>
+          <li>계정 생성 프로세스</li>
+          <li>SAP / 그룹웨어 운영 방식</li>
+          <li>방화벽 장비 / NAS 위치</li>
+          <li>인터넷 회선 이중화 여부</li>
+        </ul>
+      </div>
+      <div class="ref-block">
+        <h3>업체에게 자주 확인해야 할 질문</h3>
+        <ul>
+          <li>장애 원인</li>
+          <li>조치 예상 시간</li>
+          <li>최근 변경 사항</li>
+          <li>재발 가능성</li>
+          <li>로그 확인 요청</li>
+          <li>SAP 배치 실패 원인</li>
+          <li>인터페이스 오류 원인</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ref-block">
+      <h3>결재 문서 기준 실제 발생 업무</h3>
+      <h4>SAP 사용 신청서</h4>
+      <ul>
+        <li>업무: 신규 계정 생성 / 권한 추가·변경 / 퇴사자 권한 회수 / 부서이동 권한 변경</li>
+        <li>처리: 사용자·모듈 확인 → 결재 완료 확인 → 업체(SAP 관리자) 요청 → 완료 후 사용자 테스트 안내</li>
+      </ul>
+      <h4>월간 SAP 시스템 현황 보고서</h4>
+      <ul>
+        <li>내용: 장애 건수, 권한 처리 건수, 인터페이스 오류, 배치 실패 여부, 서버/DB 상태, 주요 요청 사항</li>
+      </ul>
+      <h4>전자전표 / IT 비용 정산</h4>
+      <ul>
+        <li>흐름: 세금계산서 수령 → 계약 금액 확인 → 월 비용 확인 → 전자전표 작성 → 결재 상신 → 회계 처리 요청</li>
+      </ul>
+    </div>
+
+    <div class="ref-block">
+      <h3>입사 초반 추천 행동 순서</h3>
+      <ol>
+        <li>시스템 구조 파악</li>
+        <li>유지보수 업체 리스트 정리</li>
+        <li>서버/NAS/VPN 위치 확인</li>
+        <li>결재 프로세스 확인</li>
+        <li>SAP 권한 신청 흐름 파악</li>
+        <li>월 비용 정산 방식 확인</li>
+        <li>장애 발생 이력 확인</li>
+        <li>백업 방식 확인</li>
+      </ol>
+    </div>
+
+    <div class="ref-block">
+      <h3>문서 기준 핵심 역할 요약</h3>
+      <ul>
+        <li>유지보수 업체와 소통하는 운영 담당자</li>
+        <li>SAP / 그룹웨어(GW) 운영 관리</li>
+        <li>IT 비용 및 계약 관리</li>
+        <li>계정 및 권한 관리</li>
+        <li>장애 대응 및 보고</li>
+        <li>예산 / 정산 관리</li>
+      </ul>
+    </div>
+  `;
+  return panel;
+}
+
+/* ---------- tabs ---------- */
+/* 주소 끝에 #daily 처럼 붙이면 그 탭이 열린 채로 시작한다.
+   챗에서 "매일 뭐 해야 해?" 하고 바로가기를 누르면 매일 탭으로 바로 온다.
+   경로(/checklist/daily) 가 아니라 # 를 쓰는 이유는 이 앱이 정적 파일이라
+   그런 경로는 nginx 가 404 를 주기 때문이다. # 는 서버까지 가지 않는다. */
+
+function tabNames(){
+  return Array.from(document.querySelectorAll('nav.tabs button')).map(b => b.dataset.tab);
+}
+
+function tabFromHash(){
+  const n = (location.hash || '').replace(/^#\/?/, '').split('/')[0];
+  return tabNames().includes(n) ? n : null;
+}
+
+// 내가 바꾼 해시 때문에 hashchange 가 다시 도는 것을 막는다
+let hashLock = false;
+
+function bindTabSwitching(){
+  document.querySelectorAll('nav.tabs button').forEach(btn => {
+    btn.onclick = () => showTab(btn.dataset.tab, true);
+  });
+}
+
+function showTab(tab, pushHash){
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+tab));
+  // 업체 관리 탭은 화면에 나타난 뒤에야 높이를 계산할 수 있다
+  if(tab === 'vendors') requestAnimationFrame(autoGrowVendorFields);
+  if(pushHash && tabFromHash() !== tab){
+    hashLock = true;
+    location.hash = tab;
+    setTimeout(() => { hashLock = false; }, 0);
+  }
+}
+
+window.addEventListener('hashchange', () => {
+  if(hashLock) return;
+  const t = tabFromHash();
+  if(t) showTab(t, false);
+});
+
+// 창 크기가 바뀌면 줄바꿈 위치가 달라지므로 높이를 다시 잡는다
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(autoGrowVendorFields, 120);
+});
+
+/* ---------- save / load ---------- */
+
+function saveAsHtmlFile(){
+  const dataScript = document.getElementById('app-data');
+  // 체크 표시는 파일에 넣지 않는다. 넣으면 내가 체크한 것이 남의 화면에도
+  // 체크된 채로 보인다. (옛 파일에서 넘어온 done 값도 여기서 걷어낸다)
+  const clean = JSON.parse(JSON.stringify(APP_DATA));
+  Object.values(clean.checklists || {}).forEach(secs =>
+    (secs || []).forEach(sec =>
+      (sec.items || []).forEach(it => { delete it.done; })));
+  dataScript.textContent = JSON.stringify(clean, null, 2);
+  const htmlStr = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([htmlStr], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const stamp = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  a.href = url;
+  a.download = `IT업무체크리스트_${stamp}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function loadBackupFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      let text = reader.result;
+      let parsed;
+      if(file.name.endsWith('.html')){
+        const match = text.match(/<script id="app-data" type="application\/json">([\s\S]*?)<\/script>/);
+        if(!match) throw new Error('no data block found');
+        parsed = JSON.parse(match[1]);
+      } else {
+        parsed = JSON.parse(text);
+      }
+      if(!parsed.checklists || !parsed.vendors) throw new Error('invalid data format');
+      APP_DATA = parsed;
+      render();
+      alert('백업 파일을 불러왔습니다.');
+    }catch(err){
+      alert('파일을 불러오지 못했습니다. 이 페이지에서 저장한 HTML 또는 JSON 파일인지 확인해주세요.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('uncheckBtn').addEventListener('click', () => {
+  if(!confirm('체크 표시를 모두 지웁니다. 항목 내용은 그대로입니다.\n계속할까요?')) return;
+  clearChecks();
+  render();
+});
+document.getElementById('saveBtn').addEventListener('click', saveAsHtmlFile);
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if(confirm('모든 체크/추가/수정 내용을 처음 상태로 되돌립니다. 계속할까요?')){
+    location.reload();
+  }
+});
+document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  if(e.target.files[0]) loadBackupFile(e.target.files[0]);
+  e.target.value = '';
+});
+
+render();
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

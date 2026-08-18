@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 이용 현황 대시보드</title>
+<!-- 엑셀을 브라우저에서 읽는 라이브러리 (SheetJS 0.18.5).
+     예전에는 이 파일 안에 통째로 박혀 있었다. 그래서 index.html 이 940KB 였고,
+     화면을 한 줄 고칠 때마다 그 940KB 를 다시 받아야 했다. 파일로 빼면
+     브라우저가 한 번 받아 두고 다시 쓴다.
+     주소는 상대경로다 — 이 앱은 포털 아래 /ai-report/ 로 붙는다. -->
+<script src="xlsx.min.js"></script>
+<style>
+/* ============ design tokens ============ */
+:root{
+  color-scheme: light;
+  --bg:#f4f5f7;
+  --surface-1:#ffffff;
+  --surface-2:#f7f8fa;
+  --border:#e6e8ec;
+  --border-strong:#d3d7de;
+  --text-primary:#14161a;
+  --text-secondary:#5b6270;
+  --text-muted:#8c94a3;
+  --accent:#2a78d6;
+  --accent-soft:#e8f1fd;
+  --track:#eef0f4;
+  --gray-mark:#9aa2b1;
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#131416;
+  --surface-1:#1c1e21;
+  --surface-2:#232629;
+  --border:#2e3237;
+  --border-strong:#3d4249;
+  --text-primary:#f2f4f7;
+  --text-secondary:#b3b9c4;
+  --text-muted:#828a97;
+  --accent:#3987e5;
+  --accent-soft:#1d2a3c;
+  --track:#282b30;
+  --gray-mark:#767e8b;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text-primary);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit; cursor:pointer}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 20px 56px}
+
+/* ============ header ============ */
+.topbar{
+  position:sticky; top:0; z-index:30; background:var(--surface-1);
+  border-bottom:1px solid var(--border);
+}
+.topbar-inner{max-width:1240px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:4px}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px}
+.brand h1{font-size:16px;font-weight:700;margin:0;letter-spacing:-.2px}
+.brand p{margin:0;font-size:11.5px;color:var(--text-muted)}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+  background:#fff7e6;color:#8a6100;font-size:12px;font-weight:600;border:1px solid #f3e2bd;white-space:nowrap;
+}
+:root[data-theme="dark"] .pill{background:#332a17;color:#e0b95f;border-color:#4a3d20}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:#e5a13a}
+.spacer{flex:1 1 auto}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+.seg button{
+  border:0;background:transparent;color:var(--text-secondary);font-size:13px;font-weight:600;
+  padding:6px 15px;border-radius:6px;transition:.12s;
+}
+.seg button[aria-pressed="true"]{background:var(--text-primary);color:var(--surface-1)}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-strong);background:var(--surface-1);
+  color:var(--text-secondary);font-size:13px;font-weight:600;padding:7px 12px;border-radius:8px;transition:.12s;
+text-decoration:none;}
+.btn:hover{background:var(--surface-2);color:var(--text-primary)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(.94);color:#fff}
+.btn svg{width:15px;height:15px}
+.hint-line{font-size:12px;color:var(--text-muted);width:100%;margin-top:-2px}
+
+/* ============ cards ============ */
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.grid-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+.kpi{padding:16px 18px;display:flex;flex-direction:column;gap:2px;min-height:118px}
+.kpi .label{font-size:12.5px;color:var(--text-secondary);font-weight:600}
+.kpi .value{font-size:30px;font-weight:750;letter-spacing:-1px;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .value .cur{font-size:20px;font-weight:650;margin-right:1px}
+.kpi .sub{font-size:11.5px;color:var(--text-muted);margin-top:auto;font-variant-numeric:tabular-nums}
+.kpi .spark{height:34px;margin:6px 0 2px}
+
+.panel{padding:16px 18px 18px}
+.panel-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:2px}
+.panel-head h3{margin:0;font-size:14.5px;font-weight:700;letter-spacing:-.2px}
+.panel-head .desc{font-size:11.5px;color:var(--text-muted);margin:3px 0 0}
+.panel-tools{margin-left:auto;display:flex;gap:6px;align-items:center}
+.icon-btn{
+  border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);
+  width:30px;height:28px;border-radius:7px;display:grid;place-items:center;padding:0;transition:.12s;
+}
+.icon-btn:hover{background:var(--surface-2);color:var(--text-primary)}
+.icon-btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.icon-btn svg{width:15px;height:15px}
+select.mini{
+  border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);
+  border-radius:7px;padding:5px 8px;font-size:12.5px;font-family:inherit;font-weight:600;
+}
+
+/* ============ bar list ============ */
+.dist{margin-top:12px;display:flex;flex-direction:column;gap:1px;max-height:none}
+.dist-row{display:grid;grid-template-columns:minmax(96px,150px) 1fr minmax(64px,auto);gap:12px;align-items:center;padding:5px 4px;border-radius:6px}
+.dist-row:hover{background:var(--surface-2)}
+.dist-name{font-size:12.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dist-name .sub{color:var(--text-muted);font-size:11px}
+.dist-track{height:11px;background:var(--track);border-radius:999px;overflow:hidden}
+.dist-fill{height:100%;background:var(--accent);border-radius:999px;min-width:3px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+.dist-fill.muted{background:var(--gray-mark)}
+.dist-val{font-size:12.5px;font-weight:650;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.badge-info{
+  display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;
+  border:1px solid var(--border-strong);color:var(--text-muted);font-size:9px;font-weight:700;margin-left:4px;cursor:help;vertical-align:middle
+}
+.home-head{margin:4px 2px 16px}
+.home-head h2{margin:0 0 4px;font-size:19px;letter-spacing:-.3px}
+.home-head p{margin:0;font-size:13px;color:var(--text-muted)}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.mcard{
+  background:var(--surface-1);border:1px solid var(--border);border-radius:14px;padding:18px 18px 14px;
+  cursor:pointer;transition:.14s;text-align:left;font-family:inherit;
+}
+.mcard:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.07)}
+.mcard .m-top{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.mcard .m-month{white-space:nowrap;font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--text-primary)}
+.mcard .m-tag{white-space:nowrap;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;background:var(--accent);color:#fff}
+.mcard .m-range{font-size:11.5px;color:var(--text-muted);margin-bottom:12px}
+.mcard .m-cost{font-size:24px;font-weight:800;letter-spacing:-1px;color:var(--text-primary)}
+.mcard .m-sub{font-size:12px;color:var(--text-secondary);margin-top:3px}
+.mcard .m-top3{border-top:1px solid var(--border);margin-top:12px;padding-top:9px}
+.mcard .m-row{display:flex;justify-content:space-between;font-size:12px;padding:2px 0;color:var(--text-secondary)}
+.mcard .m-row b{color:var(--text-primary);font-weight:600}
+.mcard .m-file{font-size:10.5px;color:var(--text-muted);margin-top:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcard.loading{opacity:.55;cursor:default}
+.u-tbl .u-row{cursor:pointer}
+.u-tbl .u-row:hover{background:var(--surface-2)}
+.u-tbl .u-row.open{background:var(--surface-2)}
+.caret{display:inline-block;width:12px;color:var(--text-muted);font-size:9px;margin-right:4px}
+.u-dept{color:var(--text-muted);margin-left:8px;font-size:11.5px}
+.sub-tr>td{background:var(--surface-2);padding:0 14px 12px!important}
+.sub-wrap{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.sub-title{font-size:11.5px;font-weight:700;color:var(--text-muted);padding:8px 0 5px}
+.sub-row{display:grid;grid-template-columns:minmax(0,1fr) 52px 74px 88px;gap:8px;font-size:12px;padding:3px 0;align-items:center}
+.sub-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+.sub-val{text-align:right;font-variant-numeric:tabular-nums;min-width:58px;color:var(--text-secondary)}
+.warn-note{
+  margin:8px 0 0;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.6;
+  background:rgba(224,160,106,.12);border:1px solid rgba(224,160,106,.35);color:var(--text-secondary);
+}
+.warn-note b{color:var(--text-primary)}
+.seg.mini-seg{padding:2px;gap:1px}
+.seg.mini-seg button{padding:5px 10px;font-size:12px;white-space:nowrap}
+.seg-div{width:1px;align-self:stretch;background:var(--border-strong);margin:4px 4px}
+.rank{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--track);color:var(--text-secondary);font-size:11px;font-weight:700}
+.rank.r1{background:#f2c94c;color:#5b4300}
+.rank.r2{background:#d5d9e0;color:#41474f}
+.rank.r3{background:#e0a06a;color:#4d2a06}
+table.tbl th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+table.tbl th.sortable:hover{color:var(--text-primary)}
+table.tbl th.sortable .ar{opacity:.35;margin-left:3px}
+table.tbl th.sortable[data-active="1"]{color:var(--accent)}
+table.tbl th.sortable[data-active="1"] .ar{opacity:1}
+.search-box{
+  border:1px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);
+  border-radius:8px;padding:6px 10px;font-size:12.5px;font-family:inherit;width:180px;
+}
+.search-box:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.more-btn{
+  margin-top:8px;width:100%;border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);
+  font-size:12.5px;font-weight:600;padding:7px;border-radius:8px;transition:.12s;
+}
+.more-btn:hover{background:var(--surface-2);color:var(--text-primary)}
+.empty-note{font-size:12.5px;color:var(--text-muted);padding:18px 4px}
+
+/* ============ table view ============ */
+table.tbl{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+table.tbl th,table.tbl td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums}
+table.tbl th{color:var(--text-muted);font-weight:600;font-size:11.5px;border-bottom:1px solid var(--border-strong)}
+table.tbl th:first-child,table.tbl td:first-child{text-align:left}
+table.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl-scroll{max-height:420px;overflow:auto}
+
+/* ============ chart ============ */
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:10px 0 4px}
+.legend span{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-secondary)}
+.legend i{width:9px;height:9px;border-radius:2.5px;display:inline-block}
+.chart-host{position:relative;width:100%}
+.chart-host svg{display:block;width:100%}
+.tip{
+  position:fixed;z-index:80;pointer-events:none;background:var(--surface-1);border:1px solid var(--border-strong);
+  border-radius:9px;box-shadow:0 6px 20px rgba(16,24,40,.14);padding:9px 11px;font-size:12px;min-width:150px;
+  opacity:0;transition:opacity .1s;
+}
+.tip.on{opacity:1}
+.tip .t{font-weight:700;margin-bottom:5px;font-size:12px}
+.tip .r{display:flex;align-items:center;gap:7px;margin-top:3px;color:var(--text-secondary)}
+.tip .r i{width:8px;height:8px;border-radius:2px}
+.tip .r b{margin-left:auto;color:var(--text-primary);font-variant-numeric:tabular-nums}
+
+/* ============ dropzone / modal ============ */
+.drop{
+  border:2px dashed var(--border-strong);border-radius:16px;background:var(--surface-1);
+  padding:56px 24px;text-align:center;color:var(--text-secondary);
+}
+.drop.hot{border-color:var(--accent);background:var(--accent-soft)}
+.drop h2{margin:10px 0 6px;font-size:17px;color:var(--text-primary)}
+.drop p{margin:0 0 16px;font-size:13px;color:var(--text-muted)}
+.modal-bg{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:60;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.on{display:flex}
+.modal{background:var(--surface-1);border-radius:16px;width:100%;max-width:720px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(16,24,40,.3)}
+.modal.wide{max-width:1080px}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.modal-head h3{margin:0;font-size:15.5px;font-weight:700}
+.modal-body{padding:16px 20px;overflow:auto}
+.modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+.map-row{display:grid;grid-template-columns:1fr 200px;gap:8px;align-items:center;padding:5px 0}
+.map-row input{
+  width:100%;padding:7px 10px;border:1px solid var(--border-strong);border-radius:7px;background:var(--surface-1);
+  color:var(--text-primary);font-family:inherit;font-size:13px;
+}
+.map-row input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.map-sec{font-size:11.5px;font-weight:700;color:var(--text-muted);padding:12px 0 4px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.map-email{font-size:12.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+textarea.bulk{width:100%;min-height:110px;padding:10px;border:1px solid var(--border-strong);border-radius:9px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:var(--surface-2);color:var(--text-primary);resize:vertical}
+.foot-note{margin-top:16px;font-size:11.5px;color:var(--text-muted);text-align:left}
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+.tabs button{border:0;background:none;padding:8px 12px;font-size:13px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.hidden{display:none !important}
+
+/* 손끝은 마우스 포인터가 아니다.
+   이 화면들의 작은 단추는 높이가 23~27px 이었다. 마우스로는 정확히
+   맞히지만 손가락 접촉면은 그보다 훨씬 넓어서, 폰에서는 옆 것이
+   눌리거나 아무것도 안 눌린다. 애플·구글 지침은 44~48px 인데
+   촘촘한 도구 줄이 헐거워지므로 여기서는 36px 로 맞춘다.
+   글자 크기는 그대로 두고 눌리는 넓이만 키운다. */
+@media (max-width:760px){
+  .btn,.more-btn,.seg button,.icon-btn,.mcard{min-height:36px}
+  .icon-btn{width:36px}
+  .seg.mini-seg button{min-height:34px}
+}
+
+/* ============ 반응형 ============
+   좁은 화면에서 무너지는 곳만 한 자리에 모았다. 예전에는 이 규칙들이
+   각자 자기가 고치는 스타일 옆에 흩어져 있어서, 「폰에서 뭐가 어떻게
+   되는가」를 알려면 파일 전체를 훑어야 했다.
+
+   ★ 제일 큰 문제는 표였다.
+     table.tbl 은 width:100% 다. 칸이 여덟 개여도 화면 폭에 맞춰
+     찌그러진다는 뜻이다. 감싼 .tbl-scroll 에 overflow:auto 가 있어도
+     표가 넘치질 않으니 스크롤 막대가 생길 일이 없었다. 그래서
+     사용자별 상세를 폰에서 열면 숫자들이 서로 겹쳐 보였다.
+
+     고치는 방법은 폭을 줄이는 게 아니라 **넘치게 두는 것**이다.
+     width:auto + 칸마다 nowrap 을 주면 표는 제 내용만큼 넓어지고,
+     그제서야 .tbl-scroll 이 옆으로 미는 스크롤을 만든다. 칸이 적은
+     표는 min-width:100% 덕에 그대로 꽉 차니 따로 나눌 필요가 없다. */
+
+@media (max-width:980px){
+  .grid-kpi{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+}
+
+@media (max-width:900px){
+  .sub-wrap{grid-template-columns:1fr}
+}
+
+@media (max-width:760px){
+  /* 표 — 줄이지 말고 옆으로 밀어 본다 (위 ★ 참고) */
+  .tbl-scroll{overflow:auto;-webkit-overflow-scrolling:touch}
+  .tbl-scroll>table.tbl{width:auto;min-width:100%}
+  .tbl-scroll>table.tbl th,
+  .tbl-scroll>table.tbl td{white-space:nowrap}
+  .tbl-scroll>table.tbl .sub-tr>td{white-space:normal}
+
+  /* 제목 오른쪽에 밀어붙어 있던 도구 줄을 아래로 내린다.
+     margin-left:auto 를 그대로 두면 검색창이 화면 밖으로 나간다. */
+  .panel-head{flex-wrap:wrap}
+  .panel-tools{margin-left:0;width:100%;flex-wrap:wrap;justify-content:flex-start}
+  .search-box{width:auto;flex:1 1 140px;min-width:0}
+
+  /* 모달은 폰에서 전체 화면으로 */
+  .modal-bg{padding:0}
+  .modal,.modal.wide{max-width:none;max-height:100vh;height:100%;border-radius:0}
+  .map-row{grid-template-columns:1fr;gap:3px;padding:8px 0}
+}
+
+@media (max-width:560px){
+  .grid-kpi{grid-template-columns:1fr}
+  .wrap{padding:14px 12px 40px}
+  .topbar-inner{padding:10px 12px;gap:8px}
+  .panel{padding:14px 13px 16px}
+  .kpi{padding:14px 15px;min-height:0}
+  .kpi .value{font-size:25px}
+  .kpi .value .cur{font-size:17px}
+  .seg button{padding:6px 11px;font-size:12.5px}
+  .home-head h2{font-size:17px}
+  .card-grid{grid-template-columns:1fr}
+  .sub-row{grid-template-columns:minmax(0,1fr) 44px 60px 74px;gap:6px}
+  .drop{padding:36px 16px}
+  .modal-head,.modal-body,.modal-foot{padding-left:14px;padding-right:14px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">AI</div>
+      <div>
+        <h1>AI 이용 현황 대시보드</h1>
+        <p id="periodLabel" style="max-width:460px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">엑셀 파일을 올리면 집계를 보여드려요</p>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <!-- 아래 셋(지표 선택·다운로드·업로드)은 서버에 물어본 뒤에 나온다.
+         미리 띄워 두면 들어올 때마다 "비용 토큰 호출수 … 엑셀 업로드" 가
+         한 번 번쩍이고 월별 목록으로 바뀐다. -->
+    <div class="seg hidden" id="metricSeg" role="group" aria-label="지표 선택">
+      <button data-metric="cost" aria-pressed="true">비용</button>
+      <button data-metric="token" aria-pressed="false">토큰</button>
+      <button data-metric="calls" aria-pressed="false">호출수</button>
+      <span class="seg-div"></span>
+      <button data-view="detail" aria-pressed="false">사용자별 상세</button>
+    </div>
+    <!-- 포탈 주소: nginx 로 한 서버에 묶여 있으면 '/'. 다르면 아래 href 만 바꾸세요. -->
+    <a class="btn hidden" id="btnPortal" href="/" title="포탈 메인으로" data-backportal>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      포탈로
+    </a>
+    <button class="btn hidden" id="btnHome" title="월별 목록으로">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      목록
+    </button>
+    <div id="serverBox" class="hidden" style="display:flex;gap:6px;align-items:center">
+      <select class="mini" id="serverFiles" title="서버에 올라간 엑셀" style="max-width:210px;text-overflow:ellipsis"></select>
+      <button class="icon-btn" id="btnDelFile" title="이 파일 삭제 (관리자)" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+      </button>
+    </div>
+    <button class="btn hidden" id="btnDownload" title="현재 화면 데이터를 엑셀로 저장">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      다운로드
+    </button>
+    <button class="btn primary hidden" id="btnUpload">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      <span id="btnUploadLabel">엑셀 업로드</span>
+    </button>
+    <button class="icon-btn" id="btnTheme" title="라이트/다크 전환">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- empty state -->
+  <!-- 처음에는 감춰 둔다.
+       서버에 물어보기 전까지는 "엑셀을 올리세요" 인지 "월별 목록" 인지 알 수 없다.
+       업로드 화면을 먼저 보여 놓고 나중에 바꾸면, 들어올 때마다 엉뚱한 화면이
+       한 번 번쩍이고 지나간다. 서버가 없을 때만(= 내 PC 파일 모드) 나온다. -->
+  <div id="emptyState" class="hidden">
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.6" style="width:44px;height:44px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg>
+      <h2>웍스AI 엑셀을 올려주세요</h2>
+      <p><b>Raw_Data_YYYYMMDD-YYYYMMDD.xlsx</b>(원본 로그) 또는 웍스AI 대시보드에서 받은 <b>이용통계 집계 엑셀</b> 둘 다 됩니다.<br>원본 로그를 올리면 전체 인원 순위·INPUT/OUTPUT 분리·활동일수까지 나옵니다.<br>파일을 이 영역에 끌어다 놓거나 아래 버튼을 누르세요.</p>
+      <button class="btn primary" id="btnUpload2">엑셀 파일 선택</button>
+      <p id="apiWarn" class="hidden" style="margin-top:16px;font-size:12px;color:var(--text-muted)"></p>
+    </div>
+  </div>
+
+  <!-- 월별 카드 (서버 모드 첫 화면) -->
+  <div id="cardHome" class="hidden">
+    <div class="home-head">
+      <h2>월별 이용 현황</h2>
+      <p id="homeSub">서버에 올라간 엑셀을 월별로 보여드려요. 카드를 누르면 그 달 상세로 들어갑니다.</p>
+    </div>
+    <div class="card-grid" id="cardGrid"></div>
+  </div>
+
+  <!-- dashboard -->
+  <div id="dash" class="hidden">
+   <div id="viewDash">
+    <div class="grid-kpi" id="kpiRow"></div>
+
+    <div class="grid-2">
+      <div class="card panel" id="cardTrendTool"></div>
+      <div class="card panel" id="cardTrendModel"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card panel" data-dist="model"></div>
+      <div class="card panel" data-dist="agent"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card panel" data-dist="route"></div>
+      <div class="card panel" data-dist="tool"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card panel" data-dist="user"></div>
+      <div class="card panel" data-dist="assistant"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card panel" data-dist="dept"></div>
+      <div class="card panel" data-dist="workspace"></div>
+    </div>
+
+   </div>
+
+    <div class="card panel hidden" id="userDetail"></div>
+
+    <p class="foot-note" id="footNote"></p>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<!-- chart zoom modal -->
+<div class="modal-bg" id="zoomModal">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h3 id="zoomTitle">차트</h3>
+      <div class="spacer"></div>
+      <button class="icon-btn" data-close="zoomModal" aria-label="닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body"><div id="zoomHost" class="chart-host"></div><div id="zoomLegend" class="legend"></div></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* =========================================================
+   상수 / 유틸
+   ========================================================= */
+const PALETTE = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+const METRICS = {
+  cost:  {key:'cost',  label:'비용',   col:'비용(원)', unit:'won'},
+  token: {key:'token', label:'토큰',   col:'토큰',     unit:'num'},
+  calls: {key:'calls', label:'호출수', col:'호출수',   unit:'cnt'}
+};
+const DIST_PANELS = [
+  {id:'model',     sheet:'분포_모델별',        title:'모델별',        desc:'상위 20개와 기타를 보여줘요.'},
+  {id:'agent',     sheet:'분포_에이전트별',    title:'에이전트별',    desc:'상위 20개와 기타를 보여줘요.'},
+  {id:'route',     sheet:'분포_실행경로별',    title:'실행 경로별',   desc:'상위 20개와 기타를 보여줘요.'},
+  {id:'tool',      sheet:'분포_기능도구별',    title:'기능·도구별',   desc:'상위 20개와 기타를 보여줘요.'},
+  {id:'user',      sheet:'분포_사용자별',      title:'사용자별',      desc:'이름 매핑이 없으면 이메일로 표시돼요.', limit:10},
+  {id:'assistant', sheet:'분포_비서별',        title:'비서별',        desc:'상위 20개와 기타를 보여줘요.'},
+  {id:'dept',      sheet:'분포_부서별',        title:'부서별',        desc:'상위 20개와 기타를 보여줘요.'},
+  {id:'workspace', sheet:'분포_워크스페이스별',title:'워크스페이스별',desc:'상위 20개와 기타를 보여줘요.'}
+];
+const MUTED_ITEMS = ['기타','부가서비스/API','부가서비스/시스템','-','부서없음','(없음)'];
+const SYSTEM_RE = /^__system__/i;
+
+/* 이메일 → 이름.
+
+   게이트웨이가 뽑아 주는 로그에는 **이메일만 있고 이름이 없다.** 그래서
+   이 표가 없으면 사용자별 순위가 전부 이메일로 나온다. 화면의 「이름 매핑」
+   에서 고치면 그 값이 이것보다 우선한다.
+
+   ★ 여기 있는 것은 전부 가상 회사 「누리코스메틱」의 지어낸 사람들이다.
+     원래는 실제 사내 명부가 코드 안에 그대로 박혀 있었다. 공개 저장소로
+     옮기면서 통째로 갈아 끼웠다 — 이런 것은 지운 뒤에도 커밋 기록에
+     남으므로, 애초에 코드에 넣지 않는 편이 낫다. */
+const DEFAULT_NAME_MAP = {
+  "user001@nuricos.example.com":"한윤현", "user002@nuricos.example.com":"오채성",
+  "user003@nuricos.example.com":"안서연", "user004@nuricos.example.com":"정은우",
+  "user005@nuricos.example.com":"서시성", "user006@nuricos.example.com":"오도현",
+  "user007@nuricos.example.com":"신윤연", "user008@nuricos.example.com":"최서우",
+  "user009@nuricos.example.com":"한도우", "user010@nuricos.example.com":"박채영",
+  "user011@nuricos.example.com":"신윤성", "user012@nuricos.example.com":"강수아",
+  "user013@nuricos.example.com":"윤채아", "user014@nuricos.example.com":"강주진",
+  "user015@nuricos.example.com":"윤예원", "user016@nuricos.example.com":"임하율",
+  "user017@nuricos.example.com":"서채희", "user018@nuricos.example.com":"정은진",
+  "user019@nuricos.example.com":"김도연", "user020@nuricos.example.com":"오하호",
+  "user021@nuricos.example.com":"정서연", "user022@nuricos.example.com":"정민우",
+  "user023@nuricos.example.com":"정준원", "user024@nuricos.example.com":"강주영",
+  "user025@nuricos.example.com":"장준원", "user026@nuricos.example.com":"오준원",
+  "user027@nuricos.example.com":"한지현", "user028@nuricos.example.com":"최도성",
+  "user029@nuricos.example.com":"이준진", "user030@nuricos.example.com":"권채율",
+  "user031@nuricos.example.com":"임서성", "user032@nuricos.example.com":"조서연",
+  "user033@nuricos.example.com":"한주우", "user034@nuricos.example.com":"한민진",
+  "user035@nuricos.example.com":"정은아", "user036@nuricos.example.com":"장민영",
+  "user037@nuricos.example.com":"김민호", "user038@nuricos.example.com":"이하호",
+  "user039@nuricos.example.com":"안시영", "user040@nuricos.example.com":"최준아",
+  "user041@nuricos.example.com":"신채현", "user042@nuricos.example.com":"이시영",
+  "user043@nuricos.example.com":"장민아", "user044@nuricos.example.com":"신현호",
+  "user045@nuricos.example.com":"오시성", "user046@nuricos.example.com":"오서아",
+  "user047@nuricos.example.com":"한하아", "user048@nuricos.example.com":"장윤희",
+  "user049@nuricos.example.com":"정예호", "user050@nuricos.example.com":"권현율",
+  "user051@nuricos.example.com":"윤수연", "user052@nuricos.example.com":"황준현"
+};
+
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> Array.from((r||document).querySelectorAll(s));
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function comma(n){ return Math.round(n).toLocaleString('ko-KR'); }
+function sig3(v){
+  let s = v >= 100 ? String(Math.round(v)) : v.toPrecision(3);
+  if (s.indexOf('.') > -1) s = s.replace(/0+$/,'').replace(/\.$/,'');
+  return s;
+}
+/** 웍스AI와 동일한 축약 표기: 1.82억 / 3,367만 / 71.9만 / 8,165 */
+function compact(n){
+  n = Number(n)||0;
+  const neg = n<0; n = Math.abs(n);
+  let out;
+  if (n >= 1e8){ const v=n/1e8; out = (v>=1000? comma(v) : sig3(v)) + '억'; }
+  else if (n >= 1e4){ const v=n/1e4; out = (v>=1000? comma(v) : sig3(v)) + '만'; }
+  else out = comma(n);
+  return (neg?'-':'')+out;
+}
+function fmt(n, metric, opt){
+  const full = opt && opt.full;
+  if (metric === 'cost') return '₩' + (full ? comma(n) : compact(n));
+  if (metric === 'calls') return (full ? comma(n) : compact(n)) + (opt && opt.noSuffix ? '' : '회');
+  return full ? comma(n) : compact(n);
+}
+function fmtDateShort(iso){
+  const m = String(iso).match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (+m[2]) + '/' + (+m[3]) : String(iso);
+}
+function isMuted(name){ return MUTED_ITEMS.indexOf(name) > -1; }
+
+/* 기간 문자열이 '그 달 1일 ~ 말일'이면 월 라벨을 돌려준다 */
+function monthLabel(period){
+  const m = String(period||'').match(/(\d{4})-(\d{2})-(\d{2})\s*~\s*(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const [ , y1, m1, d1, y2, m2, d2 ] = m;
+  if (y1 !== y2 || m1 !== m2 || d1 !== '01') return null;
+  const last = new Date(Number(y1), Number(m1), 0).getDate();
+  if (Number(d2) !== last) return null;
+  return {text: y1 + '년 ' + Number(m1) + '월', file: y1 + '-' + m1};
+}
+
+/* =========================================================
+   상태
+   ========================================================= */
+const state = {
+  metric: 'cost',
+  data: null,          // 파싱 결과
+  deptLevel: 2,
+  tableView: {},       // panelId -> bool
+  view: 'dash',        // 'cards' | 'dash' | 'detail'
+  openUser: null,      // 상세 표에서 펼친 사용자
+  userSort: {key:'token', dir:-1},
+  userQuery: '',
+  fileName: ''
+};
+
+/* 인원명부 기준 이름 변환 */
+function displayName(item){
+  return DEFAULT_NAME_MAP[item] || DEFAULT_NAME_MAP[String(item).toLowerCase()] || item;
+}
+function hasName(item){
+  return !!(DEFAULT_NAME_MAP[item] || DEFAULT_NAME_MAP[String(item).toLowerCase()]);
+}
+
+/* =========================================================
+   엑셀 파싱
+   ========================================================= */
+function sheetRows(wb, name){
+  const ws = wb.Sheets[name];
+  if (!ws) return null;
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+}
+function findSheet(wb, candidates){
+  for (const c of candidates){ if (wb.Sheets[c]) return c; }
+  return null;
+}
+
+/* Raw_Data(stat 시트) 원본 로그 → 집계 파일과 같은 구조로 변환 */
+const TYPE_LABEL = {AGENT:'에이전트', ASSISTANT:'비서', WORKFLOW:'워크플로우', THIRDPARTY_APP:'외부 앱', ETC:'기타/부가서비스'};
+
+function isRawWorkbook(wb){
+  const nm = findSheet(wb, ['stat','Sheet1','raw','Raw']);
+  if (!nm) return false;
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[nm], {header:1, defval:null, range:0});
+  if (!rows.length) return false;
+  const head = (rows[0]||[]).map(h=>String(h||'').trim());
+  return head.indexOf('email') > -1 && head.indexOf('usageCount') > -1;
+}
+
+function parseRaw(wb){
+  const nm = findSheet(wb, ['stat','Sheet1','raw','Raw']);
+  const recs = XLSX.utils.sheet_to_json(wb.Sheets[nm], {raw:true, defval:null})
+    .filter(r => r && r.email)
+    .map(r=>{
+      const inTok = Number(r.inputToken)||0, outTok = Number(r.outputToken)||0;
+      const inChg = Number(r.inputCharge)||0, outChg = Number(r.outputCharge)||0;
+      let d = r.date;
+      if (d instanceof Date) d = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      else d = String(d||'').slice(0,10);
+      return {
+        email: String(r.email).trim(),
+        person: String(r.name || '').trim(),
+        dept : String(r.departmentFullName || '-').trim() || '-',
+        type : String(r.type || 'ETC').trim(),
+        tool : (r.toolName == null || String(r.toolName).trim()==='') ? '(없음)' : String(r.toolName).trim(),
+        model: (r.model == null || String(r.model).trim()==='') ? '(없음)' : String(r.model).trim(),
+        calls: Number(r.usageCount)||0,
+        inTok, outTok, inChg, outChg,
+        token: inTok + outTok,
+        cost : inChg + outChg,
+        date : d
+      };
+    });
+
+  const out = { kpi:{}, dist:{}, trend:{}, source:'raw', recCount: recs.length };
+
+  /* --- KPI --- */
+  const sum = k => recs.reduce((a,r)=>a + r[k], 0);
+  const dates = Array.from(new Set(recs.map(r=>r.date).filter(Boolean))).sort();
+  out.kpi['총 비용(원)'] = sum('cost');
+  out.kpi['총 토큰']     = sum('token');
+  out.kpi['입력 토큰']   = sum('inTok');
+  out.kpi['출력 토큰']   = sum('outTok');
+  out.kpi['총 호출수']   = sum('calls');
+  out.kpi['기간']        = dates.length ? dates[0] + ' ~ ' + dates[dates.length-1] : '';
+  out.kpi['활동일']      = dates.length;
+
+  /* --- 분포 --- */
+  function group(keyFn, filter){
+    const m = new Map();
+    recs.forEach(r=>{
+      if (filter && !filter(r)) return;
+      const k = keyFn(r); if (k == null) return;
+      const cur = m.get(k) || {name:k, cost:0, token:0, calls:0};
+      cur.cost += r.cost; cur.token += r.token; cur.calls += r.calls;
+      m.set(k, cur);
+    });
+    return Array.from(m.values()).sort((a,b)=> b.cost - a.cost);
+  }
+  /* 상위 N개 + 기타로 묶기 (사용자별은 전원 유지) */
+  function capped(items, n){
+    if (items.length <= n) return items;
+    const head = items.slice(0, n), tail = items.slice(n);
+    const etc = tail.reduce((a,b)=>({name:'기타', cost:a.cost+b.cost, token:a.token+b.token, calls:a.calls+b.calls}),
+                            {name:'기타', cost:0, token:0, calls:0});
+    return head.concat([etc]);
+  }
+
+  out.dist.model     = capped(group(r=>r.model), 20);
+  out.dist.tool      = capped(group(r=>r.tool), 20);
+  out.dist.agent     = capped(group(r=>r.tool, r=>r.type==='AGENT'), 20);
+  out.dist.assistant = capped(group(r=>r.tool, r=>r.type==='ASSISTANT'), 20);
+  out.dist.route     = group(r=> TYPE_LABEL[r.type] || r.type);
+  out.dist.dept      = group(r=>r.dept);
+  /* 시스템 계정(감사로그·IP허용 등 부가서비스)은 사람이 아니므로 따로 묶는다 */
+  out.dist.user      = group(r=> SYSTEM_RE.test(r.email) ? '부가서비스/시스템' : r.email);
+  out.dist.workspace = null;
+
+  /* --- 추이 (도구별 / 모델별, 지표 3종) --- */
+  function buildTrend(keyFn, topN){
+    const totals = group(keyFn);
+    const names = totals.slice(0, topN).map(t=>t.name);
+    const nameSet = new Set(names);
+    const hasEtc = totals.length > topN;
+    const series = names.concat(hasEtc ? ['기타'] : []);
+    const bucket = {};
+    ['cost','token','calls'].forEach(mk=>{
+      const byDate = new Map();
+      recs.forEach(r=>{
+        if (!r.date) return;
+        const arr = byDate.get(r.date) || series.map(()=>0);
+        const k = keyFn(r);
+        const idx = nameSet.has(k) ? names.indexOf(k) : (hasEtc ? series.length-1 : -1);
+        if (idx > -1) arr[idx] += r[mk];
+        byDate.set(r.date, arr);
+      });
+      bucket[mk] = {
+        series,
+        points: Array.from(byDate.keys()).sort().map(d=>({date:d, vals:byDate.get(d)}))
+      };
+    });
+    return bucket;
+  }
+  out.trend.tool  = buildTrend(r=>r.tool, 8);
+  out.trend.model = buildTrend(r=>r.model, 8);
+
+  /* --- 사용자별 상세(원본에서만 가능한 항목) --- */
+  const sysRecs = recs.filter(r=> SYSTEM_RE.test(r.email));
+  out.system = sysRecs.length ? {
+    cost : sysRecs.reduce((a,b)=>a+b.cost,0),
+    calls: sysRecs.reduce((a,b)=>a+b.calls,0),
+    items: Array.from(sysRecs.reduce((m,r)=>{
+      const c = m.get(r.model) || {name:r.model, cost:0}; c.cost += r.cost; m.set(r.model, c); return m;
+    }, new Map()).values()).sort((a,b)=>b.cost-a.cost)
+  } : null;
+
+  const um = new Map();
+  recs.forEach(r=>{
+    if (SYSTEM_RE.test(r.email)) return;
+    const u = um.get(r.email) || {
+      name:r.email, label:'', person:r.person, dept:r.dept,
+      cost:0, token:0, calls:0, inTok:0, outTok:0, inChg:0, outChg:0,
+      days:new Set(), models:new Map(), tools:new Map()
+    };
+    u.cost+=r.cost; u.token+=r.token; u.calls+=r.calls;
+    u.inTok+=r.inTok; u.outTok+=r.outTok; u.inChg+=r.inChg; u.outChg+=r.outChg;
+    if (r.date) u.days.add(r.date);
+    const mAdd = (map, key)=>{
+      const c = map.get(key) || {name:key, cost:0, token:0, calls:0};
+      c.cost+=r.cost; c.token+=r.token; c.calls+=r.calls; map.set(key, c);
+    };
+    mAdd(u.models, r.model); mAdd(u.tools, r.tool);
+    um.set(r.email, u);
+  });
+  out.people = Array.from(um.values()).map(u=>({
+    name:u.name,
+    label: displayName(u.name) !== u.name ? displayName(u.name) : (u.person || u.name),
+    dept:u.dept, cost:u.cost, token:u.token, calls:u.calls,
+    inTok:u.inTok, outTok:u.outTok, inChg:u.inChg, outChg:u.outChg,
+    days:u.days.size,
+    models: Array.from(u.models.values()).sort((a,b)=>b.cost-a.cost),
+    tools : Array.from(u.tools.values()).sort((a,b)=>b.cost-a.cost)
+  }));
+
+  return out;
+}
+
+function parseWorkbook(wb){
+  const out = { kpi:{}, dist:{}, trend:{}, source:'agg', sheetNames: wb.SheetNames.slice() };
+
+  /* --- KPI --- */
+  const kpiRows = sheetRows(wb, findSheet(wb, ['KPI요약','KPI 요약','요약']) || '');
+  if (kpiRows){
+    kpiRows.slice(1).forEach(r=>{
+      if (r && r[0]!=null) out.kpi[String(r[0]).trim()] = r[1];
+    });
+  }
+
+  /* --- 분포 시트 --- */
+  DIST_PANELS.forEach(p=>{
+    const rows = sheetRows(wb, p.sheet);
+    if (!rows || rows.length < 2){ out.dist[p.id] = null; return; }
+    const head = rows[0].map(h=>String(h==null?'':h).trim());
+    const iCost = head.indexOf('비용(원)') > -1 ? head.indexOf('비용(원)') : head.indexOf('비용');
+    const iTok  = head.indexOf('토큰');
+    const iCall = head.indexOf('호출수');
+    const items = [];
+    rows.slice(1).forEach(r=>{
+      if (!r || r[0]==null || String(r[0]).trim()==='') return;
+      items.push({
+        name : String(r[0]).trim(),
+        cost : Number(iCost>-1 ? r[iCost] : 0) || 0,
+        token: Number(iTok >-1 ? r[iTok ] : 0) || 0,
+        calls: Number(iCall>-1 ? r[iCall] : 0) || 0
+      });
+    });
+    out.dist[p.id] = items;
+  });
+
+  /* --- 추이 시트 (지표별 시트가 있으면 지표별로, 없으면 호출수 폴백) --- */
+  ['도구별','모델별'].forEach(kind=>{
+    const bucket = {};
+    [['cost','비용'],['token','토큰'],['calls','호출수']].forEach(([mk, suffix])=>{
+      const nm = findSheet(wb, ['추이_'+kind+'_'+suffix]);
+      if (!nm) return;
+      const rows = sheetRows(wb, nm);
+      if (!rows || rows.length<2) return;
+      const head = rows[0].map(h=>String(h==null?'':h).trim());
+      const series = head.slice(1);
+      const points = [];
+      rows.slice(1).forEach(r=>{
+        if (!r || r[0]==null) return;
+        let d = r[0];
+        if (d instanceof Date) d = d.toISOString().slice(0,10);
+        else d = String(d).trim();
+        const vals = series.map((_,i)=> Number(r[i+1])||0 );
+        points.push({date:d, vals});
+      });
+      bucket[mk] = {series, points};
+    });
+    out.trend[kind === '도구별' ? 'tool' : 'model'] = bucket;
+  });
+
+  return out;
+}
+
+/* 지표에 맞는 추이 데이터. 없으면 호출수로 폴백 */
+function trendFor(which, metric){
+  const b = (state.data.trend||{})[which] || {};
+  if (b[metric]) return {data:b[metric], metric, fallback:false};
+  const order = ['calls','cost','token'].filter(m=>m!==metric);
+  for (const m of order){ if (b[m]) return {data:b[m], metric:m, fallback:true}; }
+  return null;
+}
+
+/* =========================================================
+   KPI 렌더
+   ========================================================= */
+function renderKPI(){
+  const k = state.data.kpi;
+  const cost  = Number(k['총 비용(원)'])||0;
+  const token = Number(k['총 토큰'])||0;
+  const tin   = Number(k['입력 토큰'])||0;
+  const tout  = Number(k['출력 토큰'])||0;
+  const calls = Number(k['총 호출수'])||0;
+  const days  = Number(k['활동일'])||0;
+
+  const t = trendFor('tool', state.metric);
+  let peak = null, peakTotal = 0, sparkSeries = [];
+  if (t){
+    t.data.points.forEach(p=>{
+      const s = p.vals.reduce((a,b)=>a+b,0);
+      sparkSeries.push({date:p.date, v:s});
+      if (s > peakTotal){ peakTotal = s; peak = p.date; }
+    });
+  }
+  const peakMetric = t ? t.metric : null;
+
+  const cards = [
+    {
+      label:'총 비용',
+      html:'<span class="cur">₩</span>'+comma(cost),
+      sub: days ? ('일평균 ₩'+comma(Math.floor(cost/days))+' · 활동일 '+days+'일') : '',
+      spark: peakMetric==='cost'
+    },
+    {
+      label:'총 토큰',
+      html: compact(token),
+      sub: '입력 '+compact(tin)+' · 출력 '+compact(tout),
+      spark: peakMetric==='token'
+    },
+    {
+      label:'총 호출',
+      html: comma(calls)+'회',
+      sub: calls ? ('호출당 평균 ₩'+comma(Math.floor(cost/calls))) : '',
+      spark: peakMetric==='calls'
+    },
+    {
+      label:'최다 사용일',
+      html: peak ? fmtDateShort(peak) : '—',
+      sub: peak ? ('해당일 '+fmt(peakTotal, peakMetric)+ (peakMetric!==state.metric ? ' · '+METRICS[peakMetric].label+' 기준' : '')) : '추이 데이터 없음'
+    }
+  ];
+
+  $('#kpiRow').innerHTML = cards.map(c=>`
+    <div class="card kpi">
+      <div class="label">${esc(c.label)}</div>
+      <div class="value">${c.html}</div>
+      ${c.spark ? '<div class="spark" data-spark="1"></div>' : ''}
+      <div class="sub">${esc(c.sub)}</div>
+    </div>`).join('');
+
+  const host = $('#kpiRow [data-spark]');
+  if (host && sparkSeries.length > 1) drawSpark(host, sparkSeries);
+}
+
+function drawSpark(host, pts){
+  const w = host.clientWidth || 200, h = 34, pad = 3;
+  const max = Math.max.apply(null, pts.map(p=>p.v)) || 1;
+  const step = pts.length>1 ? (w-pad*2)/(pts.length-1) : 0;
+  const xy = pts.map((p,i)=>[pad+i*step, h-pad-(p.v/max)*(h-pad*2)]);
+  const line = xy.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const area = line+` L${xy[xy.length-1][0].toFixed(1)} ${h} L${xy[0][0].toFixed(1)} ${h} Z`;
+  const last = xy[xy.length-1];
+  host.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="height:${h}px">
+    <path d="${area}" fill="${cssVar('--accent')}" opacity=".10"/>
+    <path d="${line}" fill="none" stroke="${cssVar('--accent')}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="${cssVar('--accent')}"/>
+  </svg>`;
+}
+
+/* =========================================================
+   스택 막대 차트 (SVG)
+   ========================================================= */
+function colorFor(seriesName, idx){
+  if (isMuted(seriesName)) return cssVar('--gray-mark');
+  return cssVar(PALETTE[idx % PALETTE.length]);
+}
+function seriesColors(series){
+  let slot = 0;
+  return series.map(s => isMuted(s) ? cssVar('--gray-mark') : cssVar(PALETTE[(slot++) % PALETTE.length]));
+}
+
+function drawStacked(host, chart, metric, opts){
+  opts = opts || {};
+  const H = opts.height || 190;
+  const W = Math.max(host.clientWidth || 420, 260);
+  const padL = 44, padR = 6, padT = 10, padB = 22;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const colors = seriesColors(chart.series);
+
+  const totals = chart.points.map(p => p.vals.reduce((a,b)=>a+b,0));
+  const max = Math.max.apply(null, totals.concat([1]));
+  const nice = niceMax(max);
+  const n = chart.points.length || 1;
+  const slot = plotW / n;
+  const bw = Math.max(4, Math.min(30, slot*0.62));
+  const GAP = 2;
+
+  let g = '';
+  /* grid */
+  const ticks = 4;
+  for (let i=0;i<=ticks;i++){
+    const v = nice*i/ticks;
+    const y = padT + plotH - (v/nice)*plotH;
+    g += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="${cssVar('--border')}" stroke-width="1"/>`;
+    g += `<text x="${padL-7}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="9.5" fill="${cssVar('--text-muted')}">${i===0?'0':compact(v)}</text>`;
+  }
+  /* bars */
+  chart.points.forEach((p, pi)=>{
+    const cx = padL + slot*pi + slot/2;
+    const x = cx - bw/2;
+    let acc = 0;
+    const segs = [];
+    p.vals.forEach((v, si)=>{ if (v>0) segs.push({v, si}); });
+    segs.forEach((s, k)=>{
+      const isTop = k === segs.length-1;
+      const y0 = padT + plotH - ((acc + s.v)/nice)*plotH;
+      const y1 = padT + plotH - (acc/nice)*plotH;
+      let h = y1 - y0;
+      if (!isTop) h = Math.max(1, h - GAP);
+      const r = isTop ? Math.min(4, bw/2, h) : 0;
+      g += isTop
+        ? `<path d="M${x} ${(y0+h).toFixed(1)} L${x} ${(y0+r).toFixed(1)} Q${x} ${y0.toFixed(1)} ${(x+r).toFixed(1)} ${y0.toFixed(1)} L${(x+bw-r).toFixed(1)} ${y0.toFixed(1)} Q${(x+bw).toFixed(1)} ${y0.toFixed(1)} ${(x+bw).toFixed(1)} ${(y0+r).toFixed(1)} L${(x+bw).toFixed(1)} ${(y0+h).toFixed(1)} Z" fill="${colors[s.si]}"/>`
+        : `<rect x="${x.toFixed(1)}" y="${y0.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${colors[s.si]}"/>`;
+      acc += s.v;
+    });
+    /* x label */
+    const every = Math.ceil(n / Math.max(4, Math.floor(plotW/44)));
+    if (pi % every === 0 || pi === n-1){
+      g += `<text x="${cx.toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="9.5" fill="${cssVar('--text-muted')}">${fmtDateShort(p.date)}</text>`;
+    }
+    /* hover target */
+    g += `<rect class="hit" data-i="${pi}" x="${(padL+slot*pi).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"/>`;
+  });
+  g += `<line x1="${padL}" y1="${padT+plotH}" x2="${W-padR}" y2="${padT+plotH}" stroke="${cssVar('--border-strong')}" stroke-width="1"/>`;
+
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="height:${H}px">${g}</svg>`;
+
+  /* tooltip */
+  const tip = $('#tip');
+  host.querySelectorAll('.hit').forEach(el=>{
+    el.addEventListener('mousemove', ev=>{
+      const p = chart.points[+el.dataset.i];
+      const rows = p.vals.map((v,si)=>({v, name:chart.series[si], c:colors[si]}))
+                         .filter(r=>r.v>0).sort((a,b)=>b.v-a.v).slice(0,9);
+      const tot = p.vals.reduce((a,b)=>a+b,0);
+      tip.innerHTML = `<div class="t">${esc(p.date)} · 합계 ${fmt(tot, metric)}</div>` +
+        rows.map(r=>`<div class="r"><i style="background:${r.c}"></i>${esc(r.name)}<b>${fmt(r.v, metric)}</b></div>`).join('');
+      tip.classList.add('on');
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let x = ev.clientX + 14, y = ev.clientY - th - 10;
+      if (x + tw > innerWidth - 8) x = ev.clientX - tw - 14;
+      if (y < 8) y = ev.clientY + 16;
+      tip.style.left = x+'px'; tip.style.top = y+'px';
+    });
+    el.addEventListener('mouseleave', ()=> tip.classList.remove('on'));
+  });
+}
+function niceMax(v){
+  if (v<=0) return 1;
+  const exp = Math.floor(Math.log10(v));
+  const base = Math.pow(10, exp);
+  const f = v/base;
+  const m = f<=1?1 : f<=1.2?1.2 : f<=1.5?1.5 : f<=2?2 : f<=2.5?2.5 : f<=3?3 : f<=4?4 : f<=5?5 : f<=6?6 : f<=8?8 : 10;
+  return m*base;
+}
+function legendHTML(series){
+  const colors = seriesColors(series);
+  return series.map((s,i)=>`<span><i style="background:${colors[i]}"></i>${esc(s)}</span>`).join('');
+}
+
+/* =========================================================
+   추이 카드
+   ========================================================= */
+const trendCards = [
+  {host:'#cardTrendTool',  which:'tool',  title:'일별 사용 추이 — 도구 유형별'},
+  {host:'#cardTrendModel', which:'model', title:'일별 사용 추이 — 모델별'}
+];
+
+function renderTrends(){
+  trendCards.forEach(tc=>{
+    const card = $(tc.host);
+    const t = trendFor(tc.which, state.metric);
+    const key = 'trend_'+tc.which;
+    const asTable = !!state.tableView[key];
+
+    if (!t){
+      card.innerHTML = `<div class="panel-head"><div><h3>${esc(tc.title)}</h3></div></div>
+        <p class="empty-note">이 파일에는 일별 추이 시트가 없어요.</p>`;
+      return;
+    }
+    const note = t.fallback
+      ? `날짜별 <b>${METRICS[t.metric].label}</b> 추이예요. 웍스AI 엑셀에는 ${METRICS[state.metric].label} 일별 값이 들어있지 않아 ${METRICS[t.metric].label} 기준으로 보여줘요.`
+      : (state.data.source === 'raw'
+          ? '원본 로그를 날짜별로 합산한 값이에요.'
+          : '날짜별 사용량 추이예요. 어제까지 집계된 값이라 오늘 사용분은 빠져 있어요.');
+
+    card.innerHTML = `
+      <div class="panel-head">
+        <div>
+          <h3>${esc(tc.title)}</h3>
+          <p class="desc">${note}</p>
+        </div>
+        <div class="panel-tools">
+          <button class="icon-btn" data-zoom="${tc.which}" title="크게 보기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
+          <button class="icon-btn" data-toggle-table="${key}" aria-pressed="${asTable}" title="표로 보기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="legend">${legendHTML(t.data.series)}</div>
+      ${asTable ? trendTableHTML(t.data, t.metric) : '<div class="chart-host" data-chart="'+tc.which+'"></div>'}`;
+
+    if (!asTable){
+      const host = card.querySelector('[data-chart]');
+      drawStacked(host, t.data, t.metric);
+    }
+  });
+}
+function trendTableHTML(d, metric){
+  const head = '<tr><th>날짜</th>'+d.series.map(s=>`<th>${esc(s)}</th>`).join('')+'<th>합계</th></tr>';
+  const body = d.points.map(p=>{
+    const tot = p.vals.reduce((a,b)=>a+b,0);
+    return '<tr><td>'+esc(p.date)+'</td>'+p.vals.map(v=>`<td>${v?fmt(v,metric,{full:true,noSuffix:true}):'-'}</td>`).join('')+
+           `<td><b>${fmt(tot,metric,{full:true,noSuffix:true})}</b></td></tr>`;
+  }).join('');
+  return `<div class="tbl-scroll"><table class="tbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+/* =========================================================
+   분포 패널
+   ========================================================= */
+function distItems(p){
+  let items = (state.data.dist[p.id] || []).slice();
+  if (p.id === 'user'){
+    items = items.map(it => Object.assign({}, it, {label: displayName(it.name)}));
+  } else if (p.id === 'dept'){
+    if (state.deptLevel === 1){
+      const agg = new Map();
+      items.forEach(it=>{
+        const top = it.name.split('/')[0];
+        const cur = agg.get(top) || {name:top, cost:0, token:0, calls:0};
+        cur.cost+=it.cost; cur.token+=it.token; cur.calls+=it.calls;
+        agg.set(top, cur);
+      });
+      items = Array.from(agg.values());
+    }
+    items = items.map(it => Object.assign({}, it, {label: it.name === '-' ? '부서없음' : it.name}));
+  } else {
+    items = items.map(it => Object.assign({}, it, {label: it.name}));
+  }
+  items.sort((a,b)=> b[state.metric] - a[state.metric]);
+  return items;
+}
+
+function renderDist(){
+  DIST_PANELS.forEach(p=>{
+    const card = $(`[data-dist="${p.id}"]`);
+    if (!card) return;
+    const raw = state.data.dist[p.id];
+    card.style.display = '';
+    if (!raw){
+      if (state.data.source === 'raw'){ card.style.display = 'none'; return; }
+      card.innerHTML = `<div class="panel-head"><div><h3>${esc(p.title)}</h3></div></div>
+        <p class="empty-note">이 파일에 <code>${esc(p.sheet)}</code> 시트가 없어요.</p>`;
+      return;
+    }
+    const items = distItems(p);
+    const max = Math.max.apply(null, items.map(i=>i[state.metric]).concat([1]));
+    const asTable = !!state.tableView[p.id];
+
+    /* 상위 N명만 노출 (묶음 항목인 '기타' 등은 총액 확인용으로 항상 표시) */
+    let shown = items;
+    if (p.limit && !asTable){
+      let k = 0;
+      shown = items.filter(it=> isMuted(it.name) ? true : (++k <= p.limit));
+    }
+
+    let extra = '';
+    if (p.id === 'dept'){
+      extra = `<select class="mini" id="deptLevel">
+        <option value="1"${state.deptLevel===1?' selected':''}>1단계</option>
+        <option value="2"${state.deptLevel===2?' selected':''}>2단계</option>
+      </select>`;
+    }
+    let desc = p.desc;
+    if (p.id === 'user'){
+      const total = raw.filter(it => it.name.indexOf('@')>-1).length;
+      desc = `상위 ${Math.min(p.limit||total, total)}명이에요. 전체 ${total}명은 상단 <b>사용자별 상세</b> 탭에서 볼 수 있어요.`;
+    }
+
+    const body = asTable ? distTableHTML(items) : `
+      <div class="dist">${shown.map(it=>{
+        const v = it[state.metric];
+        const w = Math.max(0.6, (v/max)*100);
+        const muted = isMuted(it.name);
+        return `<div class="dist-row" data-tip='${esc(JSON.stringify({n:it.label, c:it.cost, t:it.token, k:it.calls}))}'>
+          <div class="dist-name" title="${esc(it.label)}">${esc(it.label)}${muted?'<span class="badge-info" title="개별 항목으로 나누지 않고 묶어서 집계한 값이에요">i</span>':''}</div>
+          <div class="dist-track"><div class="dist-fill${muted?' muted':''}" style="width:${w.toFixed(2)}%"></div></div>
+          <div class="dist-val">${fmt(v, state.metric, {noSuffix: state.metric==='calls'?false:true})}</div>
+        </div>`;
+      }).join('')}</div>`;
+
+    card.innerHTML = `
+      <div class="panel-head">
+        <div>
+          <h3>${esc(p.title)}</h3>
+          <p class="desc">${desc}</p>
+        </div>
+        <div class="panel-tools">
+          ${extra}
+          <button class="icon-btn" data-toggle-table="${p.id}" aria-pressed="${asTable}" title="표로 보기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+          </button>
+        </div>
+      </div>
+      ${body}`;
+  });
+}
+function distTableHTML(items){
+  const sums = items.reduce((a,i)=>({c:a.c+i.cost, t:a.t+i.token, k:a.k+i.calls}), {c:0,t:0,k:0});
+  const denom = sums[state.metric==='cost'?'c':state.metric==='token'?'t':'k'] || 1;
+  const rows = items.map(i=>`<tr>
+      <td>${esc(i.label)}</td>
+      <td>₩${comma(i.cost)}</td>
+      <td>${comma(i.token)}</td>
+      <td>${comma(i.calls)}</td>
+      <td>${(i[state.metric]/denom*100).toFixed(1)}%</td>
+    </tr>`).join('');
+  return `<div class="tbl-scroll"><table class="tbl">
+    <thead><tr><th>항목</th><th>비용</th><th>토큰</th><th>호출수</th><th>비중</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><th>합계</th><th>₩${comma(sums.c)}</th><th>${comma(sums.t)}</th><th>${comma(sums.k)}</th><th>100%</th></tr></tfoot>
+  </table></div>`;
+}
+
+/* =========================================================
+   사용자별 상세
+   ========================================================= */
+const USER_COLS = [
+  {key:'label', label:'이름',   align:'left'},
+  {key:'calls', label:'사용 횟수'},
+  {key:'token', label:'토큰'},
+  {key:'cost',  label:'요금'},
+  {key:'share', label:'비중', nosort:true}
+];
+
+function renderUserDetail(){
+  const host = $('#userDetail');
+  const raw = state.data.dist.user;
+  if (!raw || !raw.length){ host.classList.add('hidden'); host.innerHTML=''; return; }
+  host.classList.remove('hidden');
+  if (state.data.source === 'raw'){ renderUserDetailRaw(host); return; }
+
+  const people = raw.filter(it => it.name.indexOf('@') > -1)
+                    .map(it => Object.assign({}, it, {label: displayName(it.name)}));
+  const etc = raw.find(it => it.name === '기타');
+  const denom = Number(state.data.kpi['총 비용(원)']) || people.reduce((a,b)=>a+b.cost,0) || 1;
+
+  const s = state.userSort;
+  const sorted = people.slice().sort((a,b)=>{
+    if (s.key === 'label') return a.label.localeCompare(b.label, 'ko') * s.dir;
+    return (a[s.key] - b[s.key]) * s.dir;
+  });
+  /* 순위 = 현재 정렬 기준의 자리 (검색해도 원래 순위를 유지) */
+  const rankOf = {};
+  sorted.forEach((p,i)=>{ rankOf[p.name] = i+1; });
+
+  const q = state.userQuery.trim().toLowerCase();
+  const rows = q ? sorted.filter(p => (p.label + ' ' + p.name).toLowerCase().indexOf(q) > -1) : sorted;
+
+  const head = USER_COLS.map(c => c.nosort
+    ? `<th>${esc(c.label)}</th>`
+    : `<th class="sortable" data-usort="${c.key}" data-active="${s.key===c.key?1:0}">${esc(c.label)}<span class="ar">${s.key===c.key ? (s.dir<0?'▼':'▲') : '▾'}</span></th>`
+  ).join('');
+
+  const body = rows.map(p => {
+    const rank = rankOf[p.name];
+    return `<tr>
+      <td style="text-align:left">
+        <span class="rank${rank<=3?' r'+rank:''}">${rank}</span>
+        <span style="margin-left:8px;font-weight:600">${esc(p.label)}</span>
+        <span style="color:var(--text-muted);margin-left:6px;font-size:11.5px">${esc(p.name)}</span>
+      </td>
+      <td>${comma(p.calls)}</td>
+      <td>${comma(p.token)}</td>
+      <td><b>₩${comma(p.cost)}</b></td>
+      <td>${(p.cost/denom*100).toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  const sums = rows.reduce((a,p)=>({c:a.c+p.cost, t:a.t+p.token, k:a.k+p.calls}), {c:0,t:0,k:0});
+
+  host.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h3>사용자별 상세</h3>
+        <p class="desc">전체 ${people.length}명 · ${
+          {calls:'사용 횟수', token:'토큰', cost:'요금', label:'이름'}[s.key]} ${s.dir<0?'많은':'적은'} 순이에요.${
+          etc ? '' : ''}</p>${
+          etc ? `<p class="warn-note">웍스AI 엑셀은 <b>상위 20명까지만</b> 이름을 주고, 나머지 인원은 '기타'(₩${comma(etc.cost)} · ${comma(etc.calls)}회 · 전체 비용의 ${(etc.cost/denom*100).toFixed(1)}%)로 묶어서 내려줍니다. 그래서 이 표에 21위 이하는 나올 수 없어요.</p>` : ''}
+      </div>
+      <div class="panel-tools">
+        <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">순위 기준</span>
+        <div class="seg mini-seg" id="userRankSeg">
+          ${[['calls','사용 횟수'],['token','토큰'],['cost','요금']].map(([k,lb])=>
+            `<button data-usort="${k}" aria-pressed="${s.key===k}">${lb}</button>`).join('')}
+        </div>
+        <input type="text" class="search-box" id="userSearch" placeholder="이름 검색..." value="${esc(state.userQuery)}">
+      </div>
+    </div>
+    <div class="tbl-scroll" style="max-height:none">
+      <table class="tbl">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">검색 결과가 없어요.</td></tr>'}</tbody>
+        <tfoot><tr>
+          <th style="text-align:left">${rows.length}명 합계</th>
+          <th>${comma(sums.k)}</th>
+          <th>${comma(sums.t)}</th>
+          <th>₩${comma(sums.c)}</th>
+          <th>${(sums.c/denom*100).toFixed(1)}%</th>
+        </tr></tfoot>
+      </table>
+    </div>`;
+}
+
+
+/* 원본(Raw_Data) 업로드 시: 전원 + INPUT/OUTPUT 분리 + 활동일 + 드릴다운 */
+const RAW_COLS = [
+  {key:'label',  label:'이름'},
+  {key:'calls',  label:'사용 횟수'},
+  {key:'inTok',  label:'INPUT 토큰'},
+  {key:'outTok', label:'OUTPUT 토큰'},
+  {key:'inChg',  label:'INPUT 요금'},
+  {key:'outChg', label:'OUTPUT 요금'},
+  {key:'cost',   label:'합계 요금'},
+  {key:'days',   label:'활동일'}
+];
+
+function renderUserDetailRaw(host){
+  const people = state.data.people || [];
+  const denom = people.reduce((a,b)=>a+b.cost,0) || 1;
+  const s = state.userSort;
+  const key = (RAW_COLS.some(c=>c.key===s.key) ? s.key : 'cost');
+
+  const sorted = people.slice().sort((a,b)=>{
+    if (key === 'label') return a.label.localeCompare(b.label,'ko') * s.dir;
+    return (a[key] - b[key]) * s.dir;
+  });
+  const rankOf = {};
+  sorted.forEach((p,i)=>{ rankOf[p.name] = i+1; });
+
+  const q = state.userQuery.trim().toLowerCase();
+  const rows = q ? sorted.filter(p => (p.label+' '+p.name+' '+p.dept).toLowerCase().indexOf(q) > -1) : sorted;
+
+  const head = RAW_COLS.map(c =>
+    `<th class="sortable" data-usort="${c.key}" data-active="${key===c.key?1:0}"${c.key==='label'?' style="text-align:left"':''}>${esc(c.label)}<span class="ar">${key===c.key ? (s.dir<0?'▼':'▲') : '▾'}</span></th>`
+  ).join('');
+
+  const sub = p => {
+    const cell = list => list.slice(0,8).map(x=>
+      `<div class="sub-row"><span class="sub-name" title="${esc(x.name)}">${esc(x.name)}</span>
+       <span class="sub-val">${comma(x.calls)}회</span><span class="sub-val">${compact(x.token)}</span>
+       <span class="sub-val"><b>₩${comma(x.cost)}</b></span></div>`).join('');
+    return `<tr class="sub-tr" data-sub="${esc(p.name)}"><td colspan="${RAW_COLS.length}">
+      <div class="sub-wrap">
+        <div><div class="sub-title">모델별 (${p.models.length})</div>${cell(p.models)}</div>
+        <div><div class="sub-title">도구·에이전트별 (${p.tools.length})</div>${cell(p.tools)}</div>
+      </div></td></tr>`;
+  };
+
+  const body = rows.map(p=>{
+    const r = rankOf[p.name];
+    const open = state.openUser === p.name;
+    return `<tr class="u-row${open?' open':''}" data-user="${esc(p.name)}">
+      <td style="text-align:left">
+        <span class="caret">${open?'▼':'▶'}</span>
+        <span class="rank${r<=3?' r'+r:''}">${r}</span>
+        <span style="margin-left:8px;font-weight:600">${esc(p.label)}</span>
+        <span class="u-dept">${esc(p.dept === '-' ? '' : p.dept)}</span>
+      </td>
+      <td>${comma(p.calls)}</td>
+      <td>${comma(p.inTok)}</td>
+      <td>${comma(p.outTok)}</td>
+      <td>₩${comma(p.inChg)}</td>
+      <td>₩${comma(p.outChg)}</td>
+      <td><b>₩${comma(p.cost)}</b></td>
+      <td>${p.days}일</td>
+    </tr>` + (open ? sub(p) : '');
+  }).join('');
+
+  const t = rows.reduce((a,p)=>({k:a.k+p.calls, i:a.i+p.inTok, o:a.o+p.outTok, ic:a.ic+p.inChg, oc:a.oc+p.outChg, c:a.c+p.cost}),
+                        {k:0,i:0,o:0,ic:0,oc:0,c:0});
+
+  host.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h3>사용자별 상세</h3>
+        <p class="desc">원본 로그 기준 <b>전체 ${people.length}명</b> · ${
+          {calls:'사용 횟수', inTok:'INPUT 토큰', outTok:'OUTPUT 토큰', inChg:'INPUT 요금', outChg:'OUTPUT 요금', cost:'요금', days:'활동일', label:'이름'}[key]
+          } ${s.dir<0?'많은':'적은'} 순 · 이름을 누르면 모델·도구별 내역이 펼쳐져요.</p>${
+          state.data.system ? `<p class="warn-note">시스템 계정(${
+            state.data.system.items.map(i=>esc(i.name)).slice(0,4).join(', ')})으로 잡힌 <b>₩${comma(state.data.system.cost)}</b>은 사람이 아니라 부가서비스 사용분이라 아래 순위에서 뺐어요.</p>` : ''}
+      </div>
+      <div class="panel-tools">
+        <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">순위 기준</span>
+        <div class="seg mini-seg" id="userRankSeg">
+          ${[['calls','사용 횟수'],['token','토큰'],['cost','요금']].map(([k,lb])=>
+            `<button data-usort="${k==='token'?'inTok':k}" aria-pressed="${key===(k==='token'?'inTok':k)}">${lb}</button>`).join('')}
+        </div>
+        <input type="text" class="search-box" id="userSearch" placeholder="이름·부서 검색..." value="${esc(state.userQuery)}">
+      </div>
+    </div>
+    <div class="tbl-scroll" style="max-height:none">
+      <table class="tbl u-tbl">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body || `<tr><td colspan="${RAW_COLS.length}" style="text-align:center;color:var(--text-muted);padding:20px">검색 결과가 없어요.</td></tr>`}</tbody>
+        <tfoot><tr>
+          <th style="text-align:left">${rows.length}명 합계</th>
+          <th>${comma(t.k)}</th><th>${comma(t.i)}</th><th>${comma(t.o)}</th>
+          <th>₩${comma(t.ic)}</th><th>₩${comma(t.oc)}</th><th>₩${comma(t.c)}</th>
+          <th>${(t.c/denom*100).toFixed(0)}%</th>
+        </tr></tfoot>
+      </table>
+    </div>`;
+}
+
+/* 분포 막대 hover 툴팁 */
+document.addEventListener('mousemove', ev=>{
+  const row = ev.target.closest && ev.target.closest('.dist-row');
+  const tip = $('#tip');
+  if (!row){ if (!tip.dataset.chart) tip.classList.remove('on'); return; }
+  let d; try{ d = JSON.parse(row.dataset.tip); }catch(e){ return; }
+  tip.innerHTML = `<div class="t">${esc(d.n)}</div>
+    <div class="r">비용<b>₩${comma(d.c)}</b></div>
+    <div class="r">토큰<b>${comma(d.t)}</b></div>
+    <div class="r">호출수<b>${comma(d.k)}회</b></div>`;
+  tip.classList.add('on');
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let x = ev.clientX + 14, y = ev.clientY - th - 10;
+  if (x + tw > innerWidth - 8) x = ev.clientX - tw - 14;
+  if (y < 8) y = ev.clientY + 16;
+  tip.style.left = x+'px'; tip.style.top = y+'px';
+});
+
+/* =========================================================
+   전체 렌더
+   ========================================================= */
+function renderAll(){
+  if (!state.data) return;
+  $('#emptyState').classList.add('hidden');
+  $('#dash').classList.toggle('hidden', state.view === 'cards');
+
+  const k = state.data.kpi;
+  const ml = monthLabel(k['기간']);
+  const pl = $('#periodLabel');
+  pl.textContent = (ml ? ml.text + ' (' + k['기간'] + ')' : (k['기간'] || '')) +
+    /* 서버 모드에서는 파일명이 상단 선택창에 이미 보이므로 생략 */
+    ((state.fileName && !server.on) ? '  ·  ' + state.fileName : '');
+  pl.title = state.fileName || '';
+  syncSeg();
+  if (state.view === 'detail'){
+    renderUserDetail();
+  } else {
+    renderKPI();
+    renderTrends();
+    renderDist();
+  }
+
+  $('#footNote').innerHTML =
+    `기간 ${esc(k['기간']||'-')} · 활동일 ${esc(k['활동일']||'-')}일 · 상위 20개 외 기타로 묶음` +
+    ` · 원본: 웍스AI 이용통계 엑셀${state.fileName?' ('+esc(state.fileName)+')':''}`;
+}
+
+/* 리사이즈 시 차트 다시 그리기 */
+let rzTimer;
+addEventListener('resize', ()=>{
+  clearTimeout(rzTimer);
+  rzTimer = setTimeout(()=>{ if (state.data) renderTrends(); }, 140);
+});
+
+/* =========================================================
+   이벤트
+   ========================================================= */
+$('#metricSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.view){
+    state.view = (state.view === 'detail') ? 'dash' : 'detail';
+  } else {
+    state.metric = b.dataset.metric;
+    state.view = 'dash';
+  }
+  syncSeg();
+  if (state.data) renderAll();
+});
+function syncSeg(){
+  const cards = state.view === 'cards';
+  $$('#metricSeg button').forEach(x=>{
+    const on = x.dataset.view ? (state.view === 'detail')
+                              : (state.view !== 'detail' && x.dataset.metric === state.metric);
+    x.setAttribute('aria-pressed', String(on));
+  });
+  $('#viewDash').classList.toggle('hidden', state.view === 'detail');
+  $('#userDetail').classList.toggle('hidden', state.view !== 'detail');
+
+  $('#metricSeg').classList.toggle('hidden', cards);
+  $('#serverBox').classList.toggle('hidden', cards || !server.on);
+  $('#btnDownload').classList.toggle('hidden', cards);
+  $('#btnHome').classList.toggle('hidden', !server.on || cards);
+  $('#cardHome').classList.toggle('hidden', !cards);
+  $('#dash').classList.toggle('hidden', cards || !state.data);
+}
+
+document.addEventListener('click', e=>{
+  const tt = e.target.closest('[data-toggle-table]');
+  if (tt){
+    const k = tt.dataset.toggleTable;
+    state.tableView[k] = !state.tableView[k];
+    if (k.indexOf('trend_')===0) renderTrends(); else renderDist();
+    return;
+  }
+  const ur = e.target.closest('.u-row');
+  if (ur){
+    const em = ur.dataset.user;
+    state.openUser = (state.openUser === em) ? null : em;
+    renderUserDetail();
+    return;
+  }
+  const us = e.target.closest('[data-usort]');
+  if (us){
+    const key = us.dataset.usort;
+    if (state.userSort.key === key) state.userSort.dir *= -1;
+    else state.userSort = {key, dir: key==='label' ? 1 : -1};
+    renderUserDetail();
+    return;
+  }
+  const zm = e.target.closest('[data-zoom]');
+  if (zm){ openZoom(zm.dataset.zoom); return; }
+  const cl = e.target.closest('[data-close]');
+  if (cl){ $('#'+cl.dataset.close).classList.remove('on'); return; }
+});
+document.addEventListener('change', e=>{
+  if (e.target.id === 'deptLevel'){ state.deptLevel = +e.target.value; renderDist(); }
+});
+document.addEventListener('input', e=>{
+  if (e.target.id !== 'userSearch') return;
+  state.userQuery = e.target.value;
+  renderUserDetail();
+  const el = $('#userSearch'); if (el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+});
+
+/* 파일 업로드 */
+function pick(){ $('#fileInput').click(); }
+$('#btnUpload').addEventListener('click', pick);
+$('#btnUpload2').addEventListener('click', pick);
+$('#fileInput').addEventListener('change', e=>{ if (e.target.files[0]) readFile(e.target.files[0]); });
+
+const drop = $('#drop');
+['dragenter','dragover'].forEach(t=> drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave','drop'].forEach(t=> drop.addEventListener(t, e=>{ e.preventDefault(); drop.classList.remove('hot'); }));
+drop.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; if (f) readFile(f); });
+
+function readFile(file){
+  if (server.on && server.me.logged_in){
+    uploadToServer(file)
+      .then(async d=>{ delete fileCache[d.name]; server.current = d.name; await refreshServerFiles(false); await loadServerFile(d.name); })
+      .catch(err=>{ alert(err.message + '\n\n브라우저에서만 열어봅니다.'); readLocal(file); });
+    return;
+  }
+  readLocal(file);
+}
+
+function readLocal(file){
+  const fr = new FileReader();
+  fr.onload = ev=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:true});
+      const parsed = isRawWorkbook(wb) ? parseRaw(wb) : parseWorkbook(wb);
+      if (!parsed.kpi['총 비용(원)'] && !parsed.dist.user){
+        alert('웍스AI 엑셀 형식이 아닌 것 같아요.\n\n· Raw_Data_YYYYMMDD.xlsx (원본 로그, 권장)\n· 웍스AI 대시보드 [다운로드] 집계 파일\n둘 중 하나를 올려주세요.');
+        return;
+      }
+      state.data = parsed;
+      state.fileName = file.name;
+      state.openUser = null;
+      renderAll();
+    }catch(err){
+      console.error(err);
+      alert('파일을 읽지 못했어요: '+err.message);
+    }
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+/* =========================================================
+   차트 확대
+   ========================================================= */
+function openZoom(which){
+  const tc = trendCards.find(c=>c.which===which);
+  const t = trendFor(which, state.metric);
+  if (!t) return;
+  $('#zoomTitle').textContent = tc.title;
+  $('#zoomLegend').innerHTML = legendHTML(t.data.series);
+  $('#zoomModal').classList.add('on');
+  setTimeout(()=> drawStacked($('#zoomHost'), t.data, t.metric, {height:420}), 30);
+}
+
+/* =========================================================
+   다운로드 (현재 화면 데이터를 엑셀로)
+   ========================================================= */
+$('#btnDownload').addEventListener('click', ()=>{
+  if (!state.data) return;
+  const wb = XLSX.utils.book_new();
+  const k = state.data.kpi;
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['항목','값'],
+    ['총 비용(원)', k['총 비용(원)']||0],
+    ['총 토큰', k['총 토큰']||0],
+    ['입력 토큰', k['입력 토큰']||0],
+    ['출력 토큰', k['출력 토큰']||0],
+    ['총 호출수', k['총 호출수']||0],
+    ['기간', k['기간']||''],
+    ['활동일', k['활동일']||'']
+  ]), 'KPI요약');
+
+  DIST_PANELS.forEach(p=>{
+    if (!state.data.dist[p.id]) return;
+    const items = distItems(p);
+    const aoa = [[p.id==='user'?'이름':'항목','비용(원)','토큰','호출수']]
+      .concat(items.map(i=>[i.label, i.cost, i.token, i.calls]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), p.title.replace(/[\\\/\?\*\[\]]/g,'').slice(0,31));
+  });
+
+  ['tool','model'].forEach(w=>{
+    const t = trendFor(w, state.metric); if (!t) return;
+    const aoa = [['날짜'].concat(t.data.series)]
+      .concat(t.data.points.map(p=>[p.date].concat(p.vals)));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa),
+      (w==='tool'?'추이_도구별_':'추이_모델별_') + METRICS[t.metric].label);
+  });
+
+  const ml = monthLabel(k['기간']);
+  const period = ml ? ml.file : (k['기간']||'').replace(/[^0-9]/g,'').slice(0,16);
+  /* 원본 로그를 올린 경우 사용자별 상세 시트를 추가 */
+  if (state.data.source === 'raw' && state.data.people){
+    const s = state.userSort;
+    const key = ['label','calls','inTok','outTok','inChg','outChg','cost','days'].indexOf(s.key)>-1 ? s.key : 'cost';
+    const list = state.data.people.slice().sort((a,b)=>
+      key==='label' ? a.label.localeCompare(b.label,'ko')*s.dir : (a[key]-b[key])*s.dir);
+    const aoa = [['순위','이름','이메일','부서','사용 횟수','INPUT 토큰','OUTPUT 토큰','INPUT 요금','OUTPUT 요금','합계 요금','활동일']]
+      .concat(list.map((p,i)=>[i+1, p.label, p.name, p.dept, p.calls, p.inTok, p.outTok,
+                               Math.round(p.inChg), Math.round(p.outChg), Math.round(p.cost), p.days]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), '사용자별_상세');
+  }
+
+  XLSX.writeFile(wb, `AI이용현황_${period||'export'}.xlsx`);
+});
+
+/* =========================================================
+   테마
+   ========================================================= */
+$('#btnTheme').addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('aiUsageTheme', next); }catch(e){}
+  if (state.data) renderAll();
+});
+try{
+  const saved = localStorage.getItem('aiUsageTheme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme','dark');
+}catch(e){}
+
+/* =========================================================
+   서버(FastAPI) 연동 — 정적 파일로 열면 자동으로 비활성화된다
+   ========================================================= */
+const server = { on:false, files:[], me:{logged_in:false, is_admin:false}, current:'', base:'/' };
+
+/* 현재 페이지가 놓인 경로. nginx 서브패스(/ai-report/) 뒤에 있어도 API를 찾아가도록 한다. */
+function relBase(){
+  let p = location.pathname || '/';
+  if (!/\/$/.test(p)) p = p.replace(/[^/]*$/, '');   /* .../index.html → .../ */
+  return p || '/';
+}
+function apiURL(path){
+  return server.base + String(path).replace(/^\//, '');
+}
+async function jget(path){
+  const r = await fetch(apiURL(path), {credentials:'same-origin'});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+/* /ai-report/api/whoami → 실패하면 /api/whoami 로 한 번 더 시도 */
+async function detectApiBase(){
+  const cands = [];
+  const rb = relBase();
+  cands.push(rb);
+  if (rb !== '/') cands.push('/');
+  for (const b of cands){
+    try{
+      const r = await fetch(b + 'api/whoami', {credentials:'same-origin'});
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j && typeof j === 'object' && 'success' in j){ server.base = b; return j; }
+    }catch(e){ /* 다음 후보 */ }
+  }
+  return null;
+}
+
+const fileCache = {};
+
+async function parseServerFile(name){
+  if (fileCache[name]) return fileCache[name];
+  const r = await fetch(apiURL('api/file/' + encodeURIComponent(name)), {credentials:'same-origin'});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const buf = await r.arrayBuffer();
+  const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+  const parsed = isRawWorkbook(wb) ? parseRaw(wb) : parseWorkbook(wb);
+  fileCache[name] = parsed;
+  return parsed;
+}
+
+async function loadServerFile(name, opt){
+  if (!name) return;
+  try{
+    const parsed = await parseServerFile(name);
+    state.data = parsed;
+    state.fileName = name;
+    state.openUser = null;
+    server.current = name;
+    if (!(opt && opt.keepView)) state.view = 'dash';
+    paintServerFiles();
+    renderAll();
+  }catch(err){
+    alert('서버에서 파일을 불러오지 못했어요: ' + err.message);
+  }
+}
+
+/* ---------- 월별 카드 ---------- */
+function summaryOf(parsed){
+  const k = parsed.kpi || {};
+  const ml = monthLabel(k['기간']);
+  const m0 = String(k['기간']||'').match(/(\d{4})-(\d{2})-\d{2}/);
+  const users = parsed.people
+    ? parsed.people
+    : (parsed.dist.user || []).filter(u=>u.name.indexOf('@')>-1)
+        .map(u=>Object.assign({}, u, {label: displayName(u.name)}));
+  return {
+    month : ml ? ml.text : (m0 ? m0[1] + '년 ' + Number(m0[2]) + '월' : '기간 미상'),
+    exact : !!ml,
+    range : k['기간'] || '',
+    cost  : Number(k['총 비용(원)']) || 0,
+    calls : Number(k['총 호출수']) || 0,
+    days  : Number(k['활동일']) || 0,
+    users : users.length,
+    top3  : users.slice().sort((a,b)=>b.cost-a.cost).slice(0,3),
+    partial: parsed.source === 'agg'
+  };
+}
+
+function goHome(){
+  state.view = 'cards';
+  syncSeg();
+  $('#periodLabel').textContent = `서버에 엑셀 ${server.files.length}개`;
+  renderCards();
+}
+
+async function renderCards(){
+  const grid = $('#cardGrid');
+  if (!server.files.length){
+    grid.innerHTML = `<p class="empty-note">서버 <code>data</code> 폴더에 엑셀이 없어요. 오른쪽 위 <b>업로드</b>로 올려주세요.</p>`;
+    return;
+  }
+  grid.innerHTML = server.files.map(f=>
+    `<div class="mcard loading" data-file="${esc(f.name)}"><div class="m-month">불러오는 중…</div><div class="m-file">${esc(f.name)}</div></div>`).join('');
+
+  const parsed = await Promise.all(server.files.map(f =>
+    parseServerFile(f.name).then(p=>({name:f.name, p})).catch(()=>({name:f.name, p:null}))));
+
+  /* 기간 최신순 */
+  parsed.sort((a,b)=> String((b.p&&b.p.kpi['기간'])||'').localeCompare(String((a.p&&a.p.kpi['기간'])||'')));
+
+  grid.innerHTML = parsed.map((it, i)=>{
+    if (!it.p) return `<div class="mcard loading"><div class="m-month">읽을 수 없는 파일</div><div class="m-file">${esc(it.name)}</div></div>`;
+    const s = summaryOf(it.p);
+    return `<button class="mcard" data-file="${esc(it.name)}">
+      <div class="m-top"><span class="m-month">${esc(s.month)}</span>${i===0?'<span class="m-tag">최신</span>':''}</div>
+      <div class="m-range">${esc(s.range)}${s.exact?'':' · 일부 기간'}${s.partial?' · 집계본':''}</div>
+      <div class="m-cost">₩${comma(s.cost)}</div>
+      <div class="m-sub">${s.users}명 · ${comma(s.calls)}회${s.days?' · 활동일 '+s.days+'일':''}</div>
+      <div class="m-top3">${s.top3.map(u=>
+        `<div class="m-row"><b>${esc(u.label)}</b><span>₩${comma(u.cost)}</span></div>`).join('')}</div>
+      <div class="m-file">${esc(it.name)}</div>
+    </button>`;
+  }).join('');
+}
+
+$('#btnHome').addEventListener('click', goHome);
+document.addEventListener('click', e=>{
+  const c = e.target.closest('.mcard[data-file]');
+  if (c && !c.classList.contains('loading')) loadServerFile(c.dataset.file);
+});
+
+function paintServerFiles(){
+  const sel = $('#serverFiles');
+  sel.innerHTML = server.files.length
+    ? server.files.map(f=>`<option value="${esc(f.name)}"${f.name===server.current?' selected':''}>${esc(f.name)}</option>`).join('')
+    : '<option value="">(서버에 파일 없음)</option>';
+  $('#btnDelFile').style.display = (server.me.is_admin && server.files.length) ? '' : 'none';
+}
+
+async function refreshServerFiles(autoload){
+  server.files = await jget('api/files');
+  /* 최신 파일이 위로 오도록 이름 역순 */
+  server.files.sort((a,b)=> b.name.localeCompare(a.name, 'ko'));
+  paintServerFiles();
+  if (autoload && server.files.length) await loadServerFile(server.files[0].name);
+}
+
+function clearCache(){ Object.keys(fileCache).forEach(k=>delete fileCache[k]); }
+
+async function initServer(){
+  try{
+    const who = await detectApiBase();
+    if (!who) throw new Error('서버 API를 찾지 못했습니다.');
+    server.me = who.data ? who.data : server.me;
+    server.on = true;
+    $('#btnPortal').classList.remove('hidden');
+    await refreshServerFiles(false);
+    state.view = 'cards';
+    syncSeg();
+    $('#periodLabel').textContent = `서버에 엑셀 ${server.files.length}개`;
+    renderCards();
+    $('#btnUploadLabel').textContent = server.me.logged_in ? '서버에 업로드' : '엑셀 열기';
+    $('#btnUpload').classList.remove('hidden');
+  }catch(e){
+    /* 정적 파일로 연 경우 — 기존처럼 내 PC 파일만 사용 */
+    server.on = false;
+    $('#emptyState').classList.remove('hidden');   // 이때만 업로드 화면을 낸다
+    $('#btnUpload').classList.remove('hidden');
+    syncSeg();                                     // 지표 선택·다운로드도 여기서 낸다
+    console.warn('[AI리포트] 서버 API에 연결하지 못해 내 PC 파일 모드로 동작합니다.', e);
+    if (location.protocol.indexOf('http') === 0){
+      const w = $('#apiWarn');
+      w.classList.remove('hidden');
+      w.innerHTML = `서버의 엑셀 목록을 불러오지 못했어요. <code>${esc(relBase())}api/whoami</code> 가 응답하지 않습니다.<br>`
+        + `nginx가 이 경로의 <code>/api/</code> 요청을 ai-report 컨테이너로 넘기고 있는지 확인해주세요. (지금은 내 PC 파일만 열 수 있어요)`;
+    }
+  }
+}
+
+$('#serverFiles').addEventListener('change', e=> loadServerFile(e.target.value));
+
+$('#btnDelFile').addEventListener('click', async ()=>{
+  const name = $('#serverFiles').value;
+  if (!name) return;
+  if (!confirm(`서버에서 '${name}' 을(를) 삭제할까요?`)) return;
+  try{
+    const r = await fetch(apiURL('api/files/' + encodeURIComponent(name)), {method:'DELETE', credentials:'same-origin'});
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || j.detail || '삭제 실패');
+    delete fileCache[name];
+    server.current = '';
+    await refreshServerFiles(false);
+    goHome();
+  }catch(err){ alert(err.message); }
+});
+
+/* 업로드: 서버 모드 + 로그인 상태면 서버에 저장, 아니면 브라우저에서만 열기 */
+async function uploadToServer(file){
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch(apiURL('api/upload'), {method:'POST', body:fd, credentials:'same-origin'});
+  const j = await r.json().catch(()=>({success:false, error:'서버 응답을 읽지 못했어요.'}));
+  if (r.status === 403) throw new Error(j.detail || '포탈에 로그인한 뒤 업로드할 수 있습니다.');
+  if (!j.success) throw new Error(j.error || '업로드 실패');
+  return j.data;
+}
+
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Escape') $$('.modal-bg.on').forEach(m=>m.classList.remove('on'));
+});
+$$('.modal-bg').forEach(m=> m.addEventListener('click', e=>{ if (e.target===m) m.classList.remove('on'); }));
+
+/* 문제 진단용: 브라우저 콘솔에서 __aiReport 로 상태 확인 */
+window.__aiReport = { server, state, apiURL, relBase };
+
+initServer();
+
+})();
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

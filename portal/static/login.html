@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 — 누리코스메틱 IT 포탈</title>
+<style>
+  :root{
+    --bg:#ffffff; --side:#f7f7f8; --line:#e8e8ea;
+    --tx:#1f2023; --tx2:#6b6d76; --tx3:#9b9da6;
+    --accent:#1f4e79; --accent-soft:#eaf1f8;
+    --shadow:0 1px 2px rgba(16,17,20,.05), 0 10px 34px rgba(16,17,20,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1c1f; --side:#151619; --line:#2a2c31;
+      --tx:#ececef; --tx2:#a1a3ac; --tx3:#71737c;
+      --accent:#6aa6dd; --accent-soft:#22303e;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;display:grid;place-items:center;background:var(--side);color:var(--tx);
+    font-family:"Pretendard","맑은 고딕","Malgun Gothic",-apple-system,system-ui,sans-serif;
+    font-size:15px;
+  }
+  .box{
+    width:min(380px,calc(100vw - 40px));background:var(--bg);
+    border:1px solid var(--line);border-radius:16px;padding:34px 30px 28px;box-shadow:var(--shadow);
+  }
+  .brand{display:block;margin-bottom:26px}
+  /* ★ 높이가 아니라 **너비**로 맞춘다.
+     로고가 가로로 길어서(10:1) 높이로 맞추면 사이드바(262px) 밖으로 삐져나간다.
+     너비로 잡으면 어디에 놓든 폭을 넘지 않는다. */
+  .brand .wordmark{width:200px;max-width:100%;height:auto;margin:0 0 18px}
+  .brand > div{padding:0;border:0;border-top:1px solid var(--line);padding-top:16px}
+  .logo{
+    width:36px;height:36px;border-radius:11px;background:var(--accent);color:#fff;
+    display:grid;place-items:center;font-size:13px;font-weight:700;
+  }
+
+  .brand b{font-size:16px;font-weight:650;display:block;letter-spacing:-.01em}
+  .brand span{font-size:12px;color:var(--tx3)}
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--tx2);margin:0 0 6px}
+  input{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
+    background:var(--bg);color:var(--tx);font:inherit;font-size:14px;outline:none;transition:.15s;
+  }
+  input:focus{border-color:var(--accent)}
+  .field{margin-bottom:15px}
+  button{
+    width:100%;padding:12px;border:0;border-radius:10px;background:var(--accent);
+    color:#fff;font:inherit;font-size:14.5px;font-weight:600;cursor:pointer;
+    margin-top:6px;transition:.15s;
+  }
+  button:hover{opacity:.9}
+  button:disabled{background:var(--line);color:var(--tx3);cursor:default}
+  .err{
+    margin-top:14px;padding:10px 12px;border-radius:9px;background:#fbe4e4;
+    color:#9c2020;font-size:13px;display:none;
+  }
+  @media (prefers-color-scheme: dark){ .err{background:#3a1f1f;color:#e58b8b} }
+  .err.on{display:block}
+  .note{margin-top:20px;font-size:12px;color:var(--tx3);line-height:1.6;text-align:center}
+
+  /* ── 체험판 안내 (DEMO_MODE=1 일 때만 그린다) ────────────────
+     사내에서는 /api/demo 가 {"demo":false} 를 주고 아무것도 안 그린다.
+     화면 파일을 두 벌로 나누지 않으려는 것이다. */
+  .demo{display:none;margin:0 0 18px;padding:13px 14px;border-radius:11px;
+        background:var(--accent-soft);border:1px solid var(--line);font-size:12.5px;line-height:1.65}
+  .demo.on{display:block}
+  .demo b{display:block;font-size:13px;margin-bottom:7px;color:var(--tx)}
+  .demo .kv{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--tx)}
+  .demo .sub{color:var(--tx2);margin-top:8px}
+  .demo .go{width:100%;margin-top:11px;padding:9px;font-size:13.5px}
+
+  /* ── 회사 워드마크 ──────────────────────────────────────────
+     밝은 배경용(짙은 글자)과 어두운 배경용(흰 글자) 두 장을 두고
+     화면 모드에 따라 바꾼다. 한 장을 filter 로 반전하면 회색이 뭉개진다. */
+  .wordmark{width:auto;display:block}
+  .wordmark.on-dark{display:none}
+  @media (prefers-color-scheme: dark){
+    .wordmark.on-light{display:none}
+    .wordmark.on-dark{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="brand">
+    <img class="wordmark on-light" alt="NURI COSMETIC" src="/static/wordmark-light.png"><img class="wordmark on-dark" alt="NURI COSMETIC" src="/static/wordmark-dark.png">
+    <div><b>IT 포탈</b><span>사내 업무 시스템</span></div>
+  </div>
+
+  <div class="demo" id="demo">
+    <b>체험판입니다</b>
+    <div class="kv">아이디 <span id="dm-id">demo</span> · 비밀번호 <span id="dm-pw">demo1234</span></div>
+    <div class="sub" id="dm-note"></div>
+    <button class="go" id="dm-go" type="button">이 계정으로 들어가기</button>
+  </div>
+
+  <form id="f" autocomplete="on">
+    <div class="field">
+      <label for="uid">아이디</label>
+      <input id="uid" name="username" autocomplete="username" autofocus>
+    </div>
+    <div class="field">
+      <label for="pw">비밀번호</label>
+      <input id="pw" type="password" name="password" autocomplete="current-password">
+    </div>
+    <button id="btn" type="submit">로그인</button>
+  </form>
+
+  <div class="err" id="err"></div>
+  <div class="note">계정이 필요하면 IT 담당자에게 요청하세요.</div>
+</div>
+
+<script>
+const KEY = "portal.jwt";
+const f = document.getElementById("f");
+const btn = document.getElementById("btn");
+const err = document.getElementById("err");
+
+function fail(msg){ err.textContent = msg; err.classList.add("on"); }
+
+/* 체험판이면 계정을 화면에 적어 둔다.
+   어차피 아무나 쓰라고 열어 둔 계정이라 숨길 이유가 없고,
+   숨기면 README 를 안 읽고 온 사람이 문 앞에서 돌아간다. */
+fetch("/api/demo").then(r=>r.json()).then(d=>{
+  if(!d.demo) return;
+  document.getElementById("dm-id").textContent = d.user_id;
+  document.getElementById("dm-pw").textContent = d.password;
+  document.getElementById("dm-note").textContent =
+    "보기 · 엑셀 올려 계산 · 챗 · 검색은 전부 됩니다. 계정 · 자산 · 서비스처럼 "
+    + "다음 사람에게 남는 것만 저장되지 않습니다. 챗은 하루 "
+    + d.chat_per_ip_day + "번까지입니다.";
+  document.getElementById("demo").classList.add("on");
+  document.getElementById("dm-go").onclick = ()=>{
+    document.getElementById("uid").value = d.user_id;
+    document.getElementById("pw").value  = d.password;
+    f.requestSubmit();
+  };
+}).catch(()=>{});   /* 못 물어봐도 로그인 화면은 그대로 떠야 한다 */
+
+f.addEventListener("submit", async e=>{
+  e.preventDefault();
+  err.classList.remove("on");
+  const user_id = document.getElementById("uid").value.trim();
+  const password = document.getElementById("pw").value;
+  if(!user_id || !password){ fail("아이디와 비밀번호를 입력하세요."); return; }
+
+  btn.disabled = true; btn.textContent = "확인 중…";
+  try{
+    const r = await fetch("/api/login", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ user_id, password })
+    });
+    const j = await r.json();
+    if(!r.ok){ fail(j.detail || "로그인에 실패했습니다."); return; }
+    localStorage.setItem(KEY, j.token);
+    location.href = "/";
+  }catch(e){
+    fail("서버에 연결하지 못했습니다.");
+  }finally{
+    btn.disabled = false; btn.textContent = "로그인";
+  }
+});
+</script>
+</body>
+</html>

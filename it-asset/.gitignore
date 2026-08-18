@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+.next/
+
+# Env
+.env
+
+# IDE
+.vscode/
+
+# Logs
+*.log
+
+# 사내 실데이터 (PC 대장, IP 목록 등) - 저장소에 올리지 않음
+data/
+# 배포 비밀/데이터
+.env.deploy
+data/app.db*
+backups/

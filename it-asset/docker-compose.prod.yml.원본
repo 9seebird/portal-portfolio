@@ -1,0 +1,38 @@
+# 서버(Azure B2ts v2, RAM 1GiB) 배포용.
+# 로컬 개발용 Postgres 는 docker-compose.yml, 이 파일은 건드리지 않는다.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# 사전 준비: backend/.env.deploy (템플릿: .env.deploy.example)
+#           data/app.db (transfer_db.py 로 만든 파일)
+
+services:
+  api:
+    build: ./backend
+    container_name: demo-asset-api
+    restart: unless-stopped
+    env_file: ./backend/.env.deploy
+    environment:
+      # 컨테이너 안 경로 기준. data/ 는 아래 볼륨으로 호스트와 공유된다.
+      DATABASE_URL: sqlite+pysqlite:////app/data/app.db
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: demo-asset-web
+    restart: unless-stopped
+    ports:
+      - "8081:80"          # 매뉴얼 포탈(8080)과 나란히. 방화벽은 사내 IP만.
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy

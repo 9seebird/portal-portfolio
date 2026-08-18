@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>누리코스메틱 IT 포탈</title>
+<style>
+  /* 확인이 끝날 때까지 화면을 감춘다.
+     이게 없으면 관리자 화면이 다 그려진 다음에야 "권한 없음"을 알고
+     로그인으로 튕긴다. 잠깐이지만 **보면 안 되는 화면이 보인다.**
+     visibility 로 감추는 이유: display:none 이면 폭 계산이 어긋난다. */
+  html.booting body{visibility:hidden}
+</style>
+<script>
+/* ── 문 앞에서 먼저 판단한다 ──────────────────────────────
+   이 조각은 <head> 에 있다. 그래야 **본문이 그려지기 전에** 돌아서,
+   엉뚱한 화면이 번쩍이지 않는다. 본문 끝에서 검사하면 이미 늦다.
+
+   여기서 하는 것은 "빨리 돌려보내기" 뿐이고, 진짜 권한 검사는
+   서버가 한다. 토큰을 손으로 만들어 넣어도 서버에서 막힌다. */
+(function(){
+  // ★ 감추는 것이 먼저다.
+  //   돌려보내기(location.replace)는 곧바로 일어나지 않는다. 그 사이에
+  //   본문이 그려지면 결국 번쩍인다. 그래서 먼저 감추고 나서 판단한다.
+  document.documentElement.className += " booting";
+
+  var KEY = "portal.jwt";
+  var t = null;
+  try{ t = localStorage.getItem(KEY); }catch(e){}
+  if(!t){ location.replace("/login"); return; }
+  // 초기 비밀번호를 쓰는 중이면 바꾸는 화면으로 먼저 보낸다.
+  try{
+    var p = JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+    if(p.chg){ location.replace("/password"); return; }
+  }catch(e){}
+  // 서버가 대답을 안 하면 영영 빈 화면이 된다. 그때는 그냥 보여준다.
+  setTimeout(function(){ document.documentElement.classList.remove("booting"); }, 4000);
+})();
+</script>
+<style>
+  :root{
+    --bg:#ffffff; --side:#f7f7f8; --line:#e8e8ea; --line2:#f0f0f2;
+    --tx:#1f2023; --tx2:#6b6d76; --tx3:#9b9da6;
+    --accent:#1f4e79; --accent-soft:#eaf1f8;
+    --bubble:#f2f3f5; --radius:14px;
+    --shadow:0 1px 2px rgba(16,17,20,.05), 0 6px 20px rgba(16,17,20,.05);
+    --pop:0 8px 30px rgba(16,17,20,.13), 0 2px 6px rgba(16,17,20,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1c1f; --side:#151619; --line:#2a2c31; --line2:#232529;
+      --tx:#ececef; --tx2:#a1a3ac; --tx3:#71737c;
+      --accent:#6aa6dd; --accent-soft:#22303e; --bubble:#26282d;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+      --pop:0 10px 34px rgba(0,0,0,.5);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; display:flex; background:var(--bg); color:var(--tx);
+    font-family:"Pretendard","맑은 고딕","Malgun Gothic",-apple-system,system-ui,sans-serif;
+    font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit}
+
+  /* ── 우리말 줄바꿈 ──────────────────────────────────────────
+     기본값은 영어 기준이라 우리말을 아무 데서나 끊는다. 한 글자만
+     다음 줄로 뚝 떨어지는 것이 그래서 생긴다.
+       keep-all    낱말(어절) 사이에서만 끊는다
+       pretty      마지막 줄에 한 낱말만 남지 않게 고르게 나눈다
+       break-word  아주 긴 것(주소·해시)은 그래도 끊어 준다 */
+  body, p, .hint, .desc, td, th, label{
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .hint, .desc, p{ text-wrap: pretty; }
+
+  /* ── 사이드바 : 대화 내역 ── */
+  aside{
+    width:262px; flex:0 0 262px; background:var(--side);
+    border-right:1px solid var(--line); display:flex; flex-direction:column;
+  }
+  .brand{padding:24px 18px 30px; display:block}
+  /* 이미지 안에 넣었더니 화면에서 4px 이 되어 아무도 못 읽었다.
+     글자로 빼면 크기를 여기서 정할 수 있다. 체험판일 때만 보인다. */
+  .brandsub{display:none;margin-top:7px;font-size:11px;color:var(--tx3);letter-spacing:.01em}
+  .brandsub.on{display:block}
+  .logo{
+    width:29px;height:29px;border-radius:9px;background:var(--accent);
+    color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:700;flex:0 0 auto;
+  }
+
+  /* ── 회사 워드마크 ──────────────────────────────────────────
+     로고 이미지를 별도 파일로 두면 도커 이미지에 넣고 경로를 맞춰야 한다.
+     크기가 작아 data URI 로 심는 편이 배포가 단순하다.
+     밝은 배경용(짙은 글자)과 어두운 배경용(흰 글자) 두 장을 두고
+     화면 모드에 따라 바꾼다. 한 장을 filter 로 반전하면 회색이 뭉개진다. */
+  /* ★ 높이가 아니라 **너비**로 맞춘다.
+     로고가 가로로 길어서(10:1) 높이로 맞추면 사이드바(262px) 밖으로 삐져나간다.
+     너비로 잡으면 어디에 놓든 폭을 넘지 않는다. */
+  .wordmark{width:186px;max-width:100%;height:auto;display:block}
+  .wordmark.on-dark{display:none}
+  @media (prefers-color-scheme: dark){
+    .wordmark.on-light{display:none}
+    .wordmark.on-dark{display:block}
+  }
+
+  .newchat{padding:0 12px 10px}
+  .newchat button{
+    width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;
+    background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    color:var(--tx);font-size:13.5px;cursor:pointer;transition:.15s;
+  }
+  .newchat button:hover{border-color:var(--accent);color:var(--accent)}
+  .adminlink{
+    display:flex;align-items:center;gap:8px;margin:0 12px 4px;padding:8px 12px;
+    border-radius:9px;color:var(--tx2);text-decoration:none;font-size:13px;transition:.15s;
+  }
+  .adminlink:hover{background:var(--bg);color:var(--accent)}
+  .sec{padding:8px 14px 6px;font-size:11px;font-weight:650;color:var(--tx3);letter-spacing:.04em}
+  nav{flex:1;overflow-y:auto;padding:0 8px 8px}
+  .conv{
+    display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;
+    cursor:pointer;transition:.12s;margin-bottom:1px;
+  }
+  .conv:hover{background:var(--bg)}
+  .conv.on{background:var(--accent-soft)}
+  .conv .t{
+    flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  /* 제목이 아직 안 지어진 동안 ("새 대화"). 곧 바뀔 자리라 조금 흐리게. */
+  .conv .t.wait{color:var(--tx3)}
+  .conv .tm{font-size:11px;color:var(--tx3);flex:0 0 auto}
+  .conv:hover .tm{display:none}
+  .grp{
+    padding:12px 12px 5px;font-size:11px;font-weight:650;color:var(--tx3);letter-spacing:.03em;
+  }
+  .grp:first-child{padding-top:4px}
+  .conv .x{
+    opacity:0;border:0;background:transparent;color:var(--tx3);cursor:pointer;
+    padding:2px 4px;border-radius:5px;font-size:14px;line-height:1;flex:0 0 auto;
+  }
+  .conv:hover .x{opacity:1}
+  .conv .x:hover{background:var(--line);color:#c0392b}
+  .empty{padding:10px 14px;font-size:12.5px;color:var(--tx3)}
+  .me{padding:11px 14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .avatar{
+    width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;
+    display:grid;place-items:center;font-size:12px;font-weight:600;flex:0 0 auto;
+  }
+  .me .nm{font-size:13px;font-weight:600;line-height:1.25}
+  .me .rl{font-size:11px;color:var(--tx3);line-height:1.25;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .me .out{
+    border:0;background:transparent;color:var(--tx3);cursor:pointer;
+    padding:5px;border-radius:7px;flex:0 0 auto;display:grid;place-items:center;
+  }
+  .me .out:hover{background:var(--line);color:var(--tx)}
+
+  /* ── 본문 ── */
+  main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+  header{
+    height:52px;flex:0 0 52px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 18px;border-bottom:1px solid var(--line2);background:var(--bg);
+  }
+  header .title{font-size:13.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .launch{
+    display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line);
+    border-radius:9px;background:var(--bg);color:var(--tx);font-size:13px;cursor:pointer;transition:.15s;
+  }
+  .launch:hover{border-color:var(--accent);color:var(--accent)}
+  .hdr-right{display:flex;align-items:center;gap:8px}
+
+  /* ── 체험판 표시 ────────────────────────────────────────────
+     DEMO_MODE=0 이면 /api/demo 가 {"demo":false} 라 아무것도 안 그린다.
+     사내용과 화면 파일을 두 벌로 나누지 않기 위한 것이다. */
+  .demopill{display:none;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;
+            background:var(--accent-soft);color:var(--tx2);font-size:11.5px;
+            white-space:nowrap;cursor:default}
+  .demopill.on{display:inline-flex}
+  .demopill b{color:var(--tx);font-weight:650}
+  @media(max-width:620px){ .demopill .long{display:none} }
+  /* 톱니. 글자 없이 아이콘만 — 옆의 「앱」과 무게가 비슷해지면 둘 다 눈에 안 띈다. */
+  .iconbtn{
+    display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+    border:1px solid transparent;border-radius:9px;background:transparent;
+    color:var(--tx3);cursor:pointer;transition:.15s;
+  }
+  .iconbtn:hover{background:var(--side);color:var(--tx);border-color:var(--line)}
+  .iconbtn.on{background:var(--side);color:var(--accent);border-color:var(--line)}
+
+  /* 설정 메뉴 */
+  .menu{
+    position:absolute;top:56px;right:18px;min-width:186px;padding:6px;
+    background:var(--bg);border:1px solid var(--line);border-radius:11px;box-shadow:var(--pop);
+    display:none;flex-direction:column;z-index:31;
+  }
+  .menu.open{display:flex}
+  .mitem{
+    display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;
+    color:var(--tx);text-decoration:none;font-size:13.5px;transition:.12s;white-space:nowrap;
+  }
+  .mitem:hover{background:var(--side);color:var(--accent)}
+
+  /* 앱 런처 팝오버 */
+  .pop{
+    position:absolute;top:56px;right:18px;width:330px;max-height:70vh;overflow:hidden;
+    background:var(--bg);border:1px solid var(--line);border-radius:13px;box-shadow:var(--pop);
+    display:none;flex-direction:column;z-index:30;
+  }
+  .pop.open{display:flex}
+  .pop .srch{padding:10px;border-bottom:1px solid var(--line2)}
+  .pop input{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+    background:var(--side);color:var(--tx);font:inherit;font-size:13.5px;outline:none;
+  }
+  .pop input:focus{border-color:var(--accent)}
+  .pop .list{overflow-y:auto;padding:6px}
+  .appitem{
+    display:block;padding:10px 11px;border-radius:9px;text-decoration:none;color:inherit;transition:.12s;
+  }
+  .appitem:hover{background:var(--side)}
+  .appitem .n{font-size:13.5px;font-weight:600}
+  .appitem .d{font-size:12px;color:var(--tx3);line-height:1.45;margin-top:2px}
+  .pop .none{padding:16px;text-align:center;color:var(--tx3);font-size:13px}
+
+  #scroll{flex:1;overflow-y:auto;scroll-behavior:smooth}
+  .wrap{max-width:760px;margin:0 auto;padding:28px 24px 8px}
+
+  .hero{min-height:50vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:8px}
+  .hero h1{font-size:25px;font-weight:650;margin:0;letter-spacing:-.02em}
+  .hero p{margin:0;color:var(--tx2);font-size:14px}
+  /* 예시 칩. 네 개가 **한 줄**에 들어가야 한다. 560px 로 잡아 두었더니
+     마지막 하나만 아래로 떨어져서, 첫 화면이 어정쩡해 보였다.
+     창이 좁으면 그때는 접히게 둔다 (wrap 은 그대로). */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px;
+         max-width:min(880px, 100%)}
+  .chip{
+    padding:9px 14px;border:1px solid var(--line);border-radius:999px;
+    background:var(--bg);font-size:13px;color:var(--tx2);cursor:pointer;transition:.15s;
+    /* 칩 안에서 글자가 두 줄로 꺾이면 줄 높이가 어긋난다 */
+    white-space:nowrap;
+  }
+  .chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .heroapps{margin-top:26px;width:100%;max-width:600px}
+  .heroapps .cap{font-size:11px;color:var(--tx3);font-weight:650;letter-spacing:.04em;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* 「숨긴 앱 N개」. 제목줄 오른쪽 끝에 조용히 붙는다.
+     앱 카드보다 눈에 띄면 안 되므로 테두리도 배경도 두지 않는다. */
+  .scopesw{
+    background:none;border:0;padding:0;cursor:pointer;
+    font-size:11px;font-weight:650;letter-spacing:.02em;
+    color:var(--tx3);white-space:nowrap;font-family:inherit;
+  }
+  .scopesw:hover{color:var(--accent);text-decoration:underline}
+
+  /* 「안 보이게」 ×. 별과 같은 규칙 — 평소엔 없고 마우스를 올려야 나온다.
+     자주 누를 것이 아니라서 늘 보이면 지저분하다. */
+  .hidebtn{
+    position:absolute;top:6px;right:29px;width:22px;height:22px;padding:0;
+    border:0;background:none;cursor:pointer;line-height:1;font-size:14px;
+    color:var(--tx3);opacity:0;transition:opacity .12s,color .12s;border-radius:6px;
+  }
+  .card:hover .hidebtn, .appitem:hover .hidebtn, .hidebtn:focus-visible{opacity:1}
+  .hidebtn:hover{color:var(--accent);background:var(--line2)}
+  /* 되돌리기(↺)는 늘 보인다. 숨긴 것 위에서만 나오므로
+     "여기를 누르면 돌아온다"가 바로 보여야 한다. */
+  .hidebtn.on{opacity:1}
+
+  /* 숨긴 앱. 지운 것이 아니라 안 보기로 한 것뿐이라 흐리게만 둔다. */
+  .card.dim, .appitem.dim{opacity:.45}
+  .card.dim:hover, .appitem.dim:hover{opacity:.8}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
+  .card{
+    text-align:left;padding:11px 13px;border:1px solid var(--line);border-radius:11px;
+    text-decoration:none;color:inherit;transition:.15s;background:var(--bg);
+  }
+  .card:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .card .n{font-size:13px;font-weight:600}
+  .card .d{font-size:11.5px;color:var(--tx3);margin-top:2px;
+           display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .moreapps{
+    margin-top:9px;width:100%;padding:9px;border:1px dashed var(--line);border-radius:11px;
+    background:transparent;color:var(--tx2);font-size:12.5px;cursor:pointer;transition:.15s;
+  }
+  .moreapps:hover{border-color:var(--accent);color:var(--accent);border-style:solid}
+  /* 펼친 목록이 길어지면 첫 화면이 앱 목록 페이지가 된다. 여기까지만
+     늘어나고 그 뒤로는 이 안에서 굴린다. 챗 입력창을 밀어내지 않는다. */
+  .heroapps .grid{max-height:46vh;overflow-y:auto;padding-right:2px}
+  .herosrch input{
+    width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--bg);
+    font-size:13px;font-family:inherit;color:inherit;outline:none;
+  }
+  .herosrch input:focus{border-color:var(--accent)}
+  .nohit{grid-column:1/-1;padding:14px;text-align:center;color:var(--tx3);font-size:12.5px}
+
+  /* ── 고정(즐겨찾기) 별 ──────────────────────────────────
+     평소에는 흐리게 두고 마우스를 올렸을 때만 또렷해진다. 고정한 것은
+     늘 보인다 — 지금 무엇이 박혀 있는지가 한눈에 보여야 하기 때문이다. */
+  .card, .appitem{position:relative}
+  .fav{
+    position:absolute;top:6px;right:7px;width:22px;height:22px;padding:0;
+    border:0;background:none;cursor:pointer;line-height:1;font-size:14px;
+    color:var(--tx3);opacity:0;transition:opacity .12s,color .12s;border-radius:6px;
+  }
+  .card:hover .fav, .appitem:hover .fav, .fav:focus-visible{opacity:1}
+  .fav.on{opacity:1;color:#e0a800}
+  .fav:hover{color:#e0a800;background:var(--line2)}
+  /* 별과 글자가 겹치지 않게 오른쪽을 비워 둔다 */
+  .card .n, .appitem .n{padding-right:44px}
+
+  .turn{margin-bottom:26px}
+  .turn.user{display:flex;justify-content:flex-end}
+  /* 말풍선과 첨부 표시를 세로로 쌓는다. 한 줄에 나란히 두면 파일 이름이
+     말풍선 옆으로 밀려서, 무엇을 물었는지가 뒤로 가 버린다. */
+  .turn.user .ubox{
+    display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:78%;
+  }
+  .turn.user .txt{background:var(--bubble);padding:11px 15px;border-radius:16px 16px 4px 16px;max-width:100%;white-space:pre-wrap}
+  .turn.bot{display:flex;gap:12px}
+  .bot .ico{
+    width:27px;height:27px;border-radius:8px;background:var(--accent);color:#fff;
+    display:grid;place-items:center;font-size:11px;font-weight:700;flex:0 0 auto;margin-top:1px;
+  }
+  .bot .body{flex:1;min-width:0}
+  .bot .txt{white-space:pre-wrap;word-break:break-word}
+
+  .steps{display:flex;flex-direction:column;gap:5px;margin-bottom:9px}
+  .step{
+    display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--tx2);
+    background:var(--line2);border-radius:999px;padding:5px 11px;align-self:flex-start;
+    animation:pop .18s ease-out;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(-2px)}to{opacity:1}}
+  .step.done{color:var(--tx3)}
+  .spin{width:11px;height:11px;border:2px solid var(--tx3);border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .tick{color:#2e9e5b;font-size:12px;line-height:1}
+  .dots{display:inline-flex;gap:3px;align-items:center}
+  .dots i{width:5px;height:5px;border-radius:50%;background:var(--tx3);animation:bl 1.2s infinite}
+  .dots i:nth-child(2){animation-delay:.18s} .dots i:nth-child(3){animation-delay:.36s}
+  @keyframes bl{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+  .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .links a{
+    display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--accent);
+    color:#fff;border-radius:9px;text-decoration:none;font-size:13px;font-weight:550;transition:.15s;
+  }
+  .links a:hover{opacity:.88}
+  .meta{margin-top:9px;font-size:11.5px;color:var(--tx3)}
+  .err{color:#c0392b}
+
+  footer{padding:10px 24px 16px;background:var(--bg)}
+  .composer{
+    max-width:760px;margin:0 auto;display:flex;align-items:flex-end;gap:8px;
+    border:1px solid var(--line);border-radius:var(--radius);padding:8px 8px 8px 16px;
+    background:var(--bg);box-shadow:var(--shadow);transition:.15s;
+  }
+  .composer:focus-within{border-color:var(--accent)}
+  #q{flex:1;border:0;outline:0;background:transparent;color:var(--tx);font:inherit;resize:none;max-height:180px;padding:7px 0;line-height:1.55}
+  #q::placeholder{color:var(--tx3)}
+  #send{
+    width:34px;height:34px;border:0;border-radius:9px;background:var(--accent);color:#fff;
+    cursor:pointer;display:grid;place-items:center;flex:0 0 auto;transition:.15s;
+  }
+  #send:disabled{background:var(--line);color:var(--tx3);cursor:default}
+  #clip{
+    width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:var(--tx3);
+    cursor:pointer;display:grid;place-items:center;flex:0 0 auto;transition:.15s;margin-left:-6px;
+  }
+  #clip:hover{background:var(--line2);color:var(--tx)}
+  #clip:disabled{color:var(--line);cursor:default}
+  /* ── 첨부한 파일 칩 ── */
+  #attachbar{max-width:760px;margin:0 auto 8px;display:flex;flex-wrap:wrap;gap:6px}
+  #attachbar:empty{display:none}
+  .chip{
+    display:flex;align-items:center;gap:7px;padding:6px 8px 6px 11px;
+    border:1px solid var(--line);border-radius:9px;background:var(--side);
+    font-size:12.5px;color:var(--tx2);max-width:260px;
+  }
+  /* min-width:0 이 없으면 flex 항목이 내용보다 작아지지 않아서
+     text-overflow 가 걸리지 않고 칩 밖으로 글자가 삐져나온다. */
+  .chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .chip .sz{color:var(--tx3);font-size:11px;flex:0 0 auto}
+  .chip .x{
+    border:0;background:transparent;color:var(--tx3);cursor:pointer;font-size:15px;
+    line-height:1;padding:2px 4px;border-radius:5px;flex:0 0 auto;
+  }
+  .chip .x:hover{background:var(--line);color:#c0392b}
+  .chip.up{opacity:.55}
+  .chip.bad{border-color:#e0b4b4;color:#b4472f;background:#fdf6f6}
+  /* ── 안내줄 ──
+     "'pptx' 형식은 올릴 수 없습니다. 가능한 형식: …" 같은 문장은 칩에 담기지
+     않는다. 칩은 붙은 파일을 보여주는 자리고, 이건 읽어야 하는 문장이다.
+     그래서 자리를 나눴다. 줄바꿈이 되고, 닫을 수 있고, 저절로 사라진다. */
+  #notice{
+    max-width:760px;margin:0 auto 8px;padding:9px 10px 9px 12px;
+    display:flex;align-items:flex-start;gap:8px;
+    border:1px solid #e6c9c9;border-radius:10px;background:#fdf6f6;
+    color:#a34430;font-size:12.5px;line-height:1.55;
+    animation:fade .12s ease-out;
+  }
+  #notice[hidden]{display:none}
+  #notice .msgs{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  #notice .msgs div{word-break:break-word}
+  #notice .x{
+    border:0;background:transparent;color:#b98b80;cursor:pointer;font-size:15px;
+    line-height:1;padding:2px 4px;border-radius:5px;flex:0 0 auto;
+  }
+  #notice .x:hover{background:#f3e2e2;color:#a34430}
+  /* ── 파일을 끌어왔을 때 화면 전체에 뜨는 안내 ──
+     끌어다 놓는 게 되는지 모르는 사람이 대부분이라, 끌어오는 순간
+     "여기 놓으면 된다"를 크게 보여준다. */
+  #drop{
+    position:fixed;inset:0;z-index:80;display:none;place-items:center;
+    background:rgba(31,78,121,.10);backdrop-filter:blur(3px);
+    /* ★ 이게 없으면 안내가 뜨는 순간 그 자체가 드래그 대상이 되어
+       dragenter/dragleave 가 번갈아 튀고, 안내가 깜빡이거나 사라진다. */
+    pointer-events:none;
+  }
+  #drop.on{display:grid;animation:fade .12s ease-out}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  #drop .box{
+    border:2px dashed var(--accent);border-radius:18px;background:var(--bg);
+    padding:34px 46px;text-align:center;box-shadow:var(--pop);
+    animation:pop .14s ease-out;
+  }
+  @keyframes pop{from{opacity:0;transform:scale(.96) translateY(6px)}to{opacity:1;transform:none}}
+  #drop .ic{color:var(--accent);margin-bottom:10px}
+  #drop .t1{font-size:16px;font-weight:650;color:var(--tx)}
+  #drop .t2{font-size:12.5px;color:var(--tx3);margin-top:6px}
+  /* 입력창도 같이 반응하게 — 어디로 가는지 눈에 보인다 */
+  body.dragging .composer{
+    border-color:var(--accent);box-shadow:0 0 0 3px rgba(31,78,121,.16);
+  }
+  /* 답변 안에 남는 첨부 표시 */
+  .filenote{
+    display:inline-flex;align-items:center;gap:6px;padding:5px 9px;max-width:100%;
+    border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--tx3);
+  }
+  .filenote span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .hint{max-width:760px;margin:8px auto 0;font-size:11.5px;color:var(--tx3);text-align:center}
+  /* ── 확인 모달 ── */
+  .mask{
+    position:fixed;inset:0;background:rgba(16,17,20,.45);backdrop-filter:blur(2px);
+    display:none;place-items:center;z-index:60;padding:20px;
+  }
+  .mask.on{display:grid}
+  .modal{
+    width:min(390px,100%);background:var(--bg);border-radius:16px;
+    box-shadow:0 18px 50px rgba(16,17,20,.2);overflow:hidden;animation:up .16s ease-out;
+  }
+  @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .modal h4{margin:0;padding:20px 22px 6px;font-size:16px;font-weight:650}
+  .modal .quote{
+    margin:0 22px;padding:10px 13px;border-radius:9px;background:var(--line2);
+    font-size:13px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .modal p{margin:12px 22px 0;font-size:13px;color:var(--tx3);line-height:1.6}
+  .modal .mf{padding:18px 22px 20px;display:flex;gap:8px;justify-content:flex-end}
+  .ghost{padding:9px 16px;border:1px solid var(--line);border-radius:9px;background:var(--bg);
+         color:var(--tx2);font-size:13.5px;cursor:pointer}
+  .ghost:hover{background:var(--side)}
+  .redbtn{padding:9px 18px;border:0;border-radius:9px;background:#c0392b;
+          color:#fff;font-size:13.5px;font-weight:600;cursor:pointer}
+  .redbtn:hover{opacity:.9}
+
+  #toast{
+    position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(16px);
+    background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:11px;
+    font-size:13px;box-shadow:0 10px 34px rgba(0,0,0,.2);opacity:0;
+    transition:.22s;pointer-events:none;z-index:80;
+  }
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ── 좁은 화면 ──────────────────────────────────────────────
+     예전에는 사이드바를 그냥 숨겼다. 그러면 휴대폰에서 지난 대화도,
+     새 대화 버튼도, 로그아웃도 손이 닿지 않는다.
+     이제는 밀어 넣어 두고 왼쪽 위 버튼으로 꺼낸다. */
+  #burger{display:none;border:0;background:transparent;color:var(--tx2);
+          padding:6px;margin-right:4px;border-radius:8px;cursor:pointer;flex:0 0 auto}
+  #burger:hover{background:var(--line2);color:var(--tx)}
+  #sidemask{display:none;position:fixed;inset:0;z-index:70;background:rgba(16,17,20,.38)}
+  #sidemask.on{display:block}
+
+  @media (max-width:860px){
+    aside{
+      position:fixed;left:0;top:0;bottom:0;z-index:75;width:270px;flex-basis:270px;
+      transform:translateX(-100%);transition:transform .22s ease;
+      box-shadow:0 0 26px rgba(0,0,0,.16);
+    }
+    aside.open{transform:translateX(0)}
+    #burger{display:grid;place-items:center}
+    header{padding:0 12px}
+    header .title{flex:1;min-width:0}
+    .wrap{padding:22px 16px 8px}
+    footer{padding:10px 16px 14px}
+    #attachbar, #notice{padding-left:2px;padding-right:2px}
+  }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <img class="wordmark on-light" alt="NURI COSMETIC" src="/static/wordmark-light.png"><img class="wordmark on-dark" alt="NURI COSMETIC" src="/static/wordmark-dark.png">
+    <div class="brandsub" id="brandsub"></div>
+  </div>
+  <div class="newchat"><button id="newchat">＋&nbsp; 새 대화</button></div>
+  <!-- 비밀번호 변경·관리자 페이지는 오른쪽 위 톱니로 옮겼다.
+       하루에 한 번 쓸까 말까 한 것이 대화 목록 위를 늘 차지하고 있었다. -->
+  <div class="sec">대화 내역</div>
+  <nav id="convs"></nav>
+  <div class="me">
+    <div class="avatar" id="ini">·</div>
+    <div style="flex:1;min-width:0">
+      <div class="nm" id="nm">확인 중</div><div class="rl" id="rl"></div>
+    </div>
+    <button class="out" id="out" title="로그아웃">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+      </svg>
+    </button>
+  </div>
+</aside>
+
+<div id="sidemask"></div>
+
+<main>
+  <header>
+    <button id="burger" title="메뉴" type="button" aria-label="메뉴">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="title" id="curtitle">새 대화</div>
+    <div class="hdr-right">
+    <span class="demopill" id="demopill" title="">
+      <b>체험판</b><span class="long" id="demoleft"></span>
+    </span>
+    <button class="iconbtn" id="gear" type="button" title="설정" aria-label="설정"
+            aria-haspopup="true" aria-expanded="false">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+    <button class="launch" id="launch">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/>
+        <rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/>
+      </svg>
+      앱
+    </button>
+    </div>
+  </header>
+
+  <!-- 설정 메뉴. 관리자 페이지는 관리자에게만 보인다. -->
+  <div class="menu" id="gearmenu" role="menu">
+    <a class="mitem" href="/password" role="menuitem">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      비밀번호 변경
+    </a>
+    <a class="mitem" id="adminlink" href="/admin" role="menuitem" style="display:none">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      관리자 페이지
+    </a>
+  </div>
+
+  <div class="pop" id="pop">
+    <div class="srch"><input id="appq" placeholder="앱 검색" autocomplete="off"></div>
+    <div class="list" id="applist"></div>
+  </div>
+
+  <div id="scroll"><div class="wrap" id="wrap"></div></div>
+
+  <footer>
+    <!-- 거절 사유·중복 안내가 뜨는 자리. 칩 안에 넣으면 글이 길어서 삐져나온다. -->
+    <div id="notice" hidden></div>
+    <div id="attachbar"></div>
+    <div class="composer">
+      <!-- 파일 첨부. 포털은 파일을 열어보지 않고, 분석할 수 있는
+           앱이 있으면 그 앱에 넘긴다. -->
+      <input type="file" id="fileInput" hidden multiple>
+      <button id="clip" title="파일 첨부" type="button">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <textarea id="q" rows="1" placeholder="원하는 작업을 입력하세요" autocomplete="off"></textarea>
+      <button id="send" title="전송">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </div>
+    <div class="hint">Enter 전송 · Shift+Enter 줄바꿈</div>
+  </footer>
+</main>
+
+<!-- 파일을 끌어오면 뜨는 안내. 화면 어디에 놓아도 된다. -->
+<div id="drop">
+  <div class="box">
+    <div class="ic">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <path d="M7 10l5-5 5 5"/><path d="M12 5v13"/>
+      </svg>
+    </div>
+    <div class="t1">여기에 놓으면 파일이 올라갑니다</div>
+    <div class="t2">pdf · docx · xlsx · csv · txt · 이미지</div>
+  </div>
+</div>
+
+<div class="mask" id="mDel">
+  <div class="modal">
+    <h4>대화를 삭제할까요?</h4>
+    <div class="quote" id="delTitle"></div>
+    <p>삭제하면 이 대화의 질문과 답변이 모두 사라집니다. 되돌릴 수 없습니다.</p>
+    <div class="mf">
+      <button class="ghost" id="delNo">취소</button>
+      <button class="redbtn" id="delYes">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// 로그인 화면에서 저장한 JWT 를 사용한다.
+const JWT_KEY = "portal.jwt";
+const TOKEN = localStorage.getItem(JWT_KEY) || "";
+if(!TOKEN) location.replace("/login");
+
+// 초기 비밀번호를 쓰고 있으면 변경 화면으로 보낸다
+try{
+  const p = JSON.parse(atob(TOKEN.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
+  if(p.chg) location.replace("/password");
+}catch(e){}
+
+async function logout(){
+  localStorage.removeItem(JWT_KEY);
+  localStorage.removeItem(SKEY);
+  // 옆 서비스(/ai-report/ 등)가 보는 쿠키도 함께 지운다.
+  // 여기만 지우면 챗에서는 로그아웃됐는데 리포트는 계속 열린다.
+  try{ await fetch("/api/logout", { method:"POST" }); }catch(e){}
+  location.replace("/login");
+}
+function onUnauthorized(){
+  localStorage.removeItem(JWT_KEY);
+  fetch("/api/logout", { method:"POST" }).catch(()=>{}).finally(()=>{
+    location.replace("/login");
+  });
+}
+
+/* 예시 질문.
+   권한이 없는 앱을 예시로 띄우면 눌렀다가 "권한이 없습니다"만 보게 된다.
+   그래서 앱과 연결된 예시는 그 앱이 보이는 사람에게만 나가도록 한다. */
+/* 첫 화면의 예시 질문.
+   여기 적힌 것이 "이 포털은 이런 걸 물어보는 곳"이라는 인상을 만든다.
+   그래서 **전 직원이 실제로 물어볼 만한 것**이어야 한다.
+   "이번 주 점검 뭐 있어?" 는 IT 담당자 일이고, "이번 달 AI 사용량" 도
+   담당자가 보는 숫자다. 대부분의 직원에게는 남의 일로 읽힌다. */
+const BASE_CHIPS = ["무슨 앱 쓸 수 있어?", "지금 몇 시야?", "뭐 기억하고 있어?"];
+
+/* 앞에 둔 것부터 채운다. 그 앱을 쓸 수 있는 사람에게만 보인다.
+   순서는 **쓰는 사람이 많은 것부터**다. 담당자용은 뒤로 미룬다 —
+   못 쓰는 사람에게 안 보이더라도, 담당자 화면이 담당자 일로만 차면
+   "여기서 뭘 물어보는 곳인지" 가 안 보인다. */
+const APP_CHIPS = [
+  ["prompt",    "바이브코딩 어떻게 해?"],
+  ["prompt",    "프롬프트 작성 어떻게 해?"],
+  ["manual",    "SAP 사용법 어디서 봐?"],
+  ["assets",    "내 자산 뭐 있어?"],
+  ["ai-report", "이번 달 AI 사용량 알려줘"],
+  ["checklist", "이번 주 점검 뭐 있어?"],
+];
+function chips(){
+  const have = new Set(APPS.map(a=>a.id));
+  const extra = APP_CHIPS.filter(([id])=>have.has(id)).map(([,t])=>t).slice(0,3);
+  return [BASE_CHIPS[0], ...extra, ...BASE_CHIPS.slice(1)].slice(0,4);
+}
+function reveal(){ document.documentElement.classList.remove("booting"); }
+const H = { Authorization: "Bearer " + TOKEN };
+
+const SKEY = "portal.session";
+let SESSION = sessionRestore(), APPS = [], busy = false, started = false;
+let IS_ADMIN = false;
+let IS_DEMO  = false;
+
+/* ── 앱 숨기기 ────────────────────────────────────────────────
+   관리자에게는 모든 앱이 보인다(그래야 방금 배포한 것을 바로 확인할 수
+   있다). 그런데 앱이 늘수록 정작 자기가 쓰는 것을 찾기 어려워진다.
+
+   **끄는 것이 아니라 안 보는 것이다.** 서비스는 그대로 돌아가고
+   권한도 그대로다. 이 브라우저에서 내 첫 화면에만 안 나온다.
+   그래서 서버로 보내지 않고 고정(★)과 똑같이 여기에만 남긴다.
+
+   숨긴 앱도 오른쪽 위 「앱」 목록에는 늘 그대로 있다. 첫 화면만
+   정리하는 것이지 앱으로 가는 길을 끊는 것이 아니다. */
+const HKEY = "portal.apphide";
+function hideList(){
+  try{ const v = JSON.parse(localStorage.getItem(HKEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch(e){ return []; }
+}
+function isHidden(id){ return hideList().includes(id); }
+function toggleHide(id){
+  const list = hideList();
+  const at = list.indexOf(id);
+  if(at >= 0) list.splice(at, 1); else list.push(id);
+  try{ localStorage.setItem(HKEY, JSON.stringify(list)); }catch(e){}
+}
+/* 지금 없는 앱의 id 가 계속 쌓이지 않게, 화면에 쓸 때는 현재 앱만 센다. */
+function hiddenNow(){ return APPS.filter(a => isHidden(a.id)); }
+
+/* 「숨긴 앱 보기」를 눌러 펼쳐 둔 상태인가. 되돌리려면 보여야 하니까.
+   이건 남기지 않는다 — 새로고침하면 다시 접힌다. */
+let SHOW_HIDDEN = false;
+
+/* 첫 화면에 깔 앱. */
+function shown(){
+  if(SHOW_HIDDEN) return APPS;
+  const left = APPS.filter(a => !isHidden(a.id));
+  return left.length ? left : APPS;   // 전부 숨기면 첫 화면이 텅 빈다
+}
+
+/* 첫 화면에 카드로 깔아 둘 앱 수.
+   앱이 수십 개가 되면 전부 늘어놓는 순간 첫 화면이 앱 목록 페이지가 되고,
+   정작 챗 입력창이 화면 밖으로 밀린다. 그래서 몇 개만 깔아 두고,
+   더 보고 싶으면 **그 자리에서 펼친다.** 창을 따로 띄우면 첫 화면을
+   덮어 버려서, 열고 → 찾고 → 닫는 동작이 한 번씩 더 든다. */
+const HERO_APPS = 6;
+/* 펼쳤을 때 이만큼 넘으면 검색칸을 붙인다. 스무 개까지는 눈으로 훑는 게
+   빠르지만, 그 위로는 찾는 게 일이 된다. */
+const SEARCH_FROM = 12;
+let HERO_OPEN = false;
+
+/* ── 어떤 앱을 자주 쓰는가 ──
+   앱이 백 개가 되면 목록 순서는 아무 뜻이 없어진다. 관리자가 정한 순서는
+   "회사가 보기에 중요한 순서"지 "이 사람이 자주 여는 순서"가 아니다.
+   그래서 이 브라우저에서 연 기록을 남겨 앞으로 올린다. 서버로는 보내지
+   않는다 — 누가 무엇을 얼마나 열었는지는 굳이 모을 정보가 아니다. */
+const UKEY = "portal.appuse";
+function useMap(){
+  try{ return JSON.parse(localStorage.getItem(UKEY) || "{}") || {}; }catch(e){ return {}; }
+}
+function noteUse(id){
+  if(!id) return;
+  try{
+    const m = useMap();
+    const r = m[id] || {n:0, t:0};
+    m[id] = {n: r.n + 1, t: Date.now()};
+    localStorage.setItem(UKEY, JSON.stringify(m));
+  }catch(e){}
+}
+/* ── 고정(즐겨찾기) ──────────────────────────────────────────
+   자주 여는 순으로만 두었더니 **누를 때마다 자리가 바뀌어서** 헷갈린다는
+   말이 나왔다. 늘 쓰는 앱은 늘 같은 자리에 있어야 손이 기억한다.
+
+   별을 누르면 맨 앞에 박힌다. 박은 순서도 그대로 지킨다 — 고정해 놓고도
+   자리가 흔들리면 고정한 뜻이 없다.
+
+   이 브라우저에만 남는다. 서버로 보내지 않는다. */
+const FKEY = "portal.appfav";
+function favList(){
+  try{ const v = JSON.parse(localStorage.getItem(FKEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch(e){ return []; }
+}
+function isFav(id){ return favList().includes(id); }
+function toggleFav(id){
+  const list = favList();
+  const at = list.indexOf(id);
+  if(at >= 0) list.splice(at, 1); else list.push(id);
+  try{ localStorage.setItem(FKEY, JSON.stringify(list)); }catch(e){}
+}
+
+/* 고정한 것이 맨 앞(고정한 차례대로), 그다음 많이 연 순, 같으면 최근 순.
+   한 번도 안 연 앱은 관리자가 정한 순서 그대로 뒤에 붙인다. */
+function ranked(src){
+  const m = useMap(), fav = favList();
+  const pinned = [], used = [], fresh = [];
+  (src || APPS).forEach((a, i) => {
+    if(fav.includes(a.id)) pinned.push({a, k: fav.indexOf(a.id)});
+    else (m[a.id] ? used : fresh).push({a, i, u: m[a.id]});
+  });
+  pinned.sort((x, y) => x.k - y.k);
+  used.sort((x, y) => (y.u.n - x.u.n) || (y.u.t - x.u.t) || (x.i - y.i));
+  return pinned.concat(used, fresh).map(x => x.a);
+}
+function anyUse(src){ return (src || APPS).some(a => useMap()[a.id]); }
+
+/* 별 하나. 카드와 목록이 같은 것을 쓴다. */
+function favStar(app, redraw){
+  const b = document.createElement("button");
+  b.className = "fav" + (isFav(app.id) ? " on" : "");
+  b.type = "button";
+  b.title = isFav(app.id) ? "고정 풀기" : "맨 앞에 고정";
+  b.setAttribute("aria-label", b.title);
+  b.textContent = isFav(app.id) ? "★" : "☆";
+  b.addEventListener("click", e => {
+    // 카드 자체가 링크라 그대로 두면 앱이 열려 버린다
+    e.preventDefault(); e.stopPropagation();
+    toggleFav(app.id);
+    redraw();
+  });
+  return b;
+}
+
+/* 「안 보이게」. 별 왼쪽에 나란히 둔다. 카드와 목록이 같은 것을 쓴다.
+   숨긴 것 위에서는 되돌리기 버튼이 된다. */
+function hideBtn(app, redraw){
+  const on = isHidden(app.id);
+  const b = document.createElement("button");
+  b.className = "hidebtn" + (on ? " on" : "");
+  b.type = "button";
+  b.title = on ? "다시 보이게" : "첫 화면에서 안 보이게 (서비스는 그대로 돌아갑니다)";
+  b.setAttribute("aria-label", b.title);
+  b.textContent = on ? "↺" : "×";
+  b.addEventListener("click", e => {
+    e.preventDefault(); e.stopPropagation();
+    toggleHide(app.id);
+    redraw();
+  });
+  return b;
+}
+
+function sessionRestore(){
+  try{ return localStorage.getItem(SKEY) || newId(); }catch(e){ return newId(); }
+}
+function saveSession(){
+  try{ localStorage.setItem(SKEY, SESSION); }catch(e){}
+}
+
+const wrap = document.getElementById("wrap");
+const scroll = document.getElementById("scroll");
+const q = document.getElementById("q");
+const send = document.getElementById("send");
+const convs = document.getElementById("convs");
+const pop = document.getElementById("pop");
+
+function newId(){ return "s-" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function el(t,c,x){ const e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
+function toBottom(){ scroll.scrollTop = scroll.scrollHeight; }
+
+/* ── 앱 런처 ── */
+function renderApps(filter){
+  const box = document.getElementById("applist");
+  box.innerHTML = "";
+  const f = (filter||"").trim().toLowerCase();
+  const all = ranked();          // 자주 여는 앱이 위로 (첫 화면과 같은 순서)
+  const list = f ? all.filter(a => ((a.name||"")+(a.desc||"")).toLowerCase().includes(f)) : all;
+  if(!list.length){ box.appendChild(el("div","none","검색 결과가 없습니다")); return; }
+  list.forEach(a=>{
+    const it = document.createElement("a");
+    it.className="appitem" + (isFav(a.id) ? " pinned" : "")
+                          + (isHidden(a.id) ? " dim" : "");
+    it.href=a.url; it.target="_blank"; it.rel="opener";
+    it.appendChild(el("div","n",a.name));
+    it.appendChild(el("div","d",a.desc));
+    it.appendChild(favStar(a, () => renderApps(filter)));
+    /* 여기서 숨겨도 목록에서는 사라지지 않는다. 런처는 모든 앱으로 가는
+       길이라, 여기서까지 사라지면 되돌릴 방법이 없어진다. 흐려질 뿐이다. */
+    it.appendChild(hideBtn(a, () => {
+      renderApps(filter);
+      /* 첫 화면이 떠 있을 때만 그 부분을 갈아 끼운다.
+         renderHero() 를 부르면 wrap 을 통째로 비우므로,
+         대화 중에 여기서 숨기면 대화가 화면에서 사라진다. */
+      const ha = document.querySelector(".heroapps");
+      if(ha) ha.replaceWith(heroApps());
+    }));
+    it.addEventListener("click", ()=> noteUse(a.id));
+    box.appendChild(it);
+  });
+}
+function openLauncher(){
+  if(typeof closeGear === "function") closeGear();
+  pop.classList.add("open");
+  renderApps(""); document.getElementById("appq").focus();
+}
+document.getElementById("launch").onclick = e=>{
+  e.stopPropagation();
+  if(pop.classList.contains("open")) pop.classList.remove("open");
+  else openLauncher();
+};
+document.getElementById("appq").oninput = e => renderApps(e.target.value);
+
+/* ── 설정 메뉴 ──
+   앱 목록과 설정 메뉴가 동시에 열려 겹치면 둘 다 못 읽는다. 하나만 연다. */
+const gear = document.getElementById("gear");
+const gearmenu = document.getElementById("gearmenu");
+function closeGear(){
+  gearmenu.classList.remove("open");
+  gear.classList.remove("on");
+  gear.setAttribute("aria-expanded","false");
+}
+function openGear(){
+  pop.classList.remove("open");
+  gearmenu.classList.add("open");
+  gear.classList.add("on");
+  gear.setAttribute("aria-expanded","true");
+}
+gear.onclick = e=>{
+  e.stopPropagation();
+  gearmenu.classList.contains("open") ? closeGear() : openGear();
+};
+document.addEventListener("click", e=>{
+  if(!pop.contains(e.target)) pop.classList.remove("open");
+  if(!gearmenu.contains(e.target) && e.target !== gear && !gear.contains(e.target)) closeGear();
+});
+document.addEventListener("keydown", e=>{ if(e.key === "Escape") closeGear(); });
+
+/* ── 화면 ── */
+function renderHero(){
+  wrap.innerHTML = ""; started = false; HERO_OPEN = false;
+  document.getElementById("curtitle").textContent = "새 대화";
+  const h = el("div","hero");
+  h.appendChild(el("h1","","무엇을 도와드릴까요?"));
+  h.appendChild(el("p","","원하는 작업을 자연어로 입력하면 해당 기능을 찾아 실행합니다."));
+  const c = el("div","chips");
+  chips().forEach(t=>{ const b=el("div","chip",t); b.onclick=()=>{ q.value=t; ask(); }; c.appendChild(b); });
+  h.appendChild(c);
+
+  if(APPS.length) h.appendChild(heroApps());
+  wrap.appendChild(h);
+}
+
+/* 첫 화면의 앱 카드. 접힌 상태에서는 몇 개만, 펼치면 그 자리에서 전부.
+   펼침 여부는 HERO_OPEN 하나로만 판단해서, 다시 그릴 때 상태가 어긋나지
+   않게 한다. */
+function heroApps(){
+  const ha = el("div","heroapps");
+  const AS = shown();                       // 이 화면에 보일 앱
+
+  const head = el("div","cap");
+  head.appendChild(el("span","", HERO_OPEN
+    ? `앱 ${AS.length}개`
+    : (anyUse(AS) ? `자주 쓰는 앱 · 전체 ${AS.length}개` : `사용 가능 앱 ${AS.length}개`)));
+
+  /* 숨긴 것이 있을 때만 나온다. 숨겨 놓고 되돌릴 길이 없으면
+     안 되므로, 개수를 늘 보여 주고 눌러서 펼칠 수 있게 한다. */
+  const nHidden = hiddenNow().length;
+  if(nHidden){
+    const sw = el("button","scopesw", SHOW_HIDDEN
+      ? "숨긴 앱 접기"
+      : `숨긴 앱 ${nHidden}개`);
+    sw.type = "button";
+    sw.title = SHOW_HIDDEN
+      ? "숨긴 앱을 다시 접는다"
+      : "숨긴 앱을 펼쳐서 다시 보이게 되돌린다";
+    sw.onclick = e => {
+      e.stopPropagation();
+      SHOW_HIDDEN = !SHOW_HIDDEN;
+      ha.replaceWith(heroApps());
+    };
+    head.appendChild(sw);
+  }
+  ha.appendChild(head);
+
+  let list = ranked(AS);
+
+  /* 남는 게 한둘이면 그냥 다 보여준다. 카드 하나를 감춰 두고
+     "1개 더 보기" 버튼을 두는 건 누르는 품만 늘리는 짓이다.
+
+     고정한 앱은 접힌 상태에서도 **다 보여야** 한다. 고정해 놨는데
+     "더 보기" 안에 숨어 있으면 고정한 뜻이 없다. */
+  const pinnedCount = AS.filter(a => isFav(a.id)).length;
+  const CUT = AS.length <= HERO_APPS + 2
+    ? AS.length
+    : Math.max(HERO_APPS, pinnedCount);
+
+  // 검색칸은 펼쳤을 때, 그것도 앱이 많을 때만 나온다. 일곱 개 앞에
+  // 검색칸이 있으면 안 해도 될 일을 시키는 셈이다.
+  const many = HERO_OPEN && AS.length > SEARCH_FROM;
+  const g = el("div","grid");
+
+  function draw(f){
+    g.innerHTML = "";
+    const key = (f||"").trim().toLowerCase();
+    let show = key
+      ? list.filter(a => ((a.name||"") + (a.desc||"")).toLowerCase().includes(key))
+      : (HERO_OPEN ? list : list.slice(0, CUT));
+    if(!show.length){ g.appendChild(el("div","nohit","찾는 앱이 없습니다")); return; }
+    show.forEach(a=>{
+      const card = document.createElement("a");
+      /* rel="opener" 를 붙인다. 요즘 브라우저는 target="_blank" 만 쓰면
+         opener 를 **자동으로 끊는다.** 그러면 열린 탭이 「← 포탈로」 로
+         이 탭에 돌아올 길이 없어서 포털 탭만 자꾸 늘어난다.
+         같은 도메인 안이라 noopener 가 막아 주는 위험은 해당되지 않는다. */
+      card.className="card" + (isFav(a.id) ? " pinned" : "")
+                            + (isHidden(a.id) ? " dim" : "");
+      card.href=a.url; card.target="_blank"; card.rel="opener";
+      card.appendChild(el("div","n",a.name));
+      card.appendChild(el("div","d",a.desc));
+      // 고정을 바꾸면 순서가 달라진다. 그 자리에서 다시 그린다.
+      card.appendChild(favStar(a, () => { list = ranked(AS); draw(f); }));
+      /* 숨기면 목록 자체가 달라지므로(개수·「더 보기」·제목줄) 통째로
+         다시 그린다. 카드만 지우면 제목줄의 개수가 어긋난다. */
+      card.appendChild(hideBtn(a, () => ha.replaceWith(heroApps())));
+      card.addEventListener("click", ()=> noteUse(a.id));
+      g.appendChild(card);
+    });
+  }
+
+  if(many){
+    const s = el("div","herosrch");
+    const inp = document.createElement("input");
+    inp.placeholder = "앱 이름으로 찾기"; inp.autocomplete = "off";
+    inp.oninput = e => draw(e.target.value);
+    s.appendChild(inp);
+    ha.appendChild(s);
+    setTimeout(()=>inp.focus(), 0);
+  }
+
+  draw("");
+  ha.appendChild(g);
+
+  if(AS.length > CUT){
+    const more = el("button","moreapps", HERO_OPEN
+      ? "접기" : `앱 ${AS.length - CUT}개 더 보기`);
+    more.onclick = e=>{
+      e.stopPropagation();
+      HERO_OPEN = !HERO_OPEN;
+      ha.replaceWith(heroApps());     // 그 자리에서 다시 그린다. 창을 띄우지 않는다
+    };
+    ha.appendChild(more);
+  }
+  return ha;
+}
+
+function addUser(text, files){
+  const hero = wrap.querySelector(".hero"); if(hero) hero.remove();
+  const t = el("div","turn user");
+  // 말풍선과 첨부 표시를 한 상자에 세로로 쌓는다 (CSS .ubox 참고)
+  const box = el("div","ubox");
+  box.appendChild(el("div","txt",text));
+  // 무엇을 붙여서 물었는지 대화에 남긴다
+  (files || []).forEach(function(f){
+    const n = el("div","filenote");
+    n.appendChild(el("span","","📎 " + f.name));
+    box.appendChild(n);
+  });
+  t.appendChild(box);
+  wrap.appendChild(t); toBottom();
+  if(!started){ started = true; document.getElementById("curtitle").textContent = text.slice(0,40); }
+}
+/* 바로가기 버튼 한 줄. 새 답변과 불러온 대화가 같은 모양이어야 하므로
+   그리는 코드를 한 곳에 둔다. */
+function linkRow(links){
+  if(!links || !links.length) return null;
+  const box = el("div","links");
+  links.forEach(l=>{
+    if(!l || !l.url) return;
+    const a = document.createElement("a");
+    // rel="opener" — 같은 도메인이라 위험하지 않고, 열린 탭이
+    // 「← 포탈로」 로 이 탭에 돌아오려면 opener 가 있어야 한다.
+    a.href = l.url; a.target = "_blank"; a.rel = "opener";
+    a.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+      'stroke-width="2.4" stroke-linecap="round"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg> 바로가기';
+    box.appendChild(a);
+  });
+  return box.childElementCount ? box : null;
+}
+
+function addBotText(text, links){
+  const t = el("div","turn bot");
+  t.appendChild(el("div","ico","AI"));
+  const body = el("div","body"); body.appendChild(el("div","txt",text));
+  const lr = linkRow(links); if(lr) body.appendChild(lr);
+  t.appendChild(body); wrap.appendChild(t);
+}
+function addBot(){
+  const t = el("div","turn bot");
+  t.appendChild(el("div","ico","AI"));
+  const body = el("div","body");
+  const steps = el("div","steps"), txt = el("div","txt");
+  body.appendChild(steps); body.appendChild(txt);
+  t.appendChild(body); wrap.appendChild(t); toBottom();
+  return {steps, txt, body};
+}
+function stepRow(text, spinning){
+  const s = el("div","step");
+  s.appendChild(spinning ? el("span","spin") : el("span","tick","✓"));
+  s.appendChild(el("span","",text));
+  return s;
+}
+function thinking(){
+  const s = el("div","step"), d = el("span","dots");
+  d.appendChild(el("i")); d.appendChild(el("i")); d.appendChild(el("i"));
+  s.appendChild(d); s.appendChild(el("span","","생각하는 중"));
+  return s;
+}
+
+/* ── 대화 내역 ── */
+async function loadConvs(){
+  try{
+    const r = await fetch("/api/sessions", { headers:H });
+    const j = await r.json();
+    convs.innerHTML = "";
+    if(!j.sessions.length){ convs.appendChild(el("div","empty","아직 대화가 없습니다")); return; }
+    // 지금 보고 있는 대화의 제목이 지어졌는지. 기다릴지 말지를 여기서 판단한다.
+    const mine = j.sessions.find(function(s){ return s.id === SESSION; });
+    LAST_TITLED = !!(mine && mine.titled);
+    LAST_TITLE  = (mine && mine.title) || "";
+
+    const now = new Date();
+    const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const today = startOfDay(now);
+    const DAY = 86400000;
+
+    function bucket(iso){
+      const d = new Date(iso);
+      const s = startOfDay(d);
+      if(s === today) return "오늘";
+      if(s === today - DAY) return "어제";
+      if(s > today - 7*DAY) return "지난 7일";
+      if(s > today - 30*DAY) return "지난 30일";
+      return "이전";
+    }
+    function stamp(iso){
+      const d = new Date(iso);
+      const s = startOfDay(d);
+      if(s === today) return d.toTimeString().slice(0,5);
+      if(s > today - 7*DAY) return "월화수목금토일"[(d.getDay()+6)%7] + "요일";
+      return (d.getMonth()+1) + "/" + d.getDate();
+    }
+
+    /* 제목이 아직 안 지어진 **방금 만든** 대화는 물어본 말이 그대로
+       뜬다. 몇 초 뒤 제목으로 바뀌는데, 그 사이가 보기 사납다.
+       ("이거 내용 분석해 줄 수 있어?" → "파일 분석 · SSD 속도측정")
+
+       그래서 잠깐은 그냥 "새 대화" 로 둔다. 제목이 나오면 바뀐다.
+       (진행 상황을 알리는 문구를 넣어 봤는데, 몇 초 보이자고 화면에
+        군더더기를 다는 꼴이었다. 조용히 있다가 바뀌는 편이 낫다.)
+
+       오래된 대화까지 그러면 곤란하다 — 제목 만들기가 실패했을 수도
+       있고, 그때는 물어본 말이라도 보이는 편이 낫다. 그래서 1분만 둔다. */
+    const PENDING_MS = 60000;
+    function pending(s){
+      return !s.titled && (now - new Date(s.updated_at)) < PENDING_MS;
+    }
+    function label(s){ return pending(s) ? "새 대화" : s.title; }
+
+    let last = null;
+    j.sessions.forEach(s=>{
+      const g = bucket(s.updated_at);
+      if(g !== last){ convs.appendChild(el("div","grp",g)); last = g; }
+
+      const d = el("div","conv" + (s.id===SESSION ? " on" : ""));
+      d.appendChild(el("div","t" + (pending(s) ? " wait" : ""), label(s)));
+      d.appendChild(el("span","tm", stamp(s.updated_at)));
+      const x = el("button","x","×");
+      x.title = "삭제";
+      x.onclick = ev=>{ ev.stopPropagation(); askDelete(s); };
+      d.onclick = ()=> openConv(s.id, s.title);
+      d.appendChild(x);
+      convs.appendChild(d);
+    });
+  }catch(e){ /* 무시 */ }
+}
+
+// loadConvs() 가 채운다. refreshConvsSoon() 이 언제 멈출지 판단하는 값.
+let LAST_TITLED = false;
+let LAST_TITLE = "";
+
+let delTarget = null;
+
+function toast(text){
+  const t = document.getElementById("toast");
+  t.textContent = text; t.className = "on";
+  setTimeout(()=>t.className = "", 2400);
+}
+
+function askDelete(s){
+  delTarget = s;
+  document.getElementById("delTitle").textContent = s.title;
+  document.getElementById("mDel").classList.add("on");
+  // 손이 이미 자판에 있다. 마우스로 옮겨 가 누르게 하지 않는다.
+  // Enter = 삭제, Esc = 취소.
+  document.getElementById("delYes").focus();
+}
+function closeDel(){ document.getElementById("mDel").classList.remove("on"); delTarget = null; }
+
+// 확인창이 떠 있는 동안에는 Enter/Esc 를 이 창이 가져간다.
+// capture 단계에서 잡아야 입력창의 Enter(전송)로 새어 나가지 않는다.
+document.addEventListener("keydown", function(e){
+  if(!delTarget) return;
+  if(e.key === "Enter"){
+    e.preventDefault(); e.stopPropagation();
+    document.getElementById("delYes").click();
+  } else if(e.key === "Escape"){
+    e.preventDefault(); e.stopPropagation();
+    closeDel();
+  }
+}, true);
+
+document.getElementById("delNo").onclick = closeDel;
+document.getElementById("mDel").onclick = e=>{
+  if(e.target === document.getElementById("mDel")) closeDel();
+};
+document.getElementById("delYes").onclick = async ()=>{
+  if(!delTarget) return;
+  const s = delTarget;
+  closeDel();
+  try{
+    const r = await fetch("/api/sessions/"+s.id, { method:"DELETE", headers:H });
+    if(r.status === 401){ onUnauthorized(); return; }
+    if(s.id === SESSION){ SESSION = newId(); saveSession(); clearAttached(); renderHero(); }
+    toast("대화를 삭제했습니다.");
+    loadConvs();
+  }catch(e){ toast("삭제하지 못했습니다."); }
+};
+
+async function openConv(id, title){
+  if(busy) return;
+  SESSION = id; saveSession();
+  clearAttached();          // 지금 붙여 둔 파일은 열려던 대화의 것이 아니다
+  pop.classList.remove("open");
+  wrap.innerHTML = ""; started = true;
+  document.getElementById("curtitle").textContent = title || "대화";
+  try{
+    const r = await fetch("/api/sessions/"+id, { headers:H });
+    const j = await r.json();
+    j.turns.forEach(t=>{
+      if(t.role==="user"){
+        // 새로 물을 때와 같은 구조로 그린다 (.ubox). 모양이 어긋나면
+        // 대화를 다시 열었을 때 말풍선 위치가 미묘하게 달라 보인다.
+        const d = el("div","turn user"); const b = el("div","ubox");
+        b.appendChild(el("div","txt",t.content)); d.appendChild(b); wrap.appendChild(d);
+      } else {
+        // 저장해 둔 바로가기 버튼도 함께 그린다.
+        // 텍스트만 그리면 "리포트 화면에서 확인하세요"라고 적혀 있는데
+        // 정작 갈 버튼이 없어, 답이 잘못된 것처럼 보인다.
+        addBotText(t.content, t.links);
+      }
+    });
+    toBottom();
+  }catch(e){
+    wrap.appendChild(el("div","empty","대화를 불러오지 못했습니다."));
+  }
+  loadConvs();
+}
+
+/* ── 전송 ── */
+
+/* ── 파일 첨부 ────────────────────────────────────────────────
+   포털은 파일을 열어보지 않는다. 받아서 보관하고 file_id 만 만든다.
+   그 파일을 실제로 분석하는 것은 그 일을 하는 앱이고, 앱에 넘기는 것은
+   모델이 고른 도구가 한다.
+
+   그래서 여기서는 "권한이 있는지"를 따지지 않는다. 올리는 것은 누구나
+   할 수 있고, 처리할 수 있는 도구가 없으면 답변이 그렇게 알려준다.
+   화면에서 미리 막으면 "왜 안 되는지" 를 설명할 자리가 없어진다. */
+const clip = document.getElementById("clip");
+const fileInput = document.getElementById("fileInput");
+const attachbar = document.getElementById("attachbar");
+let ATTACHED = [];        // [{file_id, name, size}]
+
+function fmtSize(n){
+  return n >= 1048576 ? (n/1048576).toFixed(1)+"MB" : Math.max(1, Math.round(n/1024))+"KB";
+}
+
+function drawChips(){
+  attachbar.innerHTML = "";
+  ATTACHED.forEach(function(f){
+    const c = el("div","chip" + (f.uploading ? " up" : "") + (f.error ? " bad" : ""));
+    const nm = el("span","nm", f.name); c.appendChild(nm);
+    c.appendChild(el("span","sz", f.error ? f.error : (f.uploading ? "올리는 중" : fmtSize(f.size))));
+    const x = el("button","x","×");
+    x.title = "빼기";
+    x.onclick = function(){ ATTACHED = ATTACHED.filter(function(y){ return y !== f; }); drawChips(); };
+    c.appendChild(x);
+    attachbar.appendChild(c);
+  });
+}
+
+clip.addEventListener("click", function(){ fileInput.click(); });
+
+fileInput.addEventListener("change", function(){
+  addFiles(fileInput.files);
+  fileInput.value = "";      // 같은 파일을 다시 골라도 change 가 뜨게
+});
+
+/* ── 안내줄 ──────────────────────────────────────────────
+   거절 사유는 대개 한 줄에 안 들어간다.
+   ("'pptx' 형식은 올릴 수 없습니다. 가능한 형식: csv, doc, docx, …")
+   칩에 넣으면 글자가 칩 밖으로 나가므로 따로 자리를 준다.
+
+   여러 개를 한꺼번에 놓았을 때 안내가 여러 줄 쌓이는 것은 그대로 둔다.
+   어느 파일이 왜 안 됐는지 각각 알아야 하기 때문이다. */
+const notice = document.getElementById("notice");
+let noticeMsgs, noticeTimer = null;
+
+function flash(msg){
+  if(!noticeMsgs){
+    noticeMsgs = el("div","msgs");
+    const x = el("button","x","×");
+    x.title = "닫기";
+    x.onclick = hideNotice;
+    notice.appendChild(noticeMsgs); notice.appendChild(x);
+  }
+  // 같은 문장이 두 번 쌓이지 않게 한다
+  const already = Array.from(noticeMsgs.children).some(function(d){
+    return d.textContent === msg;
+  });
+  if(!already) noticeMsgs.appendChild(el("div","",msg));
+  notice.hidden = false;
+
+  // 글이 길수록 읽는 데 오래 걸린다. 줄 수에 맞춰 시간을 준다.
+  clearTimeout(noticeTimer);
+  const secs = Math.min(12000, 3000 + noticeMsgs.children.length * 2500);
+  noticeTimer = setTimeout(hideNotice, secs);
+}
+
+function hideNotice(){
+  clearTimeout(noticeTimer);
+  notice.hidden = true;
+  if(noticeMsgs) noticeMsgs.innerHTML = "";
+}
+
+async function addFiles(files){
+  for(const file of Array.from(files || [])){
+    // 1차 거르기 — 서버에 보내기도 전에 잡는다.
+    // 이름과 크기가 같으면 같은 파일로 본다. 확실한 판정(내용 해시)은
+    // 서버가 하지만, 그 전에 걸러야 헛되이 올리는 일이 없다.
+    const dup = ATTACHED.some(function(f){
+      return f.name === file.name && f.size === file.size && !f.error;
+    });
+    if(dup){ flash("같은 파일이 이미 올라와 있습니다 — " + file.name); continue; }
+
+    const item = { name: file.name, size: file.size, uploading: true };
+    ATTACHED.push(item); drawChips();
+    try{
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("session_id", SESSION);
+      const r = await fetch("/api/upload", { method:"POST", headers:H, body: fd });
+      const j = await r.json();
+      if(!r.ok){
+        // 거절당한 파일은 칩으로 남기지 않는다. 붙지 않았으니 뺄 것도 없고,
+        // 사유는 칩에 담기에 너무 길다. 목록에서 빼고 안내줄로 보낸다.
+        ATTACHED = ATTACHED.filter(function(f){ return f !== item; });
+        item.dupNote = item.name + " — " + (j.detail || "올리지 못했습니다");
+      } else if(ATTACHED.some(function(f){ return f !== item && f.file_id === j.file_id; })){
+        // 2차 거르기 — 이름이 달라도 내용이 같으면 서버가 같은 file_id 를 준다.
+        // ("이력서.pdf" 와 "이력서_최종.pdf" 가 같은 파일인 경우)
+        ATTACHED = ATTACHED.filter(function(f){ return f !== item; });
+        // 안내는 drawChips() 뒤에 띄운다. 먼저 띄우면 목록을 다시 그리면서
+        // attachbar 를 비울 때 같이 지워진다.
+        // 이름까지 같으면 굳이 "이름만 다르다"고 말하지 않는다.
+        // 실제로 이름이 다를 때만 왜 같은 파일로 봤는지 알려준다.
+        item.dupNote = "같은 파일이 이미 올라와 있습니다 — " + j.name
+                     + (j.name === item.name ? "" : " (이름은 다르지만 내용이 같습니다)");
+      } else {
+        item.uploading = false; item.file_id = j.file_id;
+        item.size = j.size; item.name = j.name;
+      }
+    }catch(e){
+      ATTACHED = ATTACHED.filter(function(f){ return f !== item; });
+      item.dupNote = item.name + " — 올리지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
+    }
+    // 안내는 drawChips() 뒤에 띄운다. 순서를 바꾸면 목록을 다시 그리는
+    // 사이에 안내가 지워진다.
+    drawChips();
+    if(item.dupNote){ flash(item.dupNote); }
+  }
+}
+
+/* 화면 어디에 끌어다 놓아도 되게 한다.
+   dragenter/dragleave 는 자식 요소를 지날 때마다 계속 튀므로
+   깊이를 세서 진짜로 화면을 벗어났을 때만 안내를 감춘다. */
+const dropbox = document.getElementById("drop");
+let dragDepth = 0;
+
+function hasFiles(e){
+  return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+}
+
+document.addEventListener("dragenter", function(e){
+  if(!hasFiles(e)) return;
+  e.preventDefault(); dragDepth++;
+  dropbox.classList.add("on"); document.body.classList.add("dragging");
+});
+document.addEventListener("dragover", function(e){
+  if(!hasFiles(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";     // 커서에 + 가 뜬다
+});
+document.addEventListener("dragleave", function(e){
+  // 여기서는 hasFiles 를 따지지 않는다.
+  // 브라우저에 따라 dragleave 에는 dataTransfer 내용을 비워서 준다.
+  // 그걸 조건으로 걸면 안내가 켜진 채로 안 사라진다.
+  if(!dropbox.classList.contains("on")) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if(dragDepth === 0){ dropbox.classList.remove("on"); document.body.classList.remove("dragging"); }
+});
+
+/* 창 밖으로 끌고 나가거나 ESC 로 취소했을 때를 위한 안전장치.
+   위 셈이 어긋나도 안내가 화면에 남아 있지 않게 한다. */
+function clearDrop(){
+  dragDepth = 0;
+  dropbox.classList.remove("on");
+  document.body.classList.remove("dragging");
+}
+document.addEventListener("dragend", clearDrop);
+window.addEventListener("blur", clearDrop);
+document.addEventListener("keydown", function(e){ if(e.key === "Escape") clearDrop(); });
+document.addEventListener("drop", function(e){
+  if(!hasFiles(e)) return;
+  e.preventDefault();
+  clearDrop();
+  if(!e.dataTransfer.files.length) return;
+  addFiles(e.dataTransfer.files);
+});
+
+/* 스크린샷을 그대로 붙여넣는 경우도 받는다 (Ctrl+V) */
+document.addEventListener("paste", function(e){
+  const items = (e.clipboardData && e.clipboardData.files) || [];
+  if(items.length) addFiles(items);
+});
+
+async function ask(){
+  const text = q.value.trim();
+  const ready = ATTACHED.filter(function(f){ return f.file_id; });
+  // 파일만 올리고 아무 말도 안 적었으면, 무엇을 해달라는지 물어본다.
+  // 빈 문장으로 보내면 모델이 파일을 무시하고 엉뚱한 답을 한다.
+  if(!text && ready.length){ q.placeholder = "이 파일로 무엇을 할까요? (예: 이력서 분석해줘)"; q.focus(); return; }
+  if(!text || busy) return;
+  if(ATTACHED.some(function(f){ return f.uploading; })) return;   // 아직 올리는 중
+  busy = true; send.disabled = true; clip.disabled = true;
+  const isFirst = !started;
+  addUser(text, ready);
+  q.value = ""; q.style.height = "auto";
+  const fileIds = ready.map(function(f){ return f.file_id; });
+  clearAttached();
+
+  const ui = addBot();
+  let cur = thinking();
+  ui.steps.appendChild(cur); toBottom();
+
+  try{
+    const res = await fetch("/api/chat/stream", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", ...H },
+      body: JSON.stringify({ message:text, session_id:SESSION, file_ids:fileIds })
+    });
+    if(!res.ok){
+      if(cur) cur.remove();
+      ui.txt.className="txt err";
+      if(res.status === 401){ onUnauthorized(); return; }
+      ui.txt.textContent = "서버 오류가 발생했습니다.";
+      return;
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    while(true){
+      const {value, done} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value,{stream:true});
+      const parts = buf.split("\n\n"); buf = parts.pop();
+      for(const p of parts){
+        const line = p.split("\n").find(l=>l.startsWith("data: "));
+        if(!line) continue;
+        let ev; try{ ev = JSON.parse(line.slice(6)); }catch(_){ continue; }
+
+        if(ev.type==="status"){
+          if(cur) cur.remove();
+          cur = ev.stage==="thinking" ? thinking() : stepRow(ev.text, true);
+          ui.steps.appendChild(cur); toBottom();
+        }
+        else if(ev.type==="tool_done"){
+          if(cur){ cur.remove(); cur=null; }
+          const d = stepRow(ev.label, false); d.classList.add("done");
+          ui.steps.appendChild(d); toBottom();
+        }
+        else if(ev.type==="answer"){
+          if(cur){ cur.remove(); cur=null; }
+          ui.txt.textContent = ev.reply;
+          const lr = linkRow(ev.links);
+          if(lr) ui.body.appendChild(lr);
+          // 어떤 도구를 썼는지, 어떤 모델이었는지는 문제를 추적할 때만 필요하다.
+          // 일반 직원에게는 답만 보이면 되고, 진행 중에 이미 한글 이름
+          // ("AI 사용 현황 조회")으로 보여줬으므로 영어 함수명은 군더더기다.
+          // 체험판에서는 안 그린다. 데모 계정은 관리자로 두었지만(로그를
+          // 봐야 하니까), 방문자에게 영어 함수명과 모델 이름은 군더더기다.
+          if(IS_ADMIN && !IS_DEMO && ev.used_tools && ev.used_tools.length){
+            ui.body.appendChild(el("div","meta",
+              "사용한 기능: "+ev.used_tools.join(", ")+(ev.model?" · "+ev.model:"")));
+          }
+          toBottom();
+        }
+        else if(ev.type==="error"){
+          if(cur){ cur.remove(); cur=null; }
+          ui.txt.className="txt err"; ui.txt.textContent = ev.text; toBottom();
+        }
+      }
+    }
+  }catch(e){
+    if(cur) cur.remove();
+    ui.txt.className="txt err"; ui.txt.textContent = "서버에 연결하지 못했습니다.";
+  }finally{
+    busy = false; send.disabled = false; clip.disabled = false; q.focus();
+    // 제목이 새로 지어질 차례면 몇 번 나눠서 확인하고, 아니면 한 번만 갱신한다.
+    if(RETITLE_AT.includes(myTurnCount())) refreshConvsSoon(); else loadConvs();
+    // 체험판이면 남은 횟수를 다시 물어본다.
+    // ★ 화면 뜰 때 한 번만 물어보게 해 뒀더니, 한 번 쓰고도 「20회 남음」이
+    //   그대로 있어서 새로고침해야 줄었다. 줄어드는 것이 보여야 아껴 쓴다.
+    showDemo();
+  }
+}
+
+// 서버는 대화가 자랄 때 제목을 다시 짓는다 (첫 질문 · 3번째 · 7번째).
+// 모델을 한 번 더 부르는 일이라 몇 초 걸리고, 얼마나 걸릴지는 그때그때 다르다.
+// 예전에는 6.6초 동안만 확인하고 그만뒀는데, 모델이 그보다 늦게 답하면
+// 목록에 첫 질문이 그대로 남았다. 화면에는 실패한 것처럼 보인다.
+// 이제는 **제목이 실제로 지어질 때까지** 간격을 늘려 가며 확인하고,
+// 지어지면 곧바로 멈춘다. (목록 한 번 부르는 것은 아주 가볍다)
+// 서버는 (3, 7) 에만 다시 짓는다. 첫 제목은 질문을 받자마자 따로 짓는다.
+// 여기 1 을 남겨 두는 이유 — 첫 제목은 답변보다 먼저 나오는 것이 보통이지만,
+// 모델이 늦으면 답변이 끝난 뒤에 붙는다. 그때도 목록이 따라가야 한다.
+const RETITLE_AT = [1, 3, 7];
+const RETITLE_WAITS = [400, 1200, 2000, 3000, 4000, 6000, 8000, 10000];  // 합계 약 35초
+
+async function refreshConvsSoon(){
+  const mine = SESSION;
+  // 지금 걸려 있는 제목. 이것과 달라지면 새로 지어진 것이다.
+  // 3번째·7번째에는 이미 제목이 있으므로 "있는가"만 봐서는 알 수 없다.
+  const before = LAST_TITLE;
+  for(const ms of RETITLE_WAITS){
+    await new Promise(r => setTimeout(r, ms));
+    // 기다리는 사이에 다른 대화로 옮겨 갔으면 그만둔다
+    if(SESSION !== mine) return;
+    await loadConvs();
+    if(LAST_TITLED && LAST_TITLE !== before) return;   // 새 제목이 붙었다
+  }
+}
+
+// 이 대화에서 내가 몇 번 물었는지 (화면에 그려진 것을 센다).
+// 새 대화든 예전 대화를 이어서 하든 같은 값이 나온다.
+function myTurnCount(){
+  return wrap.querySelectorAll(".turn.user").length;
+}
+
+async function loadMe(){
+  try{
+    const r = await fetch("/api/me", { headers:H });
+    if(r.status === 401){ onUnauthorized(); return; }
+    if(!r.ok) throw 0;
+    const j = await r.json();
+    const me = j.user || {};
+
+    // ★ 토큰이 아니라 서버 대답을 기준으로 다시 본다.
+    //   머리에서 한 검사는 **토큰에 적힌 값**이다. 로그인한 뒤에 관리자가
+    //   비밀번호를 초기화하면 그 사실이 토큰에는 없다. 그러면 "비번 변경
+    //   필요" 인데도 챗이 그대로 열린다. 서버는 알고 있으므로 여기서 막는다.
+    if(me.must_change){ location.replace("/password"); return; }
+
+    document.getElementById("nm").textContent = me.name || "";
+    // 역할 이름 대신 소속 부서를 보여준다. 권한은 부서 기준으로 판정한다.
+    document.getElementById("rl").textContent =
+      [me.dept, me.is_admin ? "관리자" : ""].filter(Boolean).join(" · ") || "소속 미지정";
+    document.getElementById("ini").textContent = (me.name||"?").slice(0,1);
+    APPS = j.apps || [];
+    IS_ADMIN = !!me.is_admin;
+    // 관리 메뉴는 서버가 방금 확인해 준 값으로 매번 다시 판단한다.
+    // 토큰 안의 값만 보면 권한을 뺏긴 뒤에도 메뉴가 남는다.
+    document.getElementById("adminlink").style.display = IS_ADMIN ? "flex" : "none";
+    renderHero();
+    reveal();                       // 여기까지 왔으면 보여줘도 되는 화면이다
+  }catch(e){
+    document.getElementById("nm").textContent = "인증 실패";
+    document.getElementById("rl").textContent = "TOKEN 확인";
+    reveal();
+  }
+}
+
+q.addEventListener("input", ()=>{ q.style.height="auto"; q.style.height=Math.min(q.scrollHeight,180)+"px"; });
+q.addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); ask(); }});
+send.onclick = ask;
+document.getElementById("out").onclick = logout;
+document.getElementById("newchat").onclick = ()=>{
+  if(busy) return;
+  // 붙여 둔 파일은 **그 대화의 것**이다. 대화를 갈아타면서 따라가면
+  // 새 대화에 엉뚱한 파일이 딸려 들어간다.
+  clearAttached();
+  SESSION = newId(); saveSession(); renderHero(); loadConvs(); q.focus();
+};
+
+function clearAttached(){
+  ATTACHED = []; drawChips(); hideNotice();
+}
+
+/* ── 좁은 화면에서 사이드바 여닫기 ──────────────────────────
+   대화를 고르거나 새 대화를 시작하면 저절로 닫는다. 안 닫으면
+   답변이 사이드바에 가려서 "눌렀는데 아무 일도 안 일어난다"가 된다. */
+const aside = document.querySelector("aside");
+const sidemask = document.getElementById("sidemask");
+
+function openSide(){ aside.classList.add("open"); sidemask.classList.add("on"); }
+function closeSide(){ aside.classList.remove("open"); sidemask.classList.remove("on"); }
+function toggleSide(){ aside.classList.contains("open") ? closeSide() : openSide(); }
+
+document.getElementById("burger").onclick = toggleSide;
+sidemask.onclick = closeSide;
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape" && aside.classList.contains("open")) closeSide();
+});
+// 사이드바 안에서 무언가를 고르면 닫는다 (대화·새 대화·링크)
+aside.addEventListener("click", function(e){
+  if(e.target.closest(".conv .x")) return;      // 삭제 버튼은 확인창이 먼저다
+  if(e.target.closest(".conv, #newchat")) closeSide();
+});
+
+/* 체험판이면 머리글에 남은 챗 횟수를 띄운다.
+
+   횟수를 굳이 보여주는 이유 — 안 보이면 스무 번째를 쓰고 나서야
+   "왜 갑자기 안 되지" 가 된다. 남은 수가 보이면 아껴 쓰거나 미리 접는다. */
+async function showDemo(){
+  try{
+    const d = await (await fetch("/api/demo")).json();
+    if(!d.demo) return;
+    IS_DEMO = true;
+    const pill = document.getElementById("demopill");
+    const left = (typeof d.chat_left === "number") ? d.chat_left : d.chat_per_ip_day;
+    document.getElementById("demoleft").textContent =
+      d.chat_open ? ("· 챗 " + left + "회 남음") : "· 챗은 잠시 쉬는 중";
+    pill.title = d.notice;
+    pill.classList.add("on");
+    const sub = document.getElementById("brandsub");
+    if(sub){ sub.textContent = "가상 회사 · 포트폴리오 데모"; sub.classList.add("on"); }
+  }catch(e){}   /* 못 물어봐도 화면은 그대로 떠야 한다 */
+}
+
+async function boot(){
+  showDemo();
+  await loadMe();                      // 앱 목록 + 사용자
+  // 새로고침 전 대화가 있으면 이어서 연다
+  try{
+    const r = await fetch("/api/sessions/"+SESSION, { headers:H });
+    const j = await r.json();
+    if(j.turns && j.turns.length){
+      const first = j.turns.find(t=>t.role==="user");
+      await openConv(SESSION, first ? first.content.slice(0,40) : "대화");
+    }
+  }catch(e){}
+  loadConvs();
+  q.focus();
+}
+boot();
+</script>
+</body>
+</html>

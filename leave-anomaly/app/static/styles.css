@@ -1,0 +1,127 @@
+:root{
+  --ink:#0f172a; --ink-2:#334155; --muted:#64748b; --faint:#94a3b8;
+  --line:#e2e8f0; --line-soft:#eef2f6; --bg:#eef1f6; --surface:#ffffff;
+  --brand:#4338ca; --brand-2:#6366f1; --brand-soft:#eef2ff; --brand-ink:#3730a3;
+  --ok:#047857; --ok-soft:#ecfdf5;
+  --amber:#b45309; --amber-soft:#fffbeb; --amber-line:#fde68a;
+  --danger:#e11d48; --danger-soft:#fff1f2;
+  --radius:14px; --shadow:0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Pretendard","Malgun Gothic","맑은 고딕",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.55;
+}
+.wrap{max-width:1120px; margin:0 auto; padding:28px 20px 64px}
+header.top{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap}
+header.top h1{margin:0; font-size:24px; letter-spacing:-.3px}
+header.top p{margin:6px 0 0; color:var(--muted); font-size:14px}
+.who{font-size:13px; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:6px 14px}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px}
+.card h3{margin:0 0 4px; font-size:17px}
+.card .sub{margin:0 0 14px; color:var(--muted); font-size:13.5px}
+.row{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+label.field{display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted)}
+input[type=date],input[type=text]{
+  font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink);
+}
+button{font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--line); background:#fff; padding:8px 14px; color:var(--ink-2)}
+button.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+button.ghost-danger{color:var(--danger); border-color:#fecdd3; background:var(--danger-soft)}
+button:disabled{opacity:.5; cursor:not-allowed}
+.upload-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px}
+.upload-box{
+  display:flex; align-items:center; gap:12px; border:1.5px dashed #c7d2fe; background:var(--brand-soft);
+  border-radius:12px; padding:14px 16px; cursor:pointer; transition:.15s;
+}
+.upload-box.dragging{background:#e0e7ff; border-color:var(--brand-2)}
+.upload-box input{display:none}
+.upload-box .tag{flex:none; font-weight:700; font-size:12px; color:#fff; background:var(--brand); border-radius:7px; padding:6px 9px}
+.upload-box .tag.alt{background:#0d9488}
+.upload-box b{display:block; font-size:14px}
+.upload-box small{display:block; color:var(--muted); font-size:12.5px; margin-top:2px; word-break:break-all}
+.note{margin-top:12px; font-size:13px; color:var(--brand-ink); background:var(--brand-soft); border-radius:9px; padding:9px 12px}
+.warn{margin-top:10px; font-size:13px; color:var(--amber); background:var(--amber-soft); border:1px solid var(--amber-line); border-radius:9px; padding:9px 12px}
+.err{margin-top:10px; font-size:13px; color:var(--danger); background:var(--danger-soft); border-radius:9px; padding:9px 12px}
+.tabbar{display:flex; gap:8px; border-bottom:1px solid var(--line); margin:-4px -4px 14px; padding:0 4px 10px; flex-wrap:wrap}
+.tabbar button{border:0; background:transparent; padding:8px 12px; border-radius:9px; color:var(--muted); font-weight:600}
+.tabbar button.active{background:var(--brand-soft); color:var(--brand-ink)}
+.tabbar em{font-style:normal; margin-left:6px; font-size:12px; background:#fff; border:1px solid var(--line); border-radius:999px; padding:1px 7px}
+.tier-filter{display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap}
+.tier-filter button{font-size:13px; padding:5px 12px; border-radius:999px}
+.tier-filter button.active{background:var(--ink); color:#fff; border-color:var(--ink)}
+.tablewrap{overflow-x:auto}
+table.grid{width:100%; border-collapse:collapse; font-size:14px}
+table.grid th,table.grid td{border-bottom:1px solid var(--line-soft); padding:10px 10px; text-align:left; vertical-align:middle}
+table.grid th{font-size:12.5px; color:var(--muted); font-weight:600; background:#fafbfd}
+table.grid td.num,table.grid th.num{text-align:right; font-variant-numeric:tabular-nums}
+table.grid tr.clickrow{cursor:pointer}
+table.grid tr.clickrow:hover{background:#f8fafc}
+table.grid td .sub2{display:block; color:var(--faint); font-size:12px}
+.badge{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:2px 10px}
+.badge.danger{background:var(--danger-soft); color:var(--danger)}
+.badge.review{background:var(--amber-soft); color:var(--amber)}
+.badge.observe{background:#fefce8; color:#a16207}
+.badge.ok{background:var(--ok-soft); color:var(--ok)}
+.detailrow{display:none}
+.detailrow.open{display:table-row}
+.detailrow td{background:#f8fafc}
+table.detail{width:100%; border-collapse:collapse; font-size:13px; margin:4px 0}
+table.detail th,table.detail td{border-bottom:1px solid var(--line-soft); padding:6px 8px; text-align:left}
+table.detail td.num,table.detail th.num{text-align:right}
+.summary-strip{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px}
+.summary-strip>div{background:#f8fafc; border:1px solid var(--line); border-radius:10px; padding:8px 14px; min-width:120px}
+.summary-strip span{display:block; font-size:12px; color:var(--muted)}
+.summary-strip strong{font-size:15px}
+.empty-state{padding:36px 12px; text-align:center; color:var(--faint); font-size:14px}
+.hint{color:var(--muted); font-size:12.5px; margin:12px 0 0}
+details.criteria summary{cursor:pointer; font-weight:600; color:var(--brand-ink)}
+.criteria-body{margin-top:10px; font-size:13.5px; color:var(--ink-2)}
+.criteria-body p{margin:8px 0}
+.dates span{display:inline-block; background:#f1f5f9; border-radius:6px; padding:1px 7px; margin:1px 3px 1px 0; font-size:12px}
+.chip-list span{display:inline-flex; gap:6px; align-items:center; background:#f1f5f9; border-radius:999px; padding:3px 6px 3px 12px; margin:3px 4px 0 0; font-size:12.5px}
+.chip-list span button{border:0; background:transparent; color:var(--danger); padding:0 4px; line-height:1}
+.hidden{display:none !important}
+
+/* 포털로 돌아가는 길. 다른 앱들과 같은 자리·같은 모양으로 맞춘다 —
+   앱마다 나가는 문이 다른 곳에 있으면 그때그때 찾아야 한다. */
+.hdr-right{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+.backportal{flex:0 0 auto; white-space:nowrap; font-size:13px; text-decoration:none;
+  color:var(--muted); background:var(--surface); border:1px solid var(--line);
+  border-radius:8px; padding:7px 13px; transition:background .12s,color .12s}
+.backportal:hover{background:var(--line); color:var(--ink)}
+
+/* ============ 반응형 ============
+   이 화면은 원래도 flex-wrap 이 곳곳에 있어서 좁아지면 알아서 접힌다.
+   그런데 **표만은 안 접혔다.**
+
+   table.grid 가 width:100% 라 칸이 여덟 개여도 화면 폭에 맞춰 찌그러진다.
+   감싼 .tablewrap 에 overflow-x:auto 가 있어도 표가 넘치질 않으니
+   스크롤이 생길 일이 없었다. 폭을 auto 로 풀고 칸마다 nowrap 을 주면
+   표가 제 내용만큼 넓어지고, 그제서야 옆으로 밀어 볼 수 있다.
+   칸이 적은 표는 min-width:100% 덕에 그대로 꽉 찬다. */
+
+@media (max-width:760px){
+  .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  .tablewrap>table.grid{width:auto; min-width:100%}
+  .tablewrap>table.grid th,
+  .tablewrap>table.grid td{white-space:nowrap}
+  /* 펼친 상세는 표 안의 표다. 여기까지 nowrap 을 물려주면 안 된다. */
+  .tablewrap>table.grid .detailrow td{white-space:normal}
+
+  .wrap{padding:18px 14px 44px}
+  .card{padding:15px 14px}
+  header.top h1{font-size:21px}
+  header.top p{font-size:13px}
+  .tabbar{gap:4px; margin:-2px -2px 12px}
+  .tabbar button{padding:7px 9px; font-size:13.5px}
+}
+
+@media (max-width:480px){
+  /* 기준일 입력이 제목 옆에 붙어 있으면 둘 다 찌그러진다. 아래로 내린다. */
+  .card>.row[style*="space-between"]{flex-direction:column; align-items:stretch}
+  .upload-grid{grid-template-columns:1fr}
+  .summary-strip>div{flex:1 1 calc(50% - 5px); min-width:0}
+  .row>button{flex:1 1 auto}
+}

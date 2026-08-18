@@ -1,0 +1,85 @@
+# ★ 프로젝트 이름을 못 박는다.
+#
+#   docker compose 는 이름을 안 적으면 **폴더 이름**으로 프로젝트를 정한다.
+#   그런데 이 저장소를 받은 사람이 같은 이름의 폴더로 다른 것을 이미
+#   띄워 두었을 수 있다. 그러면 compose 가 남의 컨테이너를 이 프로젝트
+#   것으로 보고, `docker compose exec` 가 **엉뚱한 컨테이너 안에서** 돈다.
+#   실제로 그 상황을 겪었다 — 체험판 자료를 넣는 명령이 남의 앱 안에서
+#   실행됐다. 그때는 파일이 없어서 실패로 끝났지만, 있었으면 남의 데이터에
+#   가짜 자료가 들어갔을 것이다.
+#
+#   컨테이너 이름에 demo- 를 붙이는 것과는 다른 이야기다.
+#   그건 이름이 겹치지 않게 하는 것이고, 이건 **누구 것인지**를 정하는 것이다.
+name: demo-it-asset
+
+# =====================================================================
+# IT 자산 관리 — 사내 포털에 붙인 형태
+#
+# 예전(docker-compose.prod.yml)과 달라진 곳은 세 가지뿐이다.
+#   1. ports 를 없앴다        → 8081 로 직접 들어오는 문을 닫는다
+#   2. demo-net 에 붙였다   → 포털 nginx 가 이름으로 찾을 수 있게
+#   3. DEV_MODE=false         → 헤더가 없으면 401
+#
+# 컨테이너는 그대로 두 개다.
+#   asset-web   화면(정적 파일)을 주고, /api/ 는 asset-api 로 넘긴다
+#   asset-api   FastAPI
+#
+# 포털 nginx 는 asset-web 하나만 보면 된다. 안쪽 사정은 몰라도 된다.
+#
+#   브라우저 /it-asset/api/assets/
+#      → 포털 nginx  (/it-asset 을 떼고 asset-web:80 으로)
+#      → asset-web   (/api/ 를 떼고 asset-api:8000 으로)
+#      → asset-api   /assets/
+#
+# 처음 한 번만:  docker network create demo-net
+# =====================================================================
+services:
+  api:
+    build: ./backend
+    container_name: demo-asset-api
+    restart: unless-stopped
+    env_file: ./backend/.env.deploy
+    environment:
+      DATABASE_URL: sqlite+pysqlite:////app/data/app.db
+      # 헤더가 없으면 401. 서버에서는 반드시 false 로 둔다.
+      DEV_MODE: "false"
+      # 뜰 때 포털에 자기를 등록한다 (표준 규칙 22).
+      PORTAL_API_URL: http://demo-portal:8080
+      # ★ 포털 .env 의 AUDIT_TOKEN 과 **반드시 같은 값.**
+      #   다르면 등록이 403 으로 조용히 실패한다 (로그에 사유가 찍힌다).
+      #   값은 같은 폴더의 .env 에서 읽는다 — 파일에 박아 두면 깃에 올라간다.
+      AUDIT_TOKEN: ${AUDIT_TOKEN:?it-asset/.env 에 AUDIT_TOKEN 이 없습니다. setup 을 먼저 돌리세요}
+    expose:
+      - "8000"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - demo-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: demo-asset-web
+    restart: unless-stopped
+    # 포털 nginx 를 거치므로 호스트 포트를 열지 않는다.
+    # 열어 두면 /it-asset/ 을 거치지 않고 8081 로 바로 들어올 수 있고,
+    # 그 길에는 포털의 권한 검사가 없다.
+    expose:
+      - "80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - demo-net
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  demo-net:
+    external: true

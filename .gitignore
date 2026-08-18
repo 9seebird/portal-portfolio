@@ -1,0 +1,28 @@
+# 비밀값. 이 파일들이 올라가면 열쇠를 통째로 공개하는 것이 된다.
+.env
+*/.env
+it-asset/backend/.env.deploy
+
+# 앱이 만드는 것들. 받은 사람이 ./demo.sh 를 돌리면 새로 생긴다.
+data/
+*/data/
+*.db
+*.sqlite
+*.sqlite3
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+.DS_Store
+
+# 지우려고 치워 둔 것 (윈도우 마운트에서는 삭제가 안 돼 옮겨 둔다)
+_to_delete/
+
+# 사내 흔적 치환 도구. **규칙표가 곧 가명→실명 대조표**라
+# 공개 저장소에 올리면 지운 것이 전부 복원된다. 사내 저장소에만 둔다.
+tools/scrub.py
+
+# 유출 검사용 낱말 목록 — 이 목록 자체가 새면 안 된다
+.secretwords

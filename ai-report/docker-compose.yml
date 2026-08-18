@@ -1,0 +1,54 @@
+# ★ 프로젝트 이름을 못 박는다.
+#
+#   docker compose 는 이름을 안 적으면 **폴더 이름**으로 프로젝트를 정한다.
+#   그런데 이 저장소를 받은 사람이 같은 이름의 폴더로 다른 것을 이미
+#   띄워 두었을 수 있다. 그러면 compose 가 남의 컨테이너를 이 프로젝트
+#   것으로 보고, `docker compose exec` 가 **엉뚱한 컨테이너 안에서** 돈다.
+#   실제로 그 상황을 겪었다 — 체험판 자료를 넣는 명령이 남의 앱 안에서
+#   실행됐다. 그때는 파일이 없어서 실패로 끝났지만, 있었으면 남의 데이터에
+#   가짜 자료가 들어갔을 것이다.
+#
+#   컨테이너 이름에 demo- 를 붙이는 것과는 다른 이야기다.
+#   그건 이름이 겹치지 않게 하는 것이고, 이건 **누구 것인지**를 정하는 것이다.
+name: demo-ai-report
+
+# =====================================================================
+# AI 사용량 리포트.
+#
+# 포털과 같은 네트워크(demo-net)에 붙어 서로 이름으로 부른다.
+# IP 를 박아두면 서버를 옮기거나 IP 가 바뀔 때마다 전부 고쳐야 한다.
+#
+# 처음 한 번만:  docker network create demo-net
+# =====================================================================
+services:
+  aireport:
+    build: .
+    container_name: demo-aireport
+    # nginx 를 거치므로 호스트 포트를 열지 않아도 된다.
+    # 프록시 없이 직접 확인할 때만 아래 주석을 푼다.
+    # ports:
+    #   - "8081:8080"
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/data                  # 업로드한 엑셀 보존
+    environment:
+      - ALLOWED_UPLOAD_EXTS=.xlsx     # 허용 확장자
+      - MAX_UPLOAD_MB=10
+      # 로그인·관리자 확인을 포털에 물어본다.
+      # 같은 네트워크이므로 컨테이너 이름으로 부른다.
+      - PORTAL_API_URL=http://demo-portal:8080
+      # ★ 포털 .env 의 AUDIT_TOKEN 과 **반드시 같은 값.**
+      #   여기 값을 파일에 박아 두면 깃에 비밀이 그대로 올라가고,
+      #   서버용/로컬용 파일이 갈라지는 원인도 이것이었다.
+      #   이제 같은 폴더의 .env 에서 읽는다. (setup 스크립트가 맞춰 넣는다)
+      #   다르면 포털이 이 앱을 못 부르고 "Unauthorized" 만 돌아온다.
+      - AUDIT_TOKEN=${AUDIT_TOKEN:?ai-report/.env 에 AUDIT_TOKEN 이 없습니다. setup 을 먼저 돌리세요}
+      - SERVICE_NAME=AI 리포트
+    networks:
+      - demo-net
+    restart: unless-stopped
+
+networks:
+  demo-net:
+    external: true

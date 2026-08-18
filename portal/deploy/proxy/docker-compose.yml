@@ -1,0 +1,21 @@
+# =====================================================================
+# 리버스 프록시. 사내에서 접속하는 유일한 입구.
+#   /srv/portal/proxy/ 에 두고 여기서 띄운다.
+# =====================================================================
+services:
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: demo-proxy
+    ports:
+      - "80:80"
+      # - "443:443"      # 인증서가 준비되면
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
+      # - ./certs:/etc/nginx/certs:ro
+    networks:
+      - demo-net
+    restart: unless-stopped
+
+networks:
+  demo-net:
+    external: true

@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>포탈 관리 — 누리코스메틱 IT 포탈</title>
+<style>
+  /* 확인이 끝날 때까지 화면을 감춘다.
+     이게 없으면 관리자 화면이 다 그려진 다음에야 "권한 없음"을 알고
+     로그인으로 튕긴다. 잠깐이지만 **보면 안 되는 화면이 보인다.**
+     visibility 로 감추는 이유: display:none 이면 폭 계산이 어긋난다. */
+  html.booting body{visibility:hidden}
+
+  /* 오른쪽 아래 스크롤 버튼 — 갈 수 있는 방향만 나타난다.
+     매뉴얼 화면과 같은 모양이다. 화면마다 다르면 그때그때 다시 익혀야 한다. */
+  .scroll-nav{position:fixed;right:22px;bottom:22px;z-index:900;
+    display:flex;flex-direction:column;gap:8px}
+  .scroll-nav button{
+    width:44px;height:44px;padding:0;border-radius:50%;background:var(--bg);
+    border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.13);
+    font-size:15px;line-height:1;color:var(--tx2);
+    display:none;align-items:center;justify-content:center;cursor:pointer}
+  .scroll-nav button.show{display:flex}
+  .scroll-nav button:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+  @media (max-width:900px){.scroll-nav{right:12px;bottom:12px}}
+</style>
+<script>
+/* ── 문 앞에서 먼저 판단한다 ──────────────────────────────
+   이 조각은 <head> 에 있다. 그래야 **본문이 그려지기 전에** 돌아서,
+   엉뚱한 화면이 번쩍이지 않는다. 본문 끝에서 검사하면 이미 늦다.
+
+   여기서 하는 것은 "빨리 돌려보내기" 뿐이고, 진짜 권한 검사는
+   서버가 한다. 토큰을 손으로 만들어 넣어도 서버에서 막힌다. */
+(function(){
+  // ★ 감추는 것이 먼저다.
+  //   돌려보내기(location.replace)는 곧바로 일어나지 않는다. 그 사이에
+  //   본문이 그려지면 결국 번쩍인다. 그래서 먼저 감추고 나서 판단한다.
+  document.documentElement.className += " booting";
+
+  var KEY = "portal.jwt";
+  var t = null;
+  try{ t = localStorage.getItem(KEY); }catch(e){}
+  if(!t){ location.replace("/login"); return; }
+  // 서버가 대답을 안 하면 영영 빈 화면이 된다. 그때는 그냥 보여준다.
+  setTimeout(function(){ document.documentElement.classList.remove("booting"); }, 4000);
+})();
+</script>
+<style>
+  :root{
+    --bg:#ffffff; --side:#f4f6f8; --line:#e4e6ea; --line2:#f0f1f4;
+    --tx:#1f2023; --tx2:#5f6470; --tx3:#989ca6;
+    --accent:#1f4e79; --accent-soft:#eaf1f8; --danger:#c0392b;
+    --nav:#132033; --warn:#f0ad2e; --warnbg:#fff8e6;
+    --shadow:0 1px 2px rgba(16,17,20,.05), 0 6px 22px rgba(16,17,20,.06);
+    --pop:0 20px 55px rgba(16,17,20,.2);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1c1f; --side:#131417; --line:#2b2d33; --line2:#232529;
+      --tx:#ececef; --tx2:#a1a5ad; --tx3:#6f737c;
+      --accent:#6aa6dd; --accent-soft:#22303e; --danger:#e06c5c;
+      --nav:#0e1621; --warnbg:#3a3218;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 22px rgba(0,0,0,.35);
+      --pop:0 20px 55px rgba(0,0,0,.6);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--side);color:var(--tx);font-size:15px;line-height:1.6;
+       font-family:"Pretendard","맑은 고딕","Malgun Gothic",-apple-system,system-ui,sans-serif}
+  button,input,select,textarea{font:inherit}
+
+  /* ── 우리말 줄바꿈 ──────────────────────────────────────────
+     기본값(word-break:normal)은 영어 기준이라 우리말을 아무 데서나 끊는다.
+     "접근 범위 판정의 기준이므로 표기를 하나로 맞춰 두세" / "요." 처럼
+     한 글자만 다음 줄로 떨어지는 것이 그래서 생긴다.
+
+     keep-all  낱말(어절) 사이에서만 끊는다 — 우리말은 이게 맞다
+     pretty    마지막 줄에 한 낱말만 남지 않게 줄을 고르게 나눈다
+     break-word  아주 긴 것(주소·해시)은 그래도 끊어 준다. 없으면 화면을 뚫는다 */
+  body, .sub, .dim, .notice, p, td, th, label, .warnbox{
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .sub, .notice, .dim, .mh p, .warnbox{ text-wrap: pretty; }
+  a{color:var(--accent)}
+
+  header{background:var(--nav);color:#fff;padding:0 24px;height:60px;
+         display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{width:31px;height:31px;border-radius:9px;background:rgba(255,255,255,.14);
+        display:grid;place-items:center}
+  .brand b{font-size:13.5px;font-weight:500;opacity:.7;padding-left:13px;
+           border-left:1px solid rgba(255,255,255,.22)}
+  /* ★ 높이가 아니라 **너비**로 맞춘다.
+     로고가 가로로 길어서(10:1) 높이로 맞추면 사이드바(262px) 밖으로 삐져나간다.
+     너비로 잡으면 어디에 놓든 폭을 넘지 않는다. */
+  .wordmark{width:150px;max-width:100%;height:auto;display:block}
+  .hbtns{display:flex;gap:8px}
+  .hbtn{padding:7px 14px;border:1px solid rgba(255,255,255,.22);border-radius:8px;
+        background:transparent;color:#fff;font-size:13px;cursor:pointer;text-decoration:none}
+  .hbtn:hover{background:rgba(255,255,255,.12)}
+
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 24px 70px}
+  .tabs{display:inline-flex;background:var(--line2);border-radius:11px;padding:4px;margin-bottom:22px}
+  .tab{padding:9px 22px;border:0;border-radius:8px;background:transparent;
+       color:var(--tx2);font-size:13.5px;cursor:pointer;transition:color .14s}
+  .tab:hover{color:var(--tx)}
+  .tab.on{background:var(--bg);color:var(--tx);font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+  .page{display:none} .page.on{display:block}
+
+  h2{font-size:17px;font-weight:650;margin:0 0 3px}
+  .sub{font-size:12.5px;color:var(--tx3);margin-bottom:0;max-width:640px;line-height:1.55}
+  .bar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px}
+  /* 새로고침 줄 — 버튼 옆에 "언제 불러온 것인지"를 적는다.
+     이게 없으면 눌러도 표가 그대로일 때 눌린 건지 아닌지 알 수가 없다. */
+  .reload{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .reload .dim{font-size:12px;white-space:nowrap}
+
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:13px;
+        box-shadow:var(--shadow);margin-bottom:12px;padding:18px 20px;transition:border-color .14s}
+  .card:hover{border-color:#d3d7dd}
+  /* 목록 안의 작은 구분 머리 */
+  /* 담당자 지정 별표 */
+  .star{border:0;background:transparent;cursor:pointer;font-size:13px;line-height:1;
+        padding:1px 3px;color:var(--tx3);border-radius:5px}
+  .star:hover{color:var(--warn);background:var(--line2)}
+  .star.on{color:var(--warn)}
+  .sechead{display:flex;align-items:baseline;gap:9px;margin:4px 2px 10px;flex-wrap:wrap}
+  .sechead b{font-size:13.5px;font-weight:650}
+  .sechead span{font-size:12px;color:var(--tx3)}
+  .sechead + .card{margin-top:0}
+  .card + .sechead{margin-top:26px}
+  @media (prefers-color-scheme: dark){ .card:hover{border-color:#3a3d45} }
+  /* 카드는 위·아래 두 단으로 나눈다.
+     제목 줄 오른쪽에 버튼을 두고, 설명과 접근 범위는 카드 폭을 다 쓴다.
+     좌우 두 칸으로 나누면 버튼 아래가 빈 공간으로 남는다. */
+  .shead{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .shead .dotc{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+  .shead .tt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+  .shead .tt b{font-size:14.5px;font-weight:650}
+  .shead .ctr{display:flex;align-items:center;gap:0;justify-content:flex-end;flex:0 0 auto}
+  .shead .ctr .sw{margin-right:14px}
+  .card .path{font-size:12.5px;color:var(--accent);font-family:ui-monospace,Consolas,monospace}
+  .card .desc{font-size:12.5px;color:var(--tx3);margin-top:3px}
+  .card .scope{margin-top:11px;padding-top:10px;border-top:1px solid var(--line2);
+               font-size:12.5px;display:flex;align-items:baseline;gap:10px}
+  .card .scope b{font-size:11px;color:var(--tx3);font-weight:650;flex:0 0 auto}
+  @media (max-width:900px){
+    .shead{flex-wrap:wrap}
+    .shead .ctr{width:100%;justify-content:flex-start;padding-top:4px}
+  }
+
+  .chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:650}
+  /* 칩이 연달아 나올 때 서로 붙어 보인다. 표 안에서 특히 눈에 띈다. */
+  .chip + .chip{margin-left:7px}
+  td .chip{margin-bottom:3px}
+  .chip.all{background:#e2f0e2;color:#1e5b2e}
+  .chip.res{background:#fde8e8;color:#a03030}
+  .chip.off{background:var(--line2);color:var(--tx3)}
+  .chip.new{background:var(--warnbg);color:#8a6410;border:1px solid var(--warn)}
+  /* 앱이 스스로 등록했지만 아직 접근 범위가 정해지지 않은 서비스 */
+  .card.needs-setup{border-color:var(--warn);background:linear-gradient(0deg,var(--warnbg),var(--warnbg))}
+  .card.needs-setup .desc,.card.needs-setup .scope{opacity:.85}
+  @media (prefers-color-scheme: dark){ .chip.new{color:#e8c46a} }
+  @media (prefers-color-scheme: dark){
+    .chip.all{background:#1d3324;color:#87c99a} .chip.res{background:#3a2020;color:#e0928c}
+  }
+
+  /* display:inline-block 이 없으면 표 안(플렉스가 아닌 곳)에서 폭이 0이 되어 사라진다 */
+  .sw{position:relative;display:inline-block;width:42px;height:23px;flex:0 0 auto;
+      vertical-align:middle;cursor:pointer}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw i{position:absolute;inset:0;background:var(--line);border-radius:999px;
+        transition:.18s;cursor:pointer;display:block}
+  .sw i::after{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;
+               background:#fff;border-radius:50%;transition:.18s}
+  .sw input:checked + i{background:var(--accent)}
+  .sw input:checked + i::after{transform:translateX(19px)}
+
+  .sm{padding:7px 13px;border:1px solid var(--line);border-radius:8px;background:var(--bg);
+      color:var(--tx2);font-size:12.5px;line-height:1.35;cursor:pointer;white-space:nowrap;
+      transition:border-color .14s, color .14s, background .14s}
+  .sm:hover:not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .sm:disabled{opacity:.4;cursor:default}
+  .sm.danger:hover:not(:disabled){border-color:var(--danger);color:var(--danger);
+      background:transparent}
+  /* ↑ ↓ 같은 아이콘 버튼은 정사각형으로 맞춰야 나란히 놓았을 때 흔들리지 않는다 */
+  .sm.icon{padding:0;width:30px;height:30px;display:inline-grid;place-items:center;font-size:13px}
+  /* 버튼 묶음. 관련 있는 것끼리 붙이고 묶음 사이는 띄운다 */
+  .btns{display:flex;align-items:center;gap:7px}
+  .btns + .btns{margin-left:14px}
+  .primary{padding:9px 17px;border:0;border-radius:9px;background:var(--nav);
+           color:#fff;font-size:13.5px;font-weight:600;cursor:pointer}
+  .primary:hover{opacity:.9}
+  .primary:disabled{background:var(--line);color:var(--tx3)}
+
+  table{width:100%;border-collapse:collapse;background:var(--bg);
+        border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}
+  th{font-size:11.5px;color:var(--tx3);font-weight:650;text-align:left;
+     padding:11px 14px;border-bottom:1px solid var(--line2);white-space:nowrap;background:var(--bg)}
+  td{padding:12px 14px;border-bottom:1px solid var(--line2);font-size:13.5px;vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  .mono{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+  .dim{color:var(--tx3);font-size:12px}
+  /* 일괄 등록 미리보기 — 문제 있는 줄을 눈으로 바로 가려내야 한다 */
+  /* 미리보기 표 — 부서명이 "인사/총무/팀" 처럼 세로로 쪼개지지 않게 한다.
+     사유만 줄바꿈을 허용한다 (길어서). */
+  .pv{table-layout:fixed}
+  .pv td, .pv th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pv td:last-child{white-space:normal;overflow:visible;text-overflow:clip}
+  /* 확인 표(6칸) — 줄번호·관리자는 좁게, 사유는 넉넉히 */
+  .pvck th:nth-child(1),.pvck td:nth-child(1){width:44px;color:var(--tx3)}   /* 줄 */
+  .pvck th:nth-child(2),.pvck td:nth-child(2){width:17%}                     /* 아이디 */
+  .pvck th:nth-child(3),.pvck td:nth-child(3){width:12%}                     /* 이름 */
+  .pvck th:nth-child(4),.pvck td:nth-child(4){width:20%}                     /* 부서 */
+  .pvck th:nth-child(5),.pvck td:nth-child(5){width:66px}                    /* 관리자 */
+  .pvck th:nth-child(6),.pvck td:nth-child(6){width:28%}                     /* 결과 */
+  /* 부서·결과는 잘라 놓으면 "임원…" 이 되어서, 확인하라고 만든 표에서
+     정작 확인이 안 된다. 접히더라도 다 보이는 편이 낫다. */
+  .pvck td:nth-child(4){white-space:normal;overflow:visible;text-overflow:clip}
+  tr.bad td{background:var(--warnbg)}
+  tr.bad td:last-child{color:#a3560f}
+  td.pw{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .right{text-align:right}
+  td .btns{justify-content:flex-end}
+  tbody tr:hover{background:var(--line2)}
+  /* 사용한 기능 배지 */
+  .tool{display:inline-block;margin:0 5px 3px 0;padding:2px 8px;border-radius:6px;
+        background:var(--line2);color:var(--tx2);font-size:11.5px;
+        font-family:ui-monospace,Consolas,monospace}
+  /* 안내 박스 */
+  .emptybox{background:var(--bg);border:1px dashed var(--line);border-radius:13px;
+            padding:40px 24px;text-align:center}
+  .emptybox .t{font-size:14.5px;font-weight:650;margin-bottom:5px}
+  .emptybox .d{font-size:12.5px;color:var(--tx3);margin-bottom:16px}
+  .qcell{max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  tr.answer{display:none}
+  tr.answer.open{display:table-row}
+  tr.answer td{background:var(--side);padding:0}
+  .answerbox{padding:12px 16px;font-size:12.5px;color:var(--tx2);
+             white-space:pre-wrap;line-height:1.6;border-left:3px solid var(--accent)}
+  .notice{padding:11px 14px;border:1px solid var(--line);border-radius:10px;
+          background:var(--bg);color:var(--tx2);font-size:12.5px;margin-bottom:12px}
+  .notice.warn{border-color:var(--warn);background:var(--warnbg)}
+  .inlinefilter{padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+        background:var(--bg);color:var(--tx);font-size:13.5px;outline:none;min-width:240px}
+  .inlinefilter:focus{border-color:var(--accent)}
+
+  /* ── AI 사용량 ── */
+  .minih{font-size:13.5px;font-weight:650;margin:26px 0 10px;color:var(--tx2)}
+  .sums{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .sum{flex:1;min-width:150px;background:var(--bg);border:1px solid var(--line);
+       border-radius:13px;box-shadow:var(--shadow);padding:15px 17px}
+  .sum .k{font-size:12px;color:var(--tx3);margin-bottom:5px}
+  .sum .v{font-size:22px;font-weight:650;letter-spacing:-.02em}
+  .sum .v small{font-size:12.5px;font-weight:500;color:var(--tx3);margin-left:3px}
+  /* 막대그래프. 그림 라이브러리를 붙이지 않는다 — 막대 몇 개에
+     외부 스크립트를 끌어오면 사내망에서 안 뜰 때 화면이 통째로 빈다. */
+  .chart{display:flex;align-items:flex-end;gap:3px;height:132px;padding:10px 12px;
+         background:var(--bg);border:1px solid var(--line);border-radius:13px;
+         box-shadow:var(--shadow);overflow-x:auto}
+  .bar1{flex:1;min-width:7px;display:flex;flex-direction:column;justify-content:flex-end;
+        height:100%;position:relative}
+  .bar1 i{display:block;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;
+          transition:background .12s}
+  .bar1:hover i{background:var(--tx)}
+  .chart .empty{color:var(--tx3);font-size:12.5px;margin:auto}
+  /* 막대 위에 말풍선을 띄우면 그래프 상자 밖으로 나가서 잘린다
+     (가로 스크롤이 걸린 상자는 위아래도 같이 잘린다).
+     그래서 상자 위에 읽는 줄을 따로 두고 거기에 적는다. */
+  .readout{font-size:12.5px;color:var(--tx2);margin-bottom:7px;height:18px}
+  .readout .no{color:var(--tx3)}
+  /* 안쪽 탭. 위쪽 큰 탭과 헷갈리지 않게 밑줄 모양으로 다르게 그린다. */
+  .subtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .subtab{padding:9px 16px;border:0;border-bottom:2px solid transparent;background:transparent;
+          color:var(--tx3);font:inherit;font-size:13.5px;cursor:pointer;transition:.15s}
+  .subtab:hover{color:var(--tx)}
+  .subtab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:650}
+  .subpage{display:none} .subpage.on{display:block}
+
+  /* 동작 고르기 칩 */
+  /* 명부에 있는 새 부서 알림 */
+  .warnbox{background:var(--warnbg);border:1px solid var(--warn);border-radius:10px;
+           padding:12px 14px;margin-bottom:12px;font-size:13px}
+  .ndline{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .ndline input{width:16px;height:16px;cursor:pointer}
+  .nddeps{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .nddeps span{padding:3px 9px;border:1px solid var(--warn);border-radius:999px;
+               background:var(--bg);font-size:12px}
+
+  /* 누를 수 있는 머리글.
+     화살표 자리를 늘 비워 둔다(::after 의 빈 칸). 누를 때마다 글자가
+     좌우로 밀리면 여러 번 누르기가 힘들다. */
+  th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+  th.sortable:hover{color:var(--tx)}
+  th.sortable::after{content:"↕";margin-left:5px;opacity:.25;font-size:10px}
+  th.sortable.asc::after{content:"↑";opacity:1;color:var(--accent)}
+  th.sortable.desc::after{content:"↓";opacity:1;color:var(--accent)}
+  /* 날짜는 한 줄로. 접히면 "2026-08-10 / 13:12" 이 되어 표가 들쭉날쭉해진다. */
+  #usrRows td:nth-child(6){white-space:nowrap}
+
+  /* 접근 범위 목록에서 "이 사람은 관리자라 어차피 보입니다" 표시 */
+  .admark{font-size:10.5px;color:var(--warn);border:1px solid var(--warn);
+          border-radius:999px;padding:1px 6px;margin-left:5px;white-space:nowrap;
+          background:var(--warnbg)}
+
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+  .chips.sub{margin:-2px 0 12px;padding-left:2px}
+  .chips:empty{display:none}
+  .fchip{
+    padding:6px 13px;border:1px solid var(--line);border-radius:999px;background:var(--bg);
+    color:var(--tx2);font:inherit;font-size:12.5px;cursor:pointer;transition:.13s;white-space:nowrap;
+  }
+  .fchip:hover{border-color:var(--accent);color:var(--accent)}
+  .fchip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:650}
+  .fchip .cnt{opacity:.65;margin-left:5px;font-size:11.5px}
+  .fchip.on .cnt{opacity:.85}
+  .chips.sub .fchip{padding:4px 11px;font-size:12px;border-radius:7px}
+
+  .filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .filters input,.filters select{padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+        background:var(--bg);color:var(--tx);font-size:13.5px;outline:none}
+  .filters input{flex:1;min-width:200px}
+  .filters input:focus,.filters select:focus{border-color:var(--accent)}
+
+  /* 브라우저 기본 드롭다운 화살표는 OS마다 모양과 위치가 제각각이라
+     테두리에 붙어 보인다. 직접 그리고 오른쪽 여백을 확보한다. */
+  select.in, .filters select{
+    appearance:none;-webkit-appearance:none;-moz-appearance:none;
+    padding-right:34px;cursor:pointer;
+    background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23989ca6' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 13px center;
+  }
+  select.in::-ms-expand, .filters select::-ms-expand{display:none}
+
+  /* 모달 */
+  .mask{position:fixed;inset:0;background:rgba(16,17,20,.5);backdrop-filter:blur(2px);
+        display:none;place-items:center;z-index:60;padding:20px;overflow-y:auto}
+  .mask.on{display:grid}
+  .modal{width:min(470px,100%);background:var(--bg);border-radius:16px;box-shadow:var(--pop);
+         animation:up .16s ease-out;max-height:calc(100vh - 40px);display:flex;flex-direction:column}
+  .modal.wide{width:min(560px,100%)}
+  /* 표가 들어가는 모달은 더 넓게. 좁으면 부서 이름이 "임원…" 으로 잘려서
+     정작 확인하라고 만든 화면에서 확인이 안 된다. */
+  .modal.wider{width:min(900px,100%)}
+  @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .mh{padding:20px 22px 8px;flex:0 0 auto}
+  .mh h4{margin:0;font-size:16.5px;font-weight:650}
+  .mh p{margin:4px 0 0;font-size:12.5px;color:var(--tx3)}
+  .mb{padding:12px 22px 6px;overflow-y:auto}
+  .mf{padding:16px 22px 20px;display:flex;gap:8px;justify-content:flex-end;flex:0 0 auto;
+      border-top:1px solid var(--line2);margin-top:8px}
+  .ghost{padding:9px 16px;border:1px solid var(--line);border-radius:9px;background:var(--bg);
+         color:var(--tx2);font-size:13.5px;cursor:pointer}
+  .ghost:hover{background:var(--side)}
+  .redbtn{padding:9px 18px;border:0;border-radius:9px;background:var(--danger);
+          color:#fff;font-size:13.5px;font-weight:600;cursor:pointer}
+
+  .fld{display:block;font-size:12px;font-weight:650;color:var(--tx2);margin:0 0 6px}
+  .fs{margin-bottom:13px}
+  .in{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+      background:var(--bg);color:var(--tx);font-size:14px;outline:none}
+  .in:focus{border-color:var(--accent)}
+  .row2{display:flex;gap:8px}
+  .half{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  .radio{display:flex;gap:10px;margin-bottom:6px}
+  .radio label{flex:1;display:flex;gap:9px;align-items:flex-start;padding:11px 13px;
+    border:1px solid var(--line);border-radius:11px;cursor:pointer;font-size:13.5px}
+  .radio label.on{border-color:var(--accent);background:var(--accent-soft)}
+  .radio input{margin-top:3px;accent-color:var(--accent)}
+  .radio .d{display:block;font-size:11px;color:var(--tx3)}
+
+  /* 190px 은 부서 넷이면 벌써 꽉 찬다. 팀을 펼쳐서 사람을 고르는 것이
+     본래 하는 일인데, 펼치는 순간 인원이 상자 밖으로 밀려서 좁은 칸을
+     또 굴려야 했다. 창 높이에 맞춰 늘리되 화면은 넘지 않게 둔다. */
+  .deptbox{border:1px solid var(--line);border-radius:11px;padding:6px;
+           max-height:min(46vh, 420px);overflow-y:auto}
+  .dept{padding:8px 10px;border-radius:8px}
+  .dept:hover{background:var(--side)}
+  .dept .top{display:flex;align-items:center;gap:9px}
+  .dept .top label{flex:1;display:flex;gap:9px;align-items:center;cursor:pointer;font-size:13.5px}
+  .dept .cnt{font-size:11.5px;color:var(--tx3);cursor:pointer;user-select:none}
+  .dept .mem{display:none;flex-wrap:wrap;gap:12px;padding:8px 0 2px 26px}
+  .dept.open .mem{display:flex}
+  .dept .mem label{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--tx2);cursor:pointer}
+  input[type=checkbox]{accent-color:var(--accent)}
+  .taglist{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;
+       background:var(--line2);font-size:12px}
+  .tag button{border:0;background:transparent;color:var(--tx3);cursor:pointer;padding:0;font-size:14px}
+  .tag button:hover{color:var(--danger)}
+
+  .mmsg{margin:0 22px 4px;padding:9px 12px;border-radius:9px;font-size:12.5px;display:none;
+        background:#fbe4e4;color:#9c2020}
+  .mmsg.on{display:block}
+  @media (prefers-color-scheme: dark){ .mmsg{background:#3a1f1f;color:#e58b8b} }
+
+  #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(18px);
+    background:var(--tx);color:var(--bg);padding:11px 20px;border-radius:11px;font-size:13.5px;
+    box-shadow:var(--pop);opacity:0;transition:.22s;pointer-events:none;z-index:90;max-width:90vw}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.bad{background:var(--danger);color:#fff}
+  .empty{padding:34px;text-align:center;color:var(--tx3);font-size:13.5px;
+         background:var(--bg);border:1px dashed var(--line);border-radius:13px}
+
+  /* ============ 반응형 ============
+     이 화면의 표들은 <table> 이 맨몸으로 놓여 있다. 감싼 스크롤 상자가
+     없으니 width:100% 인 표가 좁은 화면에서 그냥 찌그러진다. 칸이 여섯
+     개인 사용자 미리보기 표는 폰에서 글자가 서로 겹쳐 보였다.
+
+     표마다 <div> 를 덧대는 게 정석이지만, 여기 표는 여덟 곳에 있고 그중
+     일부는 JS 가 만들어 낸다. 마크업을 여덟 군데 고치면 그만큼 어긋날
+     자리가 생긴다. 그래서 CSS 한 줄로 끝낸다 —
+
+       display:block  표 자체를 스크롤되는 상자로 만든다. thead/tbody 는
+                      제 역할을 유지해서 칸 줄맞춤은 그대로 간다.
+       white-space:nowrap  칸이 글자에 맞춰 넓어지게 둔다. 이게 있어야
+                      표가 화면을 넘치고, 넘쳐야 스크롤이 생긴다.
+
+     .pv 는 table-layout:fixed + 퍼센트 폭이라 위 방법만으로는 여전히
+     쪼그라든다. 좁은 화면에서만 auto 로 풀어 준다. */
+
+  @media (max-width:820px){
+    table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;
+          white-space:nowrap;border-radius:10px}
+    /* 퍼센트로 나눠 놓은 칸을 글자 길이에 맡긴다.
+       (.pv.pvck 로 잡아야 위 .pvck th:nth-child(n) 과 우열이 같아져,
+        나중에 쓴 이쪽이 이긴다 — !important 를 쓰지 않으려는 것이다) */
+    table.pv{table-layout:auto}
+    .pv.pvck th,.pv.pvck td{width:auto}
+    .pv td:last-child,.pvck td:nth-child(4){white-space:nowrap}
+    /* 펼친 답변은 표 안의 글이다. 여기까지 nowrap 이 물리면 한 줄로
+       늘어져 옆으로 한참 밀어야 읽힌다. */
+    .answerbox,tr.answer td{white-space:normal}
+    .qcell{max-width:min(420px,68vw)}
+
+    .wrap{padding:18px 14px 52px}
+    header{padding:0 14px}
+    .card{padding:15px 14px}
+    .bar{flex-wrap:wrap;gap:10px}
+    .subtabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+    .subtabs::-webkit-scrollbar{display:none}
+    .subtab{flex:0 0 auto}
+  }
+
+  @media (max-width:560px){
+    /* 탭 줄이 화면보다 길다. 접지 말고 옆으로 민다 — 두 줄이 되면
+       그 아래 내용이 통째로 밀려 내려가 어느 탭인지 눈으로 쫓기 어렵다. */
+    .tabs{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none}
+    .tabs::-webkit-scrollbar{display:none}
+    .tab{flex:0 0 auto;padding:9px 15px}
+    header{height:54px}
+    .wordmark{width:118px}
+    .hbtn{padding:6px 10px;font-size:12px}
+    .sums{gap:8px}
+    .sum{flex:1 1 calc(50% - 4px);min-width:0;padding:12px 13px}
+    .inlinefilter{min-width:0;width:100%}
+    .btns{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img class="wordmark" alt="NURI COSMETIC" src="/static/wordmark-dark.png">
+    <b>포탈 관리</b>
+  </div>
+  <div class="hbtns">
+    <a class="hbtn" href="/password">비밀번호 변경</a>
+    <a class="hbtn" href="/" data-backportal>포탈로 돌아가기</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab on" data-tab="svc">서비스 관리</button>
+    <button class="tab" data-tab="usr">사용자 명부</button>
+    <button class="tab" data-tab="dep">부서 관리</button>
+    <button class="tab" data-tab="aud">이력</button>
+    <button class="tab" data-tab="cost">AI 사용량</button>
+  </div>
+
+  <!-- 서비스 관리 -->
+  <div class="page on" id="p-svc">
+    <div class="bar">
+      <div><h2>등록된 서비스</h2>
+        <div class="sub">여기에 등록한 서비스가 포탈 화면과 챗 도구에 함께 반영됩니다.
+          앱이 뜨면서 스스로 등록한 것은 <b>설정 필요</b> 로 표시되며,
+          접근 범위를 정하고 켜야 직원에게 보입니다.</div></div>
+      <button class="primary" id="svcAdd">＋ 서비스 추가</button>
+    </div>
+    <div id="svcList"></div>
+  </div>
+
+  <!-- 사용자 명부 -->
+  <div class="page" id="p-usr">
+    <div class="bar">
+      <div><h2>사용자 명부</h2>
+        <div class="sub">회원가입은 없습니다. 여기서 계정을 만들어 전달하세요.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="sm" id="usrBulk">한 번에 등록</button>
+        <button class="primary" id="usrAdd">＋ 사용자 추가</button>
+      </div>
+    </div>
+    <div class="filters">
+      <input id="usrQ" placeholder="아이디 또는 이름 검색">
+      <select id="usrDept"><option value="">전체 부서</option></select>
+    </div>
+    <div class="dim" id="usrCnt" style="margin-bottom:8px"></div>
+    <table id="usrTable"><thead><tr>
+      <th class="sortable" data-sort="user_id">아이디</th>
+      <th class="sortable" data-sort="name">이름</th>
+      <th class="sortable" data-sort="dept">부서</th>
+      <th class="sortable" data-sort="is_admin">관리자</th>
+      <th class="sortable" data-sort="active">상태</th>
+      <th class="sortable" data-sort="last_login">최근 로그인</th>
+      <th></th>
+    </tr></thead><tbody id="usrRows"></tbody></table>
+  </div>
+
+  <!-- 부서 관리 -->
+  <div class="page" id="p-dep">
+    <div class="bar">
+      <div><h2>부서</h2>
+        <div class="sub">계정의 부서는 여기 등록된 것 중에서만 고를 수 있습니다.
+          접근 범위 판정의 기준이므로 표기를 하나로 맞춰 두세요.</div></div>
+      <button class="primary" id="depAdd">＋ 부서 추가</button>
+    </div>
+    <table><thead><tr>
+      <th>부서</th><th>소속 직원</th><th>이 부서를 쓰는 서비스</th><th>순서</th><th></th>
+    </tr></thead><tbody id="depRows"></tbody></table>
+    <div class="dim" style="margin-top:10px">
+      부서명을 바꾸면 계정과 서비스 접근 범위에 적힌 이름도 함께 바뀝니다.
+      쓰고 있는 곳이 남아 있으면 삭제되지 않습니다.
+    </div>
+  </div>
+
+  <!-- 이력 -->
+  <div class="page" id="p-aud">
+    <div class="bar">
+      <div><h2>이력</h2>
+        <div class="sub">포털 설정 변경과 각 서비스의 파일 업로드·조회·삭제,
+          그리고 직원이 챗에 무엇을 물었는지가 여기 모입니다.</div></div>
+      <div class="reload">
+        <span class="dim" id="audStamp"></span>
+        <button class="sm" id="audReload">새로고침</button>
+      </div>
+    </div>
+
+    <!-- 안쪽 탭. 성격이 다른 두 기록을 한 화면에 세로로 이으면
+         스크롤만 길어지고 무엇을 보고 있는지도 흐려진다. -->
+    <div class="subtabs">
+      <button class="subtab on" data-sub="svc">서비스 이력</button>
+      <button class="subtab" data-sub="chat">채팅 이력</button>
+    </div>
+
+    <div class="subpage on" id="s-svc">
+    <div class="filters">
+      <select id="audSvc"><option value="">전체 서비스</option></select>
+      <input id="audQ" placeholder="사용자·내용 검색">
+    </div>
+    <!-- 동작은 드롭다운이 아니라 칩으로 고른다.
+         목록이 열네 줄이 넘어가면 드롭다운 안에서 또 스크롤을 해야 하고,
+         그러면 무엇이 있는지 한눈에 안 들어온다. 큰 묶음을 먼저 보여주고,
+         고른 뒤에 그 안의 것만 아래에 편다. -->
+    <div class="chips" id="actChips"></div>
+    <div class="chips sub" id="actSub"></div>
+    <div class="dim" id="audCnt" style="margin-bottom:8px"></div>
+    <table><thead><tr>
+      <th>시간</th><th>서비스</th><th>사용자</th><th>동작</th><th>내용</th>
+    </tr></thead><tbody id="audRows"></tbody></table>
+    </div>
+
+    <!-- 채팅 이력 -->
+    <div class="subpage" id="s-chat">
+    <div class="filters">
+      <select id="usgSvc"><option value="">전체 서비스</option></select>
+      <input id="usgQ" placeholder="사용자·기능·질문 검색">
+    </div>
+    <div class="sub" style="margin-bottom:10px">직원이 실제로 어떻게 묻는지 보는 곳입니다.
+      도구 설명을 고치거나 어떤 앱이 더 필요한지 판단할 때 씁니다. 줄을 누르면 답변이 펼쳐집니다.</div>
+    <div class="notice" id="usgPolicy"></div>
+    <div class="dim" id="usgCnt" style="margin-bottom:8px"></div>
+    <table><thead><tr>
+      <th>시간</th><th>사용자</th><th>질문</th><th>사용한 기능</th>
+    </tr></thead><tbody id="usgRows"></tbody></table>
+    </div>
+  </div>
+
+  <!-- AI 사용량 -->
+  <div class="page" id="p-cost">
+    <div class="bar">
+      <div><h2>AI 사용량</h2>
+        <div class="sub">공급자(비즈라우터)에 실제로 얼마나 나갔는지 봅니다.
+          챗·제목·그림 읽기가 모두 여기로 모입니다.
+          <b>그림 읽기는 눈에 안 띄게 커집니다</b> — 엑셀 하나를 열었을 뿐인데
+          안에 붙은 캡처 다섯 장이 통째로 넘어갑니다.</div></div>
+      <select id="costDays" class="inlinefilter">
+        <option value="7">최근 7일</option>
+        <option value="30" selected>최근 30일</option>
+        <option value="90">최근 90일</option>
+      </select>
+    </div>
+
+    <div class="sums" id="costSums"></div>
+    <div class="notice" id="costPrice"></div>
+
+    <h3 class="minih">날마다</h3>
+    <div class="readout" id="costRead"></div>
+    <div class="chart" id="costChart"></div>
+
+    <h3 class="minih">무엇에 썼나</h3>
+    <table><thead><tr>
+      <th>용도</th><th>모델</th><th class="right">부른 횟수</th>
+      <th class="right">보낸 토큰</th><th class="right">받은 토큰</th><th class="right">금액</th>
+    </tr></thead><tbody id="costKind"></tbody></table>
+
+    <h3 class="minih">누가 썼나</h3>
+    <table><thead><tr>
+      <th>사용자</th><th class="right">부른 횟수</th>
+      <th class="right">보낸 토큰</th><th class="right">받은 토큰</th>
+    </tr></thead><tbody id="costUser"></tbody></table>
+  </div>
+</div>
+
+<!-- 서비스 추가·수정 -->
+<div class="mask" id="mSvc"><div class="modal">
+  <div class="mh"><h4 id="svcTitle">서비스 추가</h4>
+    <p>ID는 영문·숫자·하이픈만. 등록 후에는 바꿀 수 없습니다.</p></div>
+  <div class="mb">
+    <div class="half">
+      <div class="fs"><label class="fld" for="sId">서비스 ID</label>
+        <input class="in" id="sId" placeholder="ai-report" autocomplete="off"></div>
+      <div class="fs"><label class="fld" for="sName">이름</label>
+        <input class="in" id="sName" placeholder="AI 사용량 리포트" autocomplete="off"></div>
+    </div>
+    <div class="fs"><label class="fld" for="sUrl">경로 (URL)</label>
+      <input class="in" id="sUrl" placeholder="/ai-report/" autocomplete="off"></div>
+    <div class="fs"><label class="fld" for="sDesc">설명</label>
+      <input class="in" id="sDesc" placeholder="사용자별 AI 도구 사용 현황을 확인합니다" autocomplete="off"></div>
+    <div class="fs"><label class="fld" for="sKw">검색 키워드</label>
+      <input class="in" id="sKw" placeholder="AI, 사용량, 비용, 요금" autocomplete="off">
+      <div class="dim" style="margin-top:5px">앱 검색과 챗의 앱 안내가 이 값을 씁니다. 동의어를 넉넉히 넣으세요.</div></div>
+    <div class="fs"><label class="fld" for="sColor">색상</label>
+      <input class="in" id="sColor" type="color" style="height:42px;padding:4px"></div>
+  </div>
+  <div class="mmsg" id="sMsg"></div>
+  <div class="mf"><button class="ghost" data-close>취소</button>
+    <button class="primary" id="sOk">저장</button></div>
+</div></div>
+
+<!-- 접근 범위 -->
+<div class="mask" id="mAcc"><div class="modal wide">
+  <div class="mh"><h4>접근 범위 설정</h4><p id="accWho"></p></div>
+  <div class="mb">
+    <div class="radio" id="accMode">
+      <label><input type="radio" name="am" value="all"><span>전 직원
+        <span class="d">계정이 있으면 누구나</span></span></label>
+      <label><input type="radio" name="am" value="restricted"><span>부서/개인 지정
+        <span class="d">선택한 대상만</span></span></label>
+    </div>
+    <div id="accDetail">
+      <div class="fs" style="margin-top:14px">
+        <label class="fld">부서 · 개인 선택 <span style="font-weight:400;color:var(--tx3)">
+          — 어디를 체크하든 <b>체크 = 이 앱을 쓸 수 있음</b>. 팀 전체면 팀을,
+          몇 명만이면 <b>명 수</b>를 눌러 펼치고 그 사람만</span></label>
+        <div class="deptbox" id="accDepts"></div>
+        <div class="dim" style="margin-top:7px">
+          <b>포털 관리자는 이 설정과 상관없이 모든 앱이 보입니다.</b>
+          체크를 풀어도 그대로 보이므로, 범위를 시험하실 때는
+          관리자가 아닌 계정으로 확인하세요.
+        </div>
+      </div>
+      <div class="fs">
+        <label class="fld">개인 지정 <span style="font-weight:400;color:var(--tx3)">
+          — 위에서 체크한 사람이 여기 모입니다. 이름으로 찾아 넣어도 됩니다</span></label>
+        <div class="taglist" id="accUserTags"></div>
+        <input class="in" id="accUserQ" placeholder="아이디 또는 이름으로 검색" autocomplete="off">
+        <div id="accUserHits" style="margin-top:6px"></div>
+      </div>
+      <div class="fs">
+        <label class="fld">허용 IP <span style="font-weight:400;color:var(--tx3)">— 비우면 제한 없음</span></label>
+        <div class="taglist" id="accIpTags"></div>
+        <div class="row2">
+          <input class="in" id="accIp" placeholder="10.20.30.92" autocomplete="off">
+          <button class="primary" id="accIpAdd" style="white-space:nowrap">추가</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 담당자는 접근 범위와 별개다. 전 직원 공개 서비스에도 담당자는 필요하다. -->
+    <div class="fs" style="margin-top:6px;padding-top:16px;border-top:1px solid var(--line2)">
+      <label class="fld">담당자
+        <span style="font-weight:400;color:var(--tx3)">— 파일 삭제 등 되돌릴 수 없는 동작</span></label>
+      <div class="taglist" id="accMgrTags"></div>
+      <input class="in" id="accMgrQ" placeholder="아이디 또는 이름으로 검색" autocomplete="off">
+      <div id="accMgrHits" style="margin-top:6px"></div>
+      <div class="dim" style="margin-top:7px">
+        조회·업로드는 접근 범위에 든 사람 누구나 할 수 있고,
+        <b>삭제는 담당자만</b> 할 수 있습니다.
+        포털 관리자는 지정하지 않아도 항상 담당자입니다.
+      </div>
+    </div>
+  </div>
+  <div class="mmsg" id="aMsg"></div>
+  <div class="mf"><button class="ghost" data-close>취소</button>
+    <button class="primary" id="accOk">저장</button></div>
+</div></div>
+
+<!-- 사용자 추가·수정 -->
+<div class="mask" id="mUsr"><div class="modal">
+  <div class="mh"><h4 id="usrTitle">사용자 추가</h4><p id="usrHint"></p></div>
+  <div class="mb">
+    <div class="half">
+      <div class="fs"><label class="fld" for="uId">아이디</label>
+        <input class="in" id="uId" placeholder="hong" autocomplete="off"></div>
+      <div class="fs"><label class="fld" for="uNm">이름</label>
+        <input class="in" id="uNm" placeholder="구본승" autocomplete="off"></div>
+    </div>
+    <div class="fs"><label class="fld" for="uDept">부서</label>
+      <!-- 직접 입력이 아니라 선택. 오타 하나가 곧 권한 사고가 된다. -->
+      <select class="in" id="uDept"></select>
+      <div class="dim" style="margin-top:5px">
+        찾는 부서가 없으면 <b>부서 관리</b> 탭에서 먼저 등록하세요.</div></div>
+    <div class="fs" id="uPwWrap"><label class="fld" for="uPw">초기 비밀번호</label>
+      <div class="row2"><input class="in" id="uPw" placeholder="8자 이상" autocomplete="off">
+        <button class="sm" id="uGen" type="button">자동</button></div>
+      <div class="dim" style="margin-top:5px">첫 로그인 때 본인이 반드시 바꾸게 됩니다.</div></div>
+    <label style="display:flex;gap:9px;align-items:flex-start;padding:11px 13px;
+      border:1px solid var(--line);border-radius:11px;cursor:pointer;font-size:13.5px">
+      <input type="checkbox" id="uAdmin" style="margin-top:3px">
+      <span>관리자<span class="d" style="display:block;font-size:11px;color:var(--tx3)">
+        서비스·계정 관리, 이력 열람</span></span></label>
+  </div>
+  <div class="mmsg" id="uMsg"></div>
+  <div class="mf"><button class="ghost" data-close>취소</button>
+    <button class="primary" id="uOk">저장</button></div>
+</div></div>
+
+<!-- 계정 한 번에 등록 -->
+<div class="mask" id="mBulk"><div class="modal wider">
+  <div class="mh"><h4>계정 한 번에 등록</h4>
+    <p>인사팀 명부를 그대로 올리시면 됩니다. 올린다고 바로 만들어지지 않습니다 —
+      먼저 한 줄씩 확인해서 보여드립니다.</p></div>
+  <div class="mb">
+    <div class="notice">
+      <b>아이디</b>와 <b>이름</b>만 있으면 됩니다. 부서·관리자·초기 비밀번호는 선택입니다.<br>
+      머리글은 <code>사번/성명/소속</code> 처럼 쓰던 말 그대로도 알아봅니다.
+      비밀번호를 비우면 만들어 드리고, 어차피 <b>첫 로그인 때 바꾸게</b> 됩니다.<br>
+      명부에 있는데 포털에 없는 부서는 <b>말없이 만들지 않습니다</b> —
+      "영업1팀"과 "영업 1팀"이 따로 생기면 접근 범위가 조용히 갈라지기 때문입니다.
+      대신 <b>없는 부서를 아래에 늘어놓아 드립니다.</b> 보시고 함께 만들지 고르세요.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <button class="sm" id="bulkTpl">양식 내려받기</button>
+      <button class="sm" id="bulkPick">파일 고르기 (.xlsx / .csv)</button>
+      <input type="file" id="bulkFile" accept=".xlsx,.xlsm,.csv" hidden>
+      <span class="dim" id="bulkName"></span>
+    </div>
+    <!-- 없는 부서가 있을 때만 뜬다. 이름을 다 보여주는 것이 핵심이다 —
+         오타는 목록에서 나란히 봐야 눈에 띈다. -->
+    <div id="newDeptBox" class="warnbox" style="display:none">
+      <label class="ndline">
+        <input type="checkbox" id="newDeptOn">
+        <span><b id="newDeptCnt"></b> 함께 만들기</span>
+      </label>
+      <div class="nddeps" id="newDeptList"></div>
+      <div class="dim" style="margin-top:6px">
+        이미 있는 부서와 비슷한 이름이 보이면 <b>명부의 오타</b>일 수 있습니다.
+        그대로 만들면 접근 범위가 둘로 갈라집니다.
+      </div>
+    </div>
+
+    <div id="bulkSum" class="dim" style="margin-bottom:8px"></div>
+    <div id="bulkWrap" style="display:none;max-height:340px;overflow:auto;
+         border:1px solid var(--line);border-radius:10px">
+      <table class="pv pvck" style="box-shadow:none;border-radius:0;margin:0"><thead><tr>
+        <th>줄</th><th>아이디</th><th>이름</th><th>부서</th><th>관리자</th><th>결과</th>
+      </tr></thead><tbody id="bulkRows"></tbody></table>
+    </div>
+  </div>
+  <div class="mmsg" id="bMsg"></div>
+  <div class="mf"><button class="ghost" data-close>닫기</button>
+    <button class="primary" id="bOk" disabled>등록</button></div>
+</div></div>
+
+<!-- 등록 결과 -->
+<div class="mask" id="mBulkDone"><div class="modal wider">
+  <div class="mh"><h4>등록했습니다</h4>
+    <p>초기 비밀번호는 <b>이 화면에서만</b> 볼 수 있습니다. 내려받아 두시거나
+      지금 전달하세요. 창을 닫으면 다시 볼 수 없습니다.</p></div>
+  <div class="mb">
+    <div id="doneSum" class="dim" style="margin-bottom:8px"></div>
+    <div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px">
+      <table class="pv" style="box-shadow:none;border-radius:0;margin:0"><thead><tr>
+        <th>아이디</th><th>이름</th><th>부서</th><th>초기 비밀번호</th>
+      </tr></thead><tbody id="doneRows"></tbody></table>
+    </div>
+  </div>
+  <div class="mf"><button class="sm" id="doneCsv">비밀번호 내려받기 (CSV)</button>
+    <button class="primary" data-close>닫기</button></div>
+</div></div>
+
+<!-- 부서 추가·이름 변경 -->
+<div class="mask" id="mDep"><div class="modal">
+  <div class="mh"><h4 id="depTitle">부서 추가</h4><p id="depHint"></p></div>
+  <div class="mb"><div class="fs"><label class="fld" for="dName">부서명</label>
+    <input class="in" id="dName" placeholder="인사총무팀" autocomplete="off">
+    <div class="dim" style="margin-top:5px" id="dNote">
+      사내에서 쓰는 표기 그대로 넣으세요.</div></div></div>
+  <div class="mmsg" id="dMsg"></div>
+  <div class="mf"><button class="ghost" data-close>취소</button>
+    <button class="primary" id="dOk">저장</button></div>
+</div></div>
+
+<!-- 비밀번호 초기화 -->
+<div class="mask" id="mPw"><div class="modal">
+  <div class="mh"><h4>비밀번호 초기화</h4><p id="pWho"></p></div>
+  <div class="mb"><div class="fs"><label class="fld" for="pNew">새 초기 비밀번호</label>
+    <div class="row2"><input class="in" id="pNew" placeholder="8자 이상" autocomplete="off">
+      <button class="sm" id="pGen" type="button">자동</button></div></div>
+    <div class="dim">본인에게 전달하세요. 첫 로그인 때 변경 화면이 뜹니다.</div></div>
+  <div class="mmsg" id="pMsg"></div>
+  <div class="mf"><button class="ghost" data-close>취소</button>
+    <button class="primary" id="pOk">초기화</button></div>
+</div></div>
+
+<!-- 확인 -->
+<!-- 계정 삭제. 되돌릴 수 없으므로 무엇이 딸려 있는지 먼저 보여준다. -->
+<div class="mask" id="mDelUsr"><div class="modal" style="width:min(460px,100%)">
+  <div class="mh"><h4>계정 삭제</h4>
+    <p id="duWho"></p></div>
+  <div class="mb">
+    <div class="warnbox">
+      <b>되돌릴 수 없습니다.</b> 명부에서 사라지고 로그인도 막힙니다.<br>
+      잠시 쉬는 것이라면 <b>중지</b>가 맞습니다 — 자리는 남기고 문만 잠급니다.
+    </div>
+    <div id="duFoot" class="dim" style="margin-bottom:12px"></div>
+    <label class="ndline" style="margin-bottom:6px">
+      <input type="checkbox" id="duPurge">
+      <span>이 사람의 <b>대화·올린 파일·기억</b>도 함께 지우기</span>
+    </label>
+    <div class="dim">
+      체크하지 않으면 기록은 남습니다. 나중에 <b>같은 아이디로 계정을 다시 만들면
+      그 사람이 이 기록을 보게 됩니다.</b> 사번을 다시 쓰는 회사라면 체크하세요.<br>
+      관리 이력(누가 언제 무엇을 바꿨나)은 어느 쪽이든 남습니다. 회사의 기록입니다.
+    </div>
+  </div>
+  <div class="mmsg" id="duMsg"></div>
+  <div class="mf"><button class="ghost" data-close>취소</button>
+    <button class="redbtn" id="duOk">영구 삭제</button></div>
+</div></div>
+
+<div class="mask" id="mConf"><div class="modal" style="width:min(390px,100%)">
+  <div class="mh"><h4 id="cTitle">확인</h4><p id="cDesc"></p></div>
+  <div class="mf" style="border-top:0;padding-top:20px">
+    <button class="ghost" data-close>취소</button>
+    <button class="redbtn" id="cOk">확인</button></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+const KEY = "portal.jwt";
+const TOKEN = localStorage.getItem(KEY) || "";
+if(!TOKEN) location.replace("/login");
+function reveal(){ document.documentElement.classList.remove("booting"); }
+const H = { Authorization:"Bearer "+TOKEN, "Content-Type":"application/json" };
+/* 파일을 올릴 때 쓰는 헤더. **Content-Type 을 넣으면 안 된다.**
+   FormData 는 브라우저가 경계 문자열(boundary)을 붙여서 스스로 정해야 하는데,
+   우리가 application/json 이라고 박아 두면 그걸 못 붙인다. 서버는 본문을
+   읽지 못하고 422 만 돌려준다 — 파일이 잘못된 것처럼 보이지만 파일 잘못이 아니다. */
+const HFILE = { Authorization:"Bearer "+TOKEN };
+
+/* 서버가 보낸 오류를 사람이 읽을 문장으로.
+   FastAPI 의 검증 오류는 detail 이 객체 배열이라, 그대로 화면에 넣으면
+   "[object Object]" 가 뜬다. */
+/* 응답을 안전하게 읽는다.
+
+   서버가 500 을 내면 본문이 JSON 이 아니라 그냥 "Internal Server Error"
+   글자다. 그걸 r.json() 으로 읽으면 파싱 오류가 나고, 화면에는
+   'Unexpected token I ... is not valid JSON' 이라는 **엉뚱한 말**이 뜬다.
+   진짜 문제(서버가 터졌다)는 가려진다. */
+async function readBody(r){
+  const t = await r.text().catch(()=>"");
+  try{ return JSON.parse(t); }
+  catch(e){
+    if(r.status >= 500)
+      return { detail: `서버에서 오류가 났습니다 (HTTP ${r.status}). `
+                     + `docker logs portal --tail 40 으로 원인을 볼 수 있습니다.` };
+    return { detail: (t || "").slice(0, 200) || `요청이 실패했습니다 (HTTP ${r.status}).` };
+  }
+}
+
+function errText(j, fallback){
+  const d = j && j.detail;
+  if(typeof d === "string") return d;
+  if(Array.isArray(d)){
+    const one = d[0] || {};
+    return one.msg ? `${one.msg} (${(one.loc||[]).join(" › ")})` : (fallback || "요청이 올바르지 않습니다.");
+  }
+  if(d && d.msg) return d.msg;
+  return fallback || "요청이 올바르지 않습니다.";
+}
+
+let SVC = [], DEPTS = [], ALLUSERS = [], USERS = [], AUDIT = [], USAGE = [], DEPTINFO = [];
+let editSvc = null, editUsr = null, accSvc = null, pwTarget = null, confirmFn = null;
+let editDep = null;
+let accSel = { depts:new Set(), users:new Set(), excluded:new Set(), ips:[], mgrs:new Set() };
+
+const $ = id => document.getElementById(id);
+const el = (t,c,x)=>{ const e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; };
+function toast(t, bad){ const n=$("toast"); n.textContent=t; n.className = bad?"on bad":"on";
+  setTimeout(()=>n.className="", 2800); }
+function open(id){ $(id).classList.add("on"); }
+function closeAll(){ document.querySelectorAll(".mask").forEach(m=>m.classList.remove("on"));
+  document.querySelectorAll(".mmsg").forEach(m=>m.classList.remove("on")); }
+function merr(id,t){ const m=$(id); m.textContent=t; m.classList.add("on"); }
+/* 이름·부서는 사람이 채운 값이다. 엑셀 명부에 <> 가 섞여 들어와도
+   화면이 깨지거나 스크립트가 되지 않게 한다. */
+function esc(v){
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeAll);
+/* 바깥을 눌러서 닫기 — 다만 **누르기 시작한 곳도 바깥이어야** 한다.
+   입력칸에서 글자를 끌어 선택하다 손이 모달 밖으로 나가면 브라우저는
+   그 뗀 자리를 기준으로 클릭을 만든다. 그래서 예전에는 고치던 내용이
+   통째로 날아갔다. 한두 번이 아니었다.
+
+   누르기 시작한 곳을 기억해 두고, 그것도 바깥일 때만 닫는다. */
+document.querySelectorAll(".mask").forEach(m=>{
+  let pressedOutside = false;
+  m.addEventListener("mousedown", e=>{ pressedOutside = (e.target === m); });
+  m.addEventListener("click", e=>{
+    if (e.target === m && pressedOutside) closeAll();
+    pressedOutside = false;
+  });
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeAll(); });
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); $("p-"+b.dataset.tab).classList.add("on");
+  if(b.dataset.tab==="aud" || b.dataset.tab==="usg") loadAudit();
+  if(b.dataset.tab==="usr") loadUsers();
+  if(b.dataset.tab==="dep") loadDepts();
+  if(b.dataset.tab==="cost") loadCost();
+});
+
+async function api(url, opt){
+  const r = await fetch(url, { headers:H, ...opt });
+  if(r.status===401){ localStorage.removeItem(KEY); location.replace("/login"); return null; }
+  if(r.status===403){ document.body.innerHTML =
+    '<div style="padding:70px;text-align:center;color:#5f6470">관리자 권한이 필요합니다. '
+    +'<a href="/">포탈로</a></div>'; reveal(); return null; }
+  // 서버가 제대로 답했다 = 로그인도 됐고 관리자도 맞다. 이제 보여준다.
+  reveal();
+  const j = await readBody(r);
+  if(!r.ok) throw new Error(errText(j, "요청에 실패했습니다."));
+  return j;
+}
+
+/* ── 서비스 ── */
+async function loadServices(){
+  const j = await api("/api/admin/services"); if(!j) return;
+  SVC = j.services; DEPTS = j.departments; ALLUSERS = j.users;
+  const box = $("svcList"); box.innerHTML = "";
+  if(!SVC.length){
+    const e = el("div","emptybox");
+    e.appendChild(el("div","t","등록된 서비스가 없습니다"));
+    e.appendChild(el("div","d",
+      "＋ 서비스 추가 로 사내 앱을 등록하세요. 여기 등록한 것만 직원 화면과 챗에 나옵니다."));
+    const btn = el("button","sm","예시 4개 넣어보기");
+    btn.onclick = async ()=>{
+      try{ const r = await api("/api/admin/services/examples", {method:"POST"});
+        toast(`예시 ${r.added}개를 넣었습니다. 실제로 쓰지 않을 것은 삭제하세요.`);
+        loadServices();
+      }catch(err){ toast(err.message, true); }
+    };
+    e.appendChild(btn);
+    box.appendChild(e); return;
+  }
+
+  /* 새로 등록된 것(설정 필요)을 맨 위에 따로 모은다.
+     섞여 있으면 서비스가 열 개쯤 됐을 때 "새로 올라온 게 있나?" 를
+     눈으로 훑어야 한다. 손봐야 할 것이 먼저 보여야 한다. */
+  const fresh = [], done = [];
+
+  SVC.forEach((s,i)=>{
+    const c = el("div","card"), row = el("div","shead");
+    const dot = el("div","dotc"); dot.style.background = s.color; row.appendChild(dot);
+
+    const tt = el("div","tt");
+    tt.appendChild(el("b","",s.name));
+    tt.appendChild(el("span","chip "+(s.access==="all"?"all":"res"),
+      s.access==="all" ? "전 직원" : "부서/개인 지정"));
+    // 앱이 스스로 등록했지만 관리자가 아직 손대지 않은 상태.
+    // "중지"로만 표시하면 일부러 꺼둔 것과 구분이 안 된다.
+    const untouched = !s.enabled && s.access === "restricted" &&
+      !(s.allowed_depts||[]).length && !(s.allowed_users||[]).length;
+    if(untouched) tt.appendChild(el("span","chip new","설정 필요"));
+    else if(!s.enabled) tt.appendChild(el("span","chip off","중지"));
+    row.appendChild(tt);
+    if(untouched) c.classList.add("needs-setup");
+
+    const ctr = el("div","ctr");
+    const sw = el("label","sw"); const chk=document.createElement("input");
+    chk.type="checkbox"; chk.checked=s.enabled;
+    chk.onchange = async ()=>{
+      try{
+        // 범위가 하나도 없는 서비스를 켜면 아무에게도 안 보인다.
+        // 켰는데 안 보이면 "고장났나?" 가 된다. 켤 때 전 직원으로 연다.
+        // (좁히려면 접근 범위 설정에서 바꾸면 된다 — 되돌리기 쉬운 쪽으로 둔다)
+        const empty = s.access === "restricted" &&
+          !(s.allowed_depts||[]).length && !(s.allowed_users||[]).length;
+        if(chk.checked && empty){
+          await api(`/api/admin/services/${s.id}/access`, { method:"PATCH",
+            body: JSON.stringify({ access:"all", allowed_depts:[], allowed_users:[],
+                                   excluded_users:[], allowed_ips:s.allowed_ips||[],
+                                   managers:s.managers||[] }) });
+        }
+        await api(`/api/admin/services/${s.id}/enabled`, { method:"PATCH",
+          body: JSON.stringify({ active: chk.checked }) });
+        toast(!chk.checked ? "중지했습니다."
+              : empty ? "켰습니다. 전 직원이 볼 수 있습니다 — 좁히려면 접근 범위 설정에서 바꾸세요."
+                      : "사용으로 변경했습니다.");
+        loadServices();
+      }catch(e){ toast(e.message,true); chk.checked=!chk.checked; }
+    };
+    sw.appendChild(chk); sw.appendChild(document.createElement("i"));
+    ctr.appendChild(sw);
+
+    // 순서 이동은 하나의 조작이므로 붙이고, 편집 버튼 묶음과는 띄운다
+    const ord = el("div","btns");
+    const up = el("button","sm icon","↑"); up.title="위로";
+    up.onclick = ()=> move(s.id,-1); up.disabled = i===0;
+    const dn = el("button","sm icon","↓"); dn.title="아래로";
+    dn.onclick = ()=> move(s.id,1); dn.disabled = i===SVC.length-1;
+    ord.appendChild(up); ord.appendChild(dn);
+
+    const act = el("div","btns");
+    const b1 = el("button","sm","접근 범위 설정"); b1.onclick = ()=> openAccess(s);
+    const b2 = el("button","sm","수정"); b2.onclick = ()=> openSvc(s);
+    const b3 = el("button","sm danger","삭제"); b3.onclick = ()=> askDeleteSvc(s);
+    [b1,b2,b3].forEach(x=>act.appendChild(x));
+
+    ctr.appendChild(ord); ctr.appendChild(act);
+    row.appendChild(ctr);
+    c.appendChild(row);
+
+    if(s.url) c.appendChild(el("div","path",s.url));
+    if(s.description) c.appendChild(el("div","desc",s.description));
+    const sc = el("div","scope");
+    sc.appendChild(el("b","","접근 범위"));
+    sc.appendChild(el("div","",s.access_desc));
+    sc.appendChild(el("b","","담당자"));
+    sc.appendChild(el("div","",s.manager_desc));
+    c.appendChild(sc);
+
+    (untouched ? fresh : done).push(c);
+  });
+
+  // 손봐야 할 것을 먼저 보여준다
+  if(fresh.length){
+    const h = el("div","sechead");
+    h.appendChild(el("b","", "새로 등록된 서비스 " + fresh.length + "개"));
+    h.appendChild(el("span","",
+      "앱이 스스로 등록했습니다. 접근 범위를 정하고 켜야 직원에게 보입니다."));
+    box.appendChild(h);
+    fresh.forEach(c => box.appendChild(c));
+  }
+  if(done.length){
+    if(fresh.length){
+      const h2 = el("div","sechead");
+      h2.appendChild(el("b","", "쓰고 있는 서비스 " + done.length + "개"));
+      box.appendChild(h2);
+    }
+    done.forEach(c => box.appendChild(c));
+  }
+}
+
+async function move(id,d){ await api(`/api/admin/services/${id}/move?direction=${d}`,{method:"PATCH"}); loadServices(); }
+
+function openSvc(s){
+  editSvc = s || null;
+  $("svcTitle").textContent = s ? "서비스 수정" : "서비스 추가";
+  $("sId").value = s ? s.id : ""; $("sId").disabled = !!s;
+  $("sName").value = s ? s.name : "";
+  $("sUrl").value = s ? s.url : "";
+  $("sDesc").value = s ? s.description : "";
+  $("sKw").value = s ? s.keywords : "";
+  $("sColor").value = s ? s.color : "#1f4e79";
+  open("mSvc"); setTimeout(()=>(s?$("sName"):$("sId")).focus(), 60);
+}
+$("svcAdd").onclick = ()=> openSvc(null);
+$("sOk").onclick = async ()=>{
+  const payload = { id:$("sId").value.trim(), name:$("sName").value.trim(),
+    url:$("sUrl").value.trim(), description:$("sDesc").value.trim(),
+    keywords:$("sKw").value.trim(), color:$("sColor").value,
+    enabled: editSvc ? editSvc.enabled : true };
+  if(!payload.id || !payload.name) return merr("sMsg","ID와 이름을 입력하세요.");
+  try{
+    if(editSvc) await api(`/api/admin/services/${editSvc.id}`, {method:"PATCH", body:JSON.stringify(payload)});
+    else await api("/api/admin/services", {method:"POST", body:JSON.stringify(payload)});
+    closeAll(); toast(editSvc?"수정했습니다.":"서비스를 등록했습니다."); loadServices();
+  }catch(e){ merr("sMsg", e.message); }
+};
+function askDeleteSvc(s){
+  $("cTitle").textContent = "서비스 삭제";
+  $("cDesc").textContent = `${s.name} 을 삭제합니다. 이 서비스에 연결된 챗 도구도 함께 잠깁니다.`;
+  confirmFn = async ()=>{
+    try{ await api(`/api/admin/services/${s.id}`, {method:"DELETE"});
+      toast("삭제했습니다."); loadServices(); }catch(e){ toast(e.message,true); }
+  };
+  open("mConf");
+}
+$("cOk").onclick = ()=>{ const f=confirmFn; closeAll(); if(f) f(); };
+
+/* ── 접근 범위 ── */
+function openAccess(s){
+  accSvc = s;
+  accSel = { depts:new Set(s.allowed_depts), users:new Set(s.allowed_users),
+             excluded:new Set(s.excluded_users), ips:[...s.allowed_ips],
+             mgrs:new Set(s.managers || []) };
+  $("accWho").textContent = s.name;
+  document.querySelectorAll('#accMode input').forEach(r=>{
+    r.checked = r.value === s.access;
+    r.parentElement.classList.toggle("on", r.checked);
+    r.onchange = ()=>{
+      document.querySelectorAll('#accMode label').forEach(l=>l.classList.remove("on"));
+      r.parentElement.classList.add("on");
+      $("accDetail").style.display = r.value==="restricted" ? "" : "none";
+    };
+  });
+  $("accDetail").style.display = s.access==="restricted" ? "" : "none";
+  renderDepts(); renderTags();
+  $("accUserQ").value=""; $("accUserHits").innerHTML="";
+  $("accMgrQ").value=""; $("accMgrHits").innerHTML="";
+  open("mAcc");
+}
+/* 부서 칸의 체크 상태만 다시 맞춘다.
+   개인 지정을 다른 곳(태그 ×, 검색 추가)에서 바꿔도 이 목록이 따라와야
+   한다. renderDepts() 를 다시 부르면 펼쳐 둔 부서가 도로 접혀서,
+   사람을 고르던 중에 자리를 잃는다. */
+let DEPT_SYNCS = [];
+function syncDepts(){ DEPT_SYNCS.forEach(fn => { try{ fn(); }catch(e){} }); }
+
+function renderDepts(){
+  const box = $("accDepts"); box.innerHTML=""; DEPT_SYNCS = [];
+  if(!DEPTS.length){ box.appendChild(el("div","dim","등록된 부서가 없습니다. 사용자 명부에서 부서를 지정하세요.")); return; }
+  DEPTS.forEach(d=>{
+    const members = ALLUSERS.filter(u=>u.dept===d);
+    const wrap = el("div","dept");
+    const top = el("div","top");
+    const lab = document.createElement("label");
+    const cb = document.createElement("input"); cb.type="checkbox";
+    cb.checked = accSel.depts.has(d);
+    lab.appendChild(cb); lab.appendChild(el("span","",d));
+    top.appendChild(lab);
+    const cnt = el("span","cnt",`${members.length}명 ▾`);
+    cnt.onclick = ()=>{
+      const opened = wrap.classList.toggle("open");
+      cnt.textContent = `${members.length}명 ` + (opened ? "▴" : "▾");
+      // 펼친 인원이 상자 밖으로 밀리면 직접 굴려야 한다. 대신 굴려 준다.
+      if(opened) setTimeout(()=>wrap.scrollIntoView({block:"nearest"}), 0);
+    };
+    top.appendChild(cnt);
+    wrap.appendChild(top);
+
+    /* 부서를 체크했든 안 했든 **체크 = 이 사람은 이 앱을 쓸 수 있다** 로
+       뜻을 하나로 맞춘다. 안에서 하는 일만 다르다.
+
+         부서 체크 O  →  체크를 풀면 그 사람만 제외 (excluded)
+         부서 체크 X  →  체크한 사람만 개인으로 추가 (users)
+
+       예전에는 부서를 체크해야만 인원이 보였다. 그래서 "이 팀에서 세 명만"
+       같은 흔한 경우에 부서를 켰다가 나머지를 일일이 빼야 했고,
+       팀마다 권한이 다르면 그 짓을 팀 수만큼 반복해야 했다. */
+    const mem = el("div","mem");
+    const note = el("div","dim","");
+    mem.appendChild(note);
+    const boxes = [];
+    members.forEach(u=>{
+      const l = document.createElement("label");
+      const c2 = document.createElement("input"); c2.type="checkbox";
+      c2.onchange = ()=>{
+        if(cb.checked){
+          // 부서 전체가 들어와 있다. 체크를 푸는 것은 그 사람만 빼는 것.
+          c2.checked ? accSel.excluded.delete(u.user_id)
+                     : accSel.excluded.add(u.user_id);
+        }else{
+          // 부서는 안 들어와 있다. 체크하는 것은 그 사람만 넣는 것.
+          c2.checked ? accSel.users.add(u.user_id)
+                     : accSel.users.delete(u.user_id);
+          renderTags();          // 위쪽 「개인 지정」 칸과 늘 같아야 한다
+        }
+      };
+      l.appendChild(c2); l.appendChild(el("span","", u.name || u.user_id));
+      // 관리자는 체크를 풀어도 계속 보인다. 그 사실을 여기서 알려준다.
+      // (이걸 모르면 "제외했는데 왜 보이지?" 로 한참 헤맨다)
+      if(u.is_admin){
+        const m = el("span","admark","관리자");
+        m.title = "포털 관리자입니다. 체크를 풀어도 이 앱이 계속 보입니다.";
+        l.appendChild(m);
+      }
+      // 부서로 들어온 사람도 여기서 바로 담당자로 지정할 수 있다
+      l.appendChild(mgrStar(u.user_id));
+      mem.appendChild(l); boxes.push({ l, c2, uid: u.user_id });
+    });
+
+    /* 부서 체크 상태가 바뀌면 아래 체크들의 **뜻**이 바뀐다.
+       그래서 표시도 그때마다 다시 맞춰 준다. */
+    const sync = ()=>{
+      const on = cb.checked;
+      note.textContent = on
+        ? "체크를 풀면 그 사람만 제외됩니다."
+        : "체크한 사람만 개인으로 들어갑니다. 팀 전체면 위의 부서를 체크하세요.";
+      boxes.forEach(({l,c2,uid})=>{
+        c2.disabled = false;                       // 이제 잠그지 않는다
+        l.style.display = "";                      // 늘 보인다
+        c2.checked = on ? !accSel.excluded.has(uid)
+                        : accSel.users.has(uid);
+      });
+    };
+    cb.onchange = ()=>{
+      cb.checked ? accSel.depts.add(d) : accSel.depts.delete(d);
+      // 부서를 껐다면 그 부서에 걸려 있던 제외 표시도 함께 정리한다.
+      if(!cb.checked) members.forEach(u=>accSel.excluded.delete(u.user_id));
+      sync();
+      renderTags();      // 개인 지정과 겹치는지 표시가 달라진다
+      syncDepts();       // 다른 부서 칸의 「부서로도 포함됨」 표시도 함께
+    };
+    sync();
+    DEPT_SYNCS.push(sync);
+
+    wrap.appendChild(mem);
+    box.appendChild(wrap);
+  });
+}
+function renderTags(){
+  const ub = $("accUserTags"); ub.innerHTML="";
+  if(!accSel.users.size) ub.appendChild(el("span","dim","추가된 개인이 없습니다."));
+  accSel.users.forEach(uid=>{
+    const u = ALLUSERS.find(x=>x.user_id===uid);
+    // 나중에 부서를 체크해서 겹치게 된 경우가 있다. 지우지는 않고 알려만 준다 —
+    // 부서 체크를 다시 풀면 이 개인 지정이 살아나야 하기 때문이다.
+    const dept = coveredBy(uid);
+    const t = el("span","tag", (u ? (u.name||uid) : uid)
+                 + (u&&u.dept ? ` · ${u.dept}` : "")
+                 + (dept ? " · 부서로도 포함됨" : ""));
+    if(dept) t.style.opacity = ".6";
+    t.appendChild(mgrStar(uid));
+    const b = el("button","","×");
+    // 부서 칸에서 체크해서 넣은 사람일 수 있다. 거기 체크도 같이 풀어 준다.
+    b.onclick=()=>{ accSel.users.delete(uid); renderTags(); syncDepts(); };
+    t.appendChild(b); ub.appendChild(t);
+  });
+  const mb = $("accMgrTags"); mb.innerHTML="";
+  if(!accSel.mgrs.size) mb.appendChild(el("span","dim",
+    "지정된 담당자가 없습니다. 관리자만 삭제할 수 있습니다. "
+    + "위 이름 옆의 ☆ 를 누르면 그 사람이 담당자가 됩니다."));
+  accSel.mgrs.forEach(uid=>{
+    const u = ALLUSERS.find(x=>x.user_id===uid);
+    const t = el("span","tag", (u ? (u.name||uid) : uid) + (u&&u.dept ? ` · ${u.dept}` : ""));
+    const b = el("button","","×"); b.onclick=()=>{ accSel.mgrs.delete(uid); renderTags(); };
+    t.appendChild(b); mb.appendChild(t);
+  });
+
+  const ib = $("accIpTags"); ib.innerHTML="";
+  if(!accSel.ips.length) ib.appendChild(el("span","dim","등록된 IP가 없습니다."));
+  accSel.ips.forEach((ip,i)=>{
+    const t = el("span","tag",ip);
+    const b = el("button","","×"); b.onclick=()=>{ accSel.ips.splice(i,1); renderTags(); };
+    t.appendChild(b); ib.appendChild(t);
+  });
+}
+/* 이름 옆의 별표 — 누르면 그 사람이 담당자가 된다.
+
+   담당자는 대개 **접근 범위 안에 있는 사람**이다. 그런데 예전에는
+   담당자를 따로 검색해서 또 골라야 했다. 같은 사람인데 두 번 찾는 것이고,
+   직원이 500명이면 그 검색이 더 번거롭다.
+
+   이미 화면에 떠 있는 이름 옆에서 한 번 누르면 되게 한다.
+   접근 범위 밖의 사람을 담당자로 두어야 하는 드문 경우를 위해
+   아래 검색은 그대로 남겨 둔다. */
+function paintStar(b){
+  const on = accSel.mgrs.has(b.dataset.uid);
+  b.className = "star" + (on ? " on" : "");
+  b.textContent = on ? "★" : "☆";
+  b.title = on ? "담당자입니다. 누르면 해제" : "담당자로 지정";
+}
+function mgrStar(uid){
+  const b = el("button","star");
+  b.dataset.uid = uid;
+  paintStar(b);
+  b.onclick = (e)=>{
+    e.stopPropagation();
+    accSel.mgrs.has(uid) ? accSel.mgrs.delete(uid) : accSel.mgrs.add(uid);
+    /* 예전에는 여기서 renderDepts() 로 부서 목록을 통째로 다시 그렸다.
+       그러면 **펼쳐 둔 팀이 도로 접힌다.** 팀을 펼쳐 사람을 고르다가
+       담당자 하나 지정하면 자리를 잃는 셈이라, 별만 다시 칠한다. */
+    document.querySelectorAll('#accDepts .star[data-uid]').forEach(paintStar);
+    renderTags();
+  };
+  return b;
+}
+
+/* 부서를 체크해서 이미 들어온 사람인가.
+   부서 체크와 개인 추가는 서로 모르는 채로 돌아가서, 같은 사람이 양쪽에
+   담기는 일이 생겼다. 겹쳐 담아도 결과는 같지만 화면이 거짓말을 한다 —
+   "개인 지정 3명" 이라고 적혀 있는데 실제로는 부서 전체가 들어와 있다.
+   더 나쁜 경우는 제외해 둔 사람을 개인으로 추가했을 때다. 서버는
+   **제외를 먼저 본다**(app/access.py). 추가한 것처럼 보이지만 안 들어간다. */
+function coveredBy(uid){
+  const u = ALLUSERS.find(x=>x.user_id===uid);
+  return (u && u.dept && accSel.depts.has(u.dept)) ? u.dept : null;
+}
+
+$("accUserQ").oninput = e=>{
+  const q = e.target.value.trim().toLowerCase();
+  const box = $("accUserHits"); box.innerHTML="";
+  if(!q) return;
+  ALLUSERS.filter(u=>!accSel.users.has(u.user_id) &&
+      ((u.name||"").toLowerCase().includes(q) || u.user_id.toLowerCase().includes(q)))
+    .slice(0,6).forEach(u=>{
+      const dept = coveredBy(u.user_id);
+      const off  = dept && accSel.excluded.has(u.user_id);
+
+      if(dept && !off){
+        // 이미 부서로 들어와 있다. 또 담을 이유가 없으니 이유를 보여주고 막는다.
+        const b = el("button","sm", `${u.name||u.user_id} · 이미 ${dept}으로 포함됨`);
+        b.style.margin="0 5px 5px 0"; b.disabled = true; b.style.opacity=".55";
+        b.style.cursor="default";
+        box.appendChild(b);
+        return;
+      }
+
+      const b = el("button","sm",
+        `${u.name||u.user_id} · ${u.dept||"부서 없음"}` + (off ? " (제외 해제)" : ""));
+      b.style.margin="0 5px 5px 0";
+      b.onclick = ()=>{
+        if(off){
+          // 제외해 둔 사람을 다시 넣겠다는 뜻이다. 개인 목록에 담아 봐야
+          // 제외가 이기므로, 제외를 푸는 것이 실제로 원하는 결과다.
+          accSel.excluded.delete(u.user_id);
+          renderDepts();
+          toast(`${u.name||u.user_id} 님을 ${dept} 제외에서 풀었습니다.`);
+        } else {
+          accSel.users.add(u.user_id);
+        }
+        $("accUserQ").value=""; box.innerHTML=""; renderTags(); syncDepts();
+      };
+      box.appendChild(b);
+    });
+};
+$("accMgrQ").oninput = e=>{
+  const q = e.target.value.trim().toLowerCase();
+  const box = $("accMgrHits"); box.innerHTML="";
+  if(!q) return;
+  ALLUSERS.filter(u=>!accSel.mgrs.has(u.user_id) &&
+      ((u.name||"").toLowerCase().includes(q) || u.user_id.toLowerCase().includes(q)))
+    .slice(0,6).forEach(u=>{
+      const b = el("button","sm", `${u.name||u.user_id} · ${u.dept||"부서 없음"}`);
+      b.style.margin="0 5px 5px 0";
+      b.onclick = ()=>{ accSel.mgrs.add(u.user_id); $("accMgrQ").value=""; box.innerHTML=""; renderTags(); };
+      box.appendChild(b);
+    });
+};
+$("accIpAdd").onclick = ()=>{
+  const v = $("accIp").value.trim();
+  if(v && !accSel.ips.includes(v)){ accSel.ips.push(v); $("accIp").value=""; renderTags(); }
+};
+$("accOk").onclick = async ()=>{
+  const mode = document.querySelector('#accMode input:checked').value;
+  try{
+    await api(`/api/admin/services/${accSvc.id}/access`, { method:"PATCH",
+      body: JSON.stringify({ access:mode, allowed_depts:[...accSel.depts],
+        allowed_users:[...accSel.users], excluded_users:[...accSel.excluded],
+        allowed_ips:accSel.ips, managers:[...accSel.mgrs] }) });
+    closeAll(); toast("접근 범위를 저장했습니다."); loadServices();
+  }catch(e){ merr("aMsg", e.message); }
+};
+
+/* ── 사용자 ── */
+async function loadUsers(){
+  const j = await api("/api/admin/users"); if(!j) return;
+  USERS = j.users; DEPTS = j.departments;
+  $("usrDept").innerHTML = '<option value="">전체 부서</option>' +
+    DEPTS.map(d=>`<option>${d}</option>`).join("");
+  fillDeptSelect();
+  drawUsers();
+}
+/* 정렬.
+   500명이 되면 검색만으로는 부족하다. "부서별로 모아 보기",
+   "한 번도 안 들어온 사람 찾기" 는 정렬이 있어야 된다.
+
+   ★ 우리말은 localeCompare 로 비교한다. 그냥 < > 로 하면 유니코드
+     번호순이라 "김/이/박" 이 우리가 아는 가나다순으로 안 나온다. */
+let SORT_KEY = "", SORT_DIR = 1;      // 1 오름차순, -1 내림차순
+
+function sortUsers(rows){
+  if(!SORT_KEY) return rows;
+  const k = SORT_KEY;
+  return rows.slice().sort(function(a, b){
+    let x = a[k], y = b[k];
+
+    // 참/거짓(관리자·상태)은 켜진 쪽을 앞으로
+    if(typeof x === "boolean" || typeof y === "boolean")
+      return ((y?1:0) - (x?1:0)) * SORT_DIR;
+
+    x = (x === null || x === undefined) ? "" : String(x);
+    y = (y === null || y === undefined) ? "" : String(y);
+
+    // 빈 값은 방향과 상관없이 **늘 뒤로**.
+    // 부서 없는 사람 스무 명이 맨 위를 차지하면 정렬한 보람이 없다.
+    if(!x && !y) return 0;
+    if(!x) return 1;
+    if(!y) return -1;
+
+    return x.localeCompare(y, "ko") * SORT_DIR;
+  });
+}
+
+function drawSortMarks(){
+  document.querySelectorAll("#usrTable th.sortable").forEach(function(th){
+    th.classList.remove("asc","desc");
+    if(th.dataset.sort === SORT_KEY) th.classList.add(SORT_DIR > 0 ? "asc" : "desc");
+  });
+}
+
+document.querySelectorAll("#usrTable th.sortable").forEach(function(th){
+  th.onclick = function(){
+    const k = th.dataset.sort;
+    // 같은 칸을 또 누르면 방향을 뒤집고, 세 번째에는 정렬을 푼다
+    if(SORT_KEY !== k){ SORT_KEY = k; SORT_DIR = 1; }
+    else if(SORT_DIR > 0){ SORT_DIR = -1; }
+    else { SORT_KEY = ""; SORT_DIR = 1; }
+    drawSortMarks(); drawUsers();
+  };
+});
+
+function drawUsers(){
+  const q = $("usrQ").value.trim().toLowerCase(), d = $("usrDept").value;
+  const rows = sortUsers(USERS.filter(u=>
+    (!d || u.dept===d) &&
+    (!q || u.user_id.toLowerCase().includes(q) || (u.name||"").toLowerCase().includes(q))));
+  $("usrCnt").textContent = `전체 ${rows.length}명`;
+  const tb = $("usrRows"); tb.innerHTML="";
+  rows.forEach(u=>{
+    const tr = document.createElement("tr");
+    tr.appendChild(el("td","mono",u.user_id));
+    tr.appendChild(el("td","",u.name || "-"));
+    tr.appendChild(el("td","",u.dept || "-"));
+
+    const ad = document.createElement("td");
+    const sw = el("label","sw"); const c=document.createElement("input");
+    c.type="checkbox"; c.checked=!!u.is_admin;
+    c.onchange = async ()=>{
+      try{ await api(`/api/admin/users/${u.user_id}`, { method:"PATCH",
+        body: JSON.stringify({ is_admin: c.checked }) });
+        toast(c.checked?"관리자로 지정했습니다.":"관리자를 해제했습니다."); loadUsers();
+      }catch(e){ toast(e.message,true); c.checked=!c.checked; }
+    };
+    sw.appendChild(c); sw.appendChild(document.createElement("i"));
+    ad.appendChild(sw); tr.appendChild(ad);
+
+    const st = document.createElement("td");
+    st.appendChild(el("span","chip "+(u.active?"all":"off"), u.active?"사용":"중지"));
+    if(u.must_change) st.appendChild(el("span","chip off","비번 변경 필요"));
+    tr.appendChild(st);
+
+    tr.appendChild(el("td","dim", u.last_login ? u.last_login.replace("T"," ").slice(0,16) : "-"));
+
+    const ac = document.createElement("td"); ac.className="right";
+    const box = el("div","btns");
+    const b1 = el("button","sm","수정"); b1.onclick=()=>openUsr(u);
+    const b2 = el("button","sm","비밀번호 초기화"); b2.onclick=()=>openPw(u);
+    const b3 = el("button","sm"+(u.active?" danger":""), u.active?"중지":"재개");
+    b3.onclick = ()=> toggleUsr(u);
+    const b4 = el("button","sm danger","삭제");
+    b4.onclick = ()=> openDelUsr(u);
+    [b1,b2,b3,b4].forEach(x=>box.appendChild(x));
+    ac.appendChild(box); tr.appendChild(ac);
+    tb.appendChild(tr);
+  });
+}
+$("usrQ").oninput = drawUsers; $("usrDept").onchange = drawUsers;
+
+function openUsr(u){
+  editUsr = u || null;
+  $("usrTitle").textContent = u ? "사용자 수정" : "사용자 추가";
+  $("usrHint").textContent = u ? `${u.user_id}` : "초기 비밀번호는 쉬운 것으로 줘도 됩니다.";
+  $("uId").value = u ? u.user_id : ""; $("uId").disabled = !!u;
+  $("uNm").value = u ? (u.name||"") : "";
+  // 부서가 지워졌거나 목록 도입 전 값이면 그대로 두되 눈에 띄게 표시한다
+  fillDeptSelect(u && u.dept);
+  $("uDept").value = u ? (u.dept||"") : "";
+  $("uAdmin").checked = u ? !!u.is_admin : false;
+  $("uPwWrap").style.display = u ? "none" : "";
+  $("uPw").value = "";
+  open("mUsr"); setTimeout(()=>(u?$("uNm"):$("uId")).focus(), 60);
+}
+$("usrAdd").onclick = ()=> openUsr(null);
+$("uGen").onclick = async ()=>{
+  try{ const j = await api("/api/admin/suggest-password"); if(j) $("uPw").value=j.password; }
+  catch(e){ merr("uMsg", e.message); }
+};
+$("uOk").onclick = async ()=>{
+  const name=$("uNm").value.trim(), dept=$("uDept").value.trim(), is_admin=$("uAdmin").checked;
+  try{
+    if(editUsr){
+      await api(`/api/admin/users/${editUsr.user_id}`, { method:"PATCH",
+        body: JSON.stringify({ name, dept, is_admin }) });
+      closeAll(); toast("수정했습니다.");
+    }else{
+      const user_id=$("uId").value.trim(), password=$("uPw").value;
+      if(!user_id || !name) return merr("uMsg","아이디와 이름을 입력하세요.");
+      if(password.length<8) return merr("uMsg","비밀번호는 8자 이상이어야 합니다.");
+      await api("/api/admin/users", { method:"POST",
+        body: JSON.stringify({ user_id, name, password, dept, is_admin }) });
+      closeAll(); toast(`${name} 계정 생성. 초기 비밀번호: ${password}`);
+    }
+    loadUsers(); loadServices();
+  }catch(e){ merr("uMsg", e.message); }
+};
+function openPw(u){ pwTarget=u; $("pWho").textContent=`${u.name||u.user_id} (${u.user_id})`;
+  $("pNew").value=""; open("mPw"); setTimeout(()=>$("pNew").focus(),60); }
+$("pGen").onclick = async ()=>{
+  try{ const j = await api("/api/admin/suggest-password"); if(j) $("pNew").value=j.password; }
+  catch(e){ merr("pMsg", e.message); }
+};
+$("pOk").onclick = async ()=>{
+  const password = $("pNew").value;
+  if(password.length<8) return merr("pMsg","비밀번호는 8자 이상이어야 합니다.");
+  try{
+    await api(`/api/admin/users/${pwTarget.user_id}/password`, { method:"PATCH",
+      body: JSON.stringify({ password }) });
+    closeAll(); toast(`초기화 완료. 전달할 비밀번호: ${password}`); loadUsers();
+  }catch(e){ merr("pMsg", e.message); }
+};
+function toggleUsr(u){
+  const on = !u.active;
+  const go = async ()=>{
+    try{ await api(`/api/admin/users/${u.user_id}/active`, { method:"PATCH",
+      body: JSON.stringify({ active:on }) });
+      toast(on?"다시 사용할 수 있습니다.":"계정을 중지했습니다."); loadUsers();
+    }catch(e){ toast(e.message,true); }
+  };
+  if(on) return go();
+  $("cTitle").textContent = "계정 사용 중지";
+  $("cDesc").textContent = `${u.name||u.user_id} 계정을 중지합니다. 다음 로그인부터 차단됩니다.`;
+  confirmFn = go; open("mConf");
+}
+
+/* 계정 삭제.
+   누르기 전에 무엇이 딸려 있는지 물어서 보여준다. 숫자가 없으면
+   사람은 그냥 누른다. "대화 12개" 가 보여야 손이 한 번 멈춘다. */
+let delUsr = null;
+
+async function openDelUsr(u){
+  delUsr = u;
+  $("duWho").textContent = `${u.name || ""} (${u.user_id})`;
+  $("duPurge").checked = false;
+  $("duMsg").classList.remove("on");
+  $("duFoot").textContent = "확인하는 중…";
+  open("mDelUsr");
+  try{
+    const j = await api(`/api/admin/users/${encodeURIComponent(u.user_id)}/footprint`);
+    if(!j) return;
+    const bits = [];
+    bits.push(`대화 ${j.chats}개`);
+    bits.push(`올린 파일 ${j.files}개`);
+    $("duFoot").innerHTML = bits.join(" · ")
+      + (j.services && j.services.length
+         ? '<br><br>접근 범위·담당자로 적혀 있는 서비스: <b>' + j.services.map(esc).join(", ")
+           + "</b> — 삭제하면 여기서도 빠집니다."
+         : "");
+  }catch(e){
+    $("duFoot").textContent = "";
+  }
+}
+
+$("duOk").onclick = async function(){
+  if(!delUsr) return;
+  const purge = $("duPurge").checked;
+  $("duOk").disabled = true; $("duOk").textContent = "지우는 중…";
+  try{
+    const j = await api(`/api/admin/users/${encodeURIComponent(delUsr.user_id)}`
+                        + `?purge=${purge ? "true" : "false"}`, { method:"DELETE" });
+    if(!j) return;
+    closeAll();
+    toast(`${delUsr.name || delUsr.user_id} 계정을 삭제했습니다.`
+          + (j.services && j.services.length ? ` (${j.services.join(", ")} 접근 범위에서도 뺐습니다)` : ""));
+    delUsr = null;
+    loadUsers();
+  }catch(e){
+    merr("duMsg", e.message || "지우지 못했습니다.");
+  }finally{
+    $("duOk").disabled = false; $("duOk").textContent = "영구 삭제";
+  }
+};
+
+/* ── 부서 ── */
+function fillDeptSelect(keep){
+  const cur = $("uDept");
+  const opts = ['<option value="">(부서 없음)</option>']
+    .concat(DEPTS.map(d=>`<option value="${d}">${d}</option>`));
+  // 목록에 없는 값이 이미 들어 있으면 지워지지 않게 살려 둔다.
+  // 조용히 빈칸이 되면 그 사람은 아무 서비스도 못 보게 된다.
+  if(keep && !DEPTS.includes(keep))
+    opts.push(`<option value="${keep}">${keep} (목록에 없음)</option>`);
+  cur.innerHTML = opts.join("");
+}
+
+async function loadDepts(){
+  const j = await api("/api/admin/departments"); if(!j) return;
+  DEPTINFO = j.departments;
+  DEPTS = DEPTINFO.map(d=>d.name);
+  const tb = $("depRows"); tb.innerHTML = "";
+  if(!DEPTINFO.length){
+    const tr = document.createElement("tr");
+    const td = el("td","dim","등록된 부서가 없습니다. 추가해 주세요.");
+    td.colSpan = 5; tr.appendChild(td); tb.appendChild(tr); return;
+  }
+  DEPTINFO.forEach((d,i)=>{
+    const tr = document.createElement("tr");
+    tr.appendChild(el("td","",d.name));
+    tr.appendChild(el("td","dim", d.users.length ? `${d.users.length}명` : "-"));
+
+    const sv = document.createElement("td");
+    if(d.services.length) d.services.forEach(n=>sv.appendChild(el("span","chip all",n)));
+    else sv.appendChild(el("span","dim","-"));
+    tr.appendChild(sv);
+
+    const mv = document.createElement("td");
+    const box = el("div","btns");
+    const up = el("button","sm icon","↑"); up.onclick=()=>moveDep(d.name,-1); up.disabled = i===0;
+    const dn = el("button","sm icon","↓"); dn.onclick=()=>moveDep(d.name,1);
+    dn.disabled = i===DEPTINFO.length-1;
+    box.appendChild(up); box.appendChild(dn); mv.appendChild(box); tr.appendChild(mv);
+
+    const ac = document.createElement("td"); ac.className="right";
+    const b = el("div","btns");
+    const e1 = el("button","sm","이름 변경"); e1.onclick=()=>openDep(d);
+    const inUse = d.users.length || d.services.length;
+    const e2 = el("button","sm"+(inUse?"":" danger"),"삭제");
+    e2.disabled = !!inUse;
+    e2.title = inUse ? "쓰고 있는 곳이 있어 삭제할 수 없습니다" : "";
+    e2.onclick = ()=>askDeleteDep(d);
+    b.appendChild(e1); b.appendChild(e2); ac.appendChild(b); tr.appendChild(ac);
+    tb.appendChild(tr);
+  });
+}
+async function moveDep(name,d){
+  await api(`/api/admin/departments/${encodeURIComponent(name)}/move?direction=${d}`,
+            {method:"PATCH"});
+  loadDepts();
+}
+function openDep(d){
+  editDep = d || null;
+  $("depTitle").textContent = d ? "부서명 변경" : "부서 추가";
+  $("depHint").textContent = d ? d.name : "";
+  $("dName").value = d ? d.name : "";
+  $("dNote").textContent = d
+    ? `이 이름을 쓰는 계정 ${d.users.length}명, 서비스 ${d.services.length}개도 함께 바뀝니다.`
+    : "사내에서 쓰는 표기 그대로 넣으세요.";
+  open("mDep"); setTimeout(()=>$("dName").focus(), 60);
+}
+$("depAdd").onclick = ()=> openDep(null);
+$("dOk").onclick = async ()=>{
+  const name = $("dName").value.trim();
+  if(!name) return merr("dMsg","부서명을 입력하세요.");
+  try{
+    if(editDep) await api(`/api/admin/departments/${encodeURIComponent(editDep.name)}`,
+      {method:"PATCH", body:JSON.stringify({name})});
+    else await api("/api/admin/departments", {method:"POST", body:JSON.stringify({name})});
+    closeAll(); toast(editDep?"부서명을 바꿨습니다.":"부서를 추가했습니다.");
+    loadDepts(); loadServices();
+  }catch(e){ merr("dMsg", e.message); }
+};
+function askDeleteDep(d){
+  $("cTitle").textContent = "부서 삭제";
+  $("cDesc").textContent = `${d.name} 을 삭제합니다.`;
+  confirmFn = async ()=>{
+    try{ await api(`/api/admin/departments/${encodeURIComponent(d.name)}`,{method:"DELETE"});
+      toast("삭제했습니다."); loadDepts(); }catch(e){ toast(e.message,true); }
+  };
+  open("mConf");
+}
+
+/* ── 이력 ── */
+/* ── 계정 한 번에 등록 ─────────────────────────────────────
+   두 걸음이다. 올리면 **읽기만** 하고 한 줄씩 판정을 보여준다.
+   보고 나서 "등록"을 눌러야 실제로 만든다.
+
+   500줄짜리 명부에 오타 몇 개는 늘 있다. 그대로 밀어 넣으면
+   "몇 명이 들어갔고 누가 빠졌는지"를 나중에 뒤져야 한다. */
+let BULK = [];
+
+const bulkFile = $("bulkFile");
+$("usrBulk").onclick = function(){
+  BULK = []; bulkFile.value = "";
+  $("bulkName").textContent = ""; $("bulkSum").textContent = "";
+  $("bulkWrap").style.display = "none"; $("bOk").disabled = true;
+  $("newDeptBox").style.display = "none"; $("newDeptOn").checked = false;
+  NEWDEPT = false;
+  $("bMsg").classList.remove("on");
+  $("mBulk").classList.add("on");
+};
+$("bulkPick").onclick = function(){ bulkFile.click(); };
+$("bulkTpl").onclick = async function(){
+  // fetch 로 받는다 — 그냥 링크로 열면 Authorization 헤더가 안 붙어 401 이 난다
+  try{
+    const r = await fetch("/api/admin/users/template", { headers:H });
+    if(!r.ok) throw 0;
+    const blob = await r.blob();
+    saveBlob(blob, "포털_계정_양식.csv");
+  }catch(e){ merr("bMsg", "양식을 받지 못했습니다."); }
+};
+
+function saveBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+/* 없는 부서를 함께 만들지. 체크를 바꾸면 **서버에 다시 물어본다** —
+   그래야 "그러면 몇 명이 되는지"가 바로 보인다. 화면에서 어림잡아
+   숫자를 고쳐 놓으면 서버 판정과 어긋나기 시작한다. */
+let NEWDEPT = false;
+
+async function bulkCheck(){
+  const f = bulkFile.files[0]; if(!f) return;
+  $("bMsg").classList.remove("on");
+  $("bulkSum").textContent = "읽는 중…";
+  try{
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("create_depts", NEWDEPT ? "true" : "false");
+    const r = await fetch("/api/admin/users/check", { method:"POST", headers:HFILE, body:fd });
+    const j = await readBody(r);
+    if(!r.ok) throw new Error(errText(j, "읽지 못했습니다."));
+
+    BULK = j.rows.filter(function(x){ return !x.problem; });
+
+    const nd = j.new_depts || [];
+    if(nd.length){
+      $("newDeptBox").style.display = "block";
+      $("newDeptCnt").textContent = "포털에 없는 부서 " + nd.length + "개도";
+      $("newDeptList").innerHTML = nd.map(function(d){
+        return "<span>" + esc(d) + "</span>";
+      }).join("");
+      $("newDeptOn").checked = NEWDEPT;
+    }else{
+      $("newDeptBox").style.display = "none";
+    }
+
+    $("bulkSum").innerHTML = "<b>" + j.ok + "명</b> 등록 가능"
+      + (j.admins ? " (관리자 " + j.admins + "명)" : "")
+      + (j.bad ? " · <b>" + j.bad + "줄</b>은 문제가 있어 건너뜁니다" : "");
+    $("bulkRows").innerHTML = j.rows.map(function(x){
+      const dept = esc(x.dept || "-") + (x.new_dept ? ' <span class="dim">(새 부서)</span>' : "");
+      return '<tr class="' + (x.problem ? "bad" : "") + '">'
+        + "<td>" + x.line + "</td><td>" + esc(x.user_id) + "</td><td>" + esc(x.name) + "</td>"
+        + "<td>" + dept + "</td><td>" + (x.is_admin ? "예" : "") + "</td>"
+        + "<td>" + (x.problem ? esc(x.problem) : "등록됨") + "</td></tr>";
+    }).join("");
+    $("bulkWrap").style.display = "block";
+    $("bOk").disabled = BULK.length === 0;
+  }catch(e){
+    $("bulkSum").textContent = "";
+    $("bulkWrap").style.display = "none";
+    $("newDeptBox").style.display = "none";
+    $("bOk").disabled = true;
+    merr("bMsg", e.message || "읽지 못했습니다.");
+  }
+}
+
+bulkFile.onchange = function(){
+  const f = bulkFile.files[0]; if(!f) return;
+  $("bulkName").textContent = f.name;
+  NEWDEPT = false;                    // 파일이 바뀌면 처음부터 다시 고르게 한다
+  $("newDeptOn").checked = false;
+  bulkCheck();
+};
+
+$("newDeptOn").onchange = function(){
+  NEWDEPT = this.checked;
+  bulkCheck();
+};
+
+$("bOk").onclick = async function(){
+  if(!BULK.length) return;
+  $("bOk").disabled = true; $("bOk").textContent = "만드는 중…";
+  try{
+    const j = await api("/api/admin/users/bulk",
+      { method:"POST", headers:{...H, "Content-Type":"application/json"},
+        body: JSON.stringify({rows: BULK, create_depts: NEWDEPT}) });
+    if(!j) return;
+    closeAll();
+    DONE = j.made;
+    const md = j.made_depts || [];
+    $("doneSum").innerHTML = "<b>" + j.made.length + "명</b> 등록"
+      + (j.failed.length ? " · " + j.failed.length + "명 실패" : "")
+      + (md.length ? " · 부서 " + md.length + "개 새로 만듦 ("
+                     + md.map(esc).join(", ") + ")" : "");
+    $("doneRows").innerHTML = j.made.map(function(m){
+      return "<tr><td>" + esc(m.user_id) + "</td><td>" + esc(m.name) + "</td>"
+        + "<td>" + esc(m.dept || "-") + '</td><td class="pw">' + esc(m.password) + "</td></tr>";
+    }).join("");
+    $("mBulkDone").classList.add("on");
+    loadUsers();
+  }catch(e){ merr("bMsg", e.message); }
+  finally{ $("bOk").disabled = false; $("bOk").textContent = "등록"; }
+};
+
+let DONE = [];
+$("doneCsv").onclick = function(){
+  const lines = ["아이디,이름,부서,초기 비밀번호"];
+  DONE.forEach(function(m){
+    lines.push([m.user_id, m.name, m.dept || "", m.password]
+      .map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(","));
+  });
+  // BOM 을 붙여야 엑셀이 한글을 CP949 로 잘못 읽지 않는다
+  saveBlob(new Blob(["\ufeff" + lines.join("\n")], {type:"text/csv;charset=utf-8"}),
+           "포털_초기비밀번호.csv");
+};
+
+/* ── AI 사용량 ────────────────────────────────────────────
+   토큰은 정확히 셀 수 있지만 **단가는 계약마다 다르다.**
+   그래서 .env 의 USAGE_PRICES 에 적어 둔 것이 있을 때만 금액을 보여준다.
+   모르는 값을 그럴싸하게 지어내는 것보다 "토큰은 이만큼 썼다"만
+   정확히 말하는 편이 낫다. */
+function nfmt(n){ return (n||0).toLocaleString("ko-KR"); }
+function won(v){ return v==null ? "—" : "₩" + nfmt(Math.round(v)); }
+function tok(n){
+  n = n || 0;
+  if(n >= 1000000) return (n/1000000).toFixed(1) + "M";
+  if(n >= 1000)    return Math.round(n/1000) + "K";
+  return String(n);
+}
+
+async function loadCost(){
+  const days = $("costDays").value;
+  const j = await api("/api/admin/usage?days=" + days);
+  if(!j) return;
+
+  const t = j.total;
+  const cards = [
+    ["부른 횟수", nfmt(t.calls) + "<small>회</small>"],
+    ["보낸 토큰", tok(t.prompt)],
+    ["받은 토큰", tok(t.completion)],
+  ];
+  if(j.priced) cards.push(["금액" + (j.all_priced ? "" : " (아는 것만)"), won(t.cost)]);
+  $("costSums").innerHTML = cards.map(function(c){
+    return '<div class="sum"><div class="k">'+c[0]+'</div><div class="v">'+c[1]+'</div></div>';
+  }).join("");
+
+  // 단가 안내 — 안 넣어 두면 "금액이 왜 안 보이지?" 가 된다
+  const note = $("costPrice");
+  if(!j.priced){
+    note.className = "notice";
+    note.innerHTML = '토큰 수만 보입니다. 금액까지 보려면 <code>.env</code> 에 '
+      + '<code>USAGE_PRICES=모델:입력단가,출력단가;…</code> 를 넣으세요 '
+      + '(100만 토큰당 원). 예: <code>USAGE_PRICES=openai/gpt-5-mini:350,2800</code>';
+  } else if(!j.all_priced){
+    note.className = "notice warn";
+    note.textContent = "단가를 모르는 모델이 섞여 있습니다. 금액은 아는 것만 더한 값이라 "
+      + "실제보다 적게 나옵니다. USAGE_PRICES 에 빠진 모델을 추가하세요.";
+  } else {
+    note.className = "notice";
+    note.textContent = "금액은 .env 의 USAGE_PRICES 로 계산한 것입니다. "
+      + "공급자 청구서와 다르면 단가를 확인하세요.";
+  }
+
+  // 날마다 — 빈 날도 자리를 차지해야 "쉬는 날"이 보인다
+  const chart = $("costChart");
+  const byDay = {}; j.daily.forEach(function(d){ byDay[d.day] = d; });
+  const cells = [];
+  const today = new Date();
+  for(let i = days - 1; i >= 0; i--){
+    const dt = new Date(today.getTime() - i*86400000);
+    const key = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0")
+              + "-" + String(dt.getDate()).padStart(2,"0");
+    cells.push(byDay[key] || {day:key, prompt:0, completion:0, calls:0, cost:null});
+  }
+  const max = Math.max(1, ...cells.map(function(c){ return c.prompt + c.completion; }));
+  chart.innerHTML = cells.length ? cells.map(function(c){
+    const total = c.prompt + c.completion;
+    const h = Math.round(total / max * 100);
+    const tip = c.day + " · " + nfmt(total) + "토큰 · " + nfmt(c.calls) + "회"
+              + (c.cost != null ? " · " + won(c.cost) : "");
+    return '<div class="bar1" data-tip="'+tip+'"><i style="height:'+h+'%"></i></div>';
+  }).join("") : '<div class="empty">아직 기록이 없습니다</div>';
+
+  const read = $("costRead");
+  read.innerHTML = '<span class="no">막대에 마우스를 올리면 그날 수치가 나옵니다</span>';
+  chart.onmouseover = function(e){
+    const bar = e.target.closest(".bar1");
+    if(bar) read.textContent = bar.dataset.tip;
+  };
+  chart.onmouseleave = function(){
+    read.innerHTML = '<span class="no">막대에 마우스를 올리면 그날 수치가 나옵니다</span>';
+  };
+
+  $("costKind").innerHTML = j.by_kind.length ? j.by_kind.map(function(r){
+    return "<tr><td>"+r.kind+(r.images ? ' <span class="dim">그림 '+nfmt(r.images)+'장</span>' : "")
+      + "</td><td>"+r.model+"</td>"
+      + '<td class="right">'+nfmt(r.calls)+"</td>"
+      + '<td class="right">'+nfmt(r.prompt)+"</td>"
+      + '<td class="right">'+nfmt(r.completion)+"</td>"
+      + '<td class="right">'+(j.priced ? won(r.cost) : "—")+"</td></tr>";
+  }).join("") : '<tr><td colspan="6" class="dim">아직 기록이 없습니다</td></tr>';
+
+  $("costUser").innerHTML = j.by_user.length ? j.by_user.map(function(r){
+    return "<tr><td>"+r.user_id+"</td>"
+      + '<td class="right">'+nfmt(r.calls)+"</td>"
+      + '<td class="right">'+nfmt(r.prompt)+"</td>"
+      + '<td class="right">'+nfmt(r.completion)+"</td></tr>";
+  }).join("") : '<tr><td colspan="4" class="dim">아직 기록이 없습니다</td></tr>';
+}
+document.getElementById("costDays").onchange = loadCost;
+
+/* 관리 이력과 챗 사용 기록을 따로 그린다.
+   한 표에 섞으면 직원이 무엇을 물었는지가 관리자 눈에 그대로 들어온다.
+   서버도 사용 기록에 질문 내용을 담아 보내지 않는다. */
+/* ── 이력 안쪽 탭 ── */
+document.querySelectorAll(".subtab").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".subtab").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".subpage").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); $("s-"+b.dataset.sub).classList.add("on");
+});
+
+/* 동작을 큰 묶음으로 나눈다.
+   드롭다운에 "부서 추가 / 부서 삭제 / 사용자 추가 / 사용자 수정 …" 이
+   열네 줄로 늘어서 있으면 무엇을 고를지부터 생각해야 한다.
+   묶음을 먼저 고르고, 세부가 필요하면 그 안에서 고르게 한다.
+
+   ★ 동작 이름으로 판정한다. 새 동작이 생겨도 이름만 맞으면 알아서 들어간다. */
+function actGroup(a){
+  if(/사용자|계정|비밀번호|로그인/.test(a)) return "사용자";
+  if(/부서/.test(a))                        return "부서";
+  if(/서비스|접근 범위|담당자/.test(a))      return "서비스";
+  if(/파일|첨부|업로드|다운로드/.test(a))    return "파일";
+  if(/조회|열람|보기/.test(a))               return "조회";
+  return "그 밖";
+}
+const GROUP_ORDER = ["사용자","부서","서비스","파일","조회","그 밖"];
+
+/* 어떤 도구가 어느 앱의 것인지. 서버가 내려준다. */
+let TOOLSVC = {};
+function usageServices(a){
+  const out = new Set();
+  (a.tools || []).forEach(t => out.add(TOOLSVC[t] || "포털"));
+  if(!out.size) out.add("포털");
+  return out;
+}
+
+/* 눌린 티를 낸다.
+   같은 내용이 다시 그려지면 화면은 아무것도 달라지지 않는다.
+   그래서 "언제 불러왔는지"를 남긴다 — 시각이 바뀌면 돌았다는 뜻이다. */
+function stamp(msg, bad){
+  const t = new Date();
+  const hh = String(t.getHours()).padStart(2,"0");
+  const mm = String(t.getMinutes()).padStart(2,"0");
+  const ss = String(t.getSeconds()).padStart(2,"0");
+  const txt = msg || `${hh}:${mm}:${ss} 기준`;
+  ["audStamp"].forEach(id=>{
+    const e = $(id); if(!e) return;
+    e.textContent = txt;
+    e.style.color = bad ? "var(--red, #c0392b)" : "";
+  });
+}
+
+async function loadAudit(){
+  ["audReload"].forEach(id=>{ const b=$(id); if(b) b.disabled = true; });
+  stamp("불러오는 중…");
+  let j = null;
+  try{
+    j = await api("/api/admin/audit");
+  }catch(e){
+    stamp("불러오지 못했습니다", true);
+  }finally{
+    ["audReload"].forEach(id=>{ const b=$(id); if(b) b.disabled = false; });
+  }
+  if(!j) return;
+  stamp();
+  AUDIT = j.audit || []; USAGE = j.usage || [];
+  const keep = (id, cur, list, label) => {
+    $(id).innerHTML = `<option value="">${label}</option>` +
+      list.map(x=>`<option${x===cur?" selected":""}>${x}</option>`).join("");
+  };
+  TOOLSVC = j.tool_services || {};
+  // 서버가 '포털' 을 넣어 주더라도 여기서 한 번 더 걸러 낸다.
+  // 화면이 맨 앞에 따로 넣기 때문에 그냥 두면 두 번 나온다.
+  const svcs = (j.services || []).filter(x => x && x !== "포털");
+  keep("audSvc", $("audSvc").value, ["포털"].concat(svcs), "전체 서비스");
+
+  // 채팅 이력의 서비스 목록은 실제로 쓰인 도구에서 뽑는다.
+  // 관리 이력과 목록이 다른 것이 맞다 — 챗에서 안 쓰인 앱은 여기 없다.
+  const used = new Set();
+  (j.usage || []).forEach(a => usageServices(a).forEach(v => used.add(v)));
+  keep("usgSvc", $("usgSvc").value,
+       Array.from(used).sort((x,y)=> x==="포털" ? -1 : y==="포털" ? 1 : x.localeCompare(y)),
+       "전체 서비스");
+  const pol = j.policy || {};
+  $("usgPolicy").textContent = pol.text_logging
+    ? `질문·답변이 기록됩니다. ${pol.log_days || 0}일 후 자동 삭제되며, `
+      + "관리자만 볼 수 있습니다."
+    : "질문·답변 원문 저장이 꺼져 있습니다(CHAT_LOG_TEXT=off). "
+      + "누가 언제 어떤 기능을 썼는지만 남습니다.";
+  $("usgPolicy").className = "notice";
+  drawActChips(); drawAudit(); drawUsage();
+}
+
+/* 동작 고르기.
+   ACT_G 는 큰 묶음(사용자·부서·…), ACT_A 는 그 안의 낱개 동작.
+   둘 다 비어 있으면 전부 보여준다. */
+let ACT_G = "", ACT_A = "";
+
+function chip(label, count, on, onclick){
+  const b = document.createElement("button");
+  b.className = "fchip" + (on ? " on" : "");
+  b.textContent = label;
+  if(count !== null){
+    const c = document.createElement("span");
+    c.className = "cnt"; c.textContent = count;
+    b.appendChild(c);
+  }
+  b.onclick = onclick;
+  return b;
+}
+
+/* 서비스·검색어까지 반영한 건수를 칩에 적는다.
+   "사용자 0" 이 보이면 굳이 눌러 볼 필요가 없다는 뜻이다. */
+// service 가 빈 값이면 포털 자체에서 일어난 일이다
+function svcOf(a){ return a.service || "포털"; }
+
+function baseRows(){
+  const q = $("audQ").value.trim().toLowerCase();
+  const sv = $("audSvc").value;
+  return AUDIT.filter(a =>
+    (!sv || svcOf(a) === sv) &&
+    (!q || (a.user_id + a.action + a.detail).toLowerCase().includes(q)));
+}
+
+function drawActChips(){
+  const rows = baseRows();
+  const top = $("actChips"); top.innerHTML = "";
+  const sub = $("actSub");   sub.innerHTML = "";
+
+  top.appendChild(chip("전체", rows.length, !ACT_G, ()=>{
+    ACT_G = ""; ACT_A = ""; drawActChips(); drawAudit();
+  }));
+
+  const byG = {};
+  rows.forEach(a => { const g = actGroup(a.action); (byG[g] ||= []).push(a); });
+  GROUP_ORDER.forEach(g=>{
+    const list = byG[g]; if(!list) return;
+    top.appendChild(chip(g, list.length, ACT_G === g, ()=>{
+      ACT_G = (ACT_G === g) ? "" : g; ACT_A = ""; drawActChips(); drawAudit();
+    }));
+  });
+
+  if(!ACT_G) return;
+
+  // 고른 묶음 안의 낱개 동작. 종류가 하나뿐이면 굳이 또 고르게 하지 않는다.
+  const kinds = {};
+  (byG[ACT_G] || []).forEach(a => { kinds[a.action] = (kinds[a.action] || 0) + 1; });
+  const names = Object.keys(kinds).sort();
+  if(names.length < 2) return;
+
+  sub.appendChild(chip("전체", null, !ACT_A, ()=>{
+    ACT_A = ""; drawActChips(); drawAudit();
+  }));
+  names.forEach(n=>{
+    sub.appendChild(chip(n, kinds[n], ACT_A === n, ()=>{
+      ACT_A = (ACT_A === n) ? "" : n; drawActChips(); drawAudit();
+    }));
+  });
+}
+function drawAudit(){
+  const rows = baseRows().filter(a =>
+    (!ACT_G || actGroup(a.action) === ACT_G) &&
+    (!ACT_A || a.action === ACT_A));
+  $("audCnt").textContent = `전체 ${rows.length}건`;
+  const tb = $("audRows"); tb.innerHTML="";
+  if(!rows.length){ const tr=document.createElement("tr");
+    const td=el("td","dim","기록이 없습니다."); td.colSpan=5; tr.appendChild(td);
+    tb.appendChild(tr); return; }
+  rows.forEach(a=>{
+    const tr = document.createElement("tr");
+    tr.appendChild(el("td","dim", a.created_at.replace("T"," ").slice(0,19)));
+    const sc = document.createElement("td");
+    sc.appendChild(el("span","chip "+(a.service?"all":"off"), svcOf(a)));
+    tr.appendChild(sc);
+    tr.appendChild(el("td","mono", a.user_id));
+    tr.appendChild(el("td","", a.action));
+    tr.appendChild(el("td","dim", a.detail));
+    tb.appendChild(tr);
+  });
+}
+function drawUsage(){
+  const q = $("usgQ").value.trim().toLowerCase();
+  const sv = $("usgSvc").value;
+  const rows = USAGE.filter(a=>
+    (!sv || usageServices(a).has(sv)) &&
+    (!q || (a.user_id + " " + a.tools.join(" ") + " " + (a.question||"")).toLowerCase().includes(q)));
+  $("usgCnt").textContent = `전체 ${rows.length}건`;
+  const tb = $("usgRows"); tb.innerHTML="";
+  if(!rows.length){ const tr=document.createElement("tr");
+    const td=el("td","dim","기록이 없습니다."); td.colSpan=4; tr.appendChild(td);
+    tb.appendChild(tr); return; }
+  rows.forEach(a=>{
+    const tr = document.createElement("tr");
+    tr.appendChild(el("td","dim", a.created_at.replace("T"," ").slice(0,19)));
+    tr.appendChild(el("td","mono", a.user_id));
+    tr.appendChild(el("td","qcell", a.question || "(기록 없음)"));
+    const td = document.createElement("td");
+    if(a.tools.length) a.tools.forEach(t=>td.appendChild(el("span","tool",t)));
+    else td.appendChild(el("span","dim","도구 없이 답변"));
+    tr.appendChild(td);
+    tb.appendChild(tr);
+
+    // 답변은 길어서 표를 무너뜨린다. 줄을 눌렀을 때만 펼친다.
+    if(a.reply){
+      const ans = document.createElement("tr");
+      ans.className = "answer";
+      const ac = document.createElement("td"); ac.colSpan = 4;
+      ac.appendChild(el("div","answerbox", a.reply));
+      ans.appendChild(ac); tb.appendChild(ans);
+      tr.style.cursor = "pointer";
+      tr.onclick = ()=> ans.classList.toggle("open");
+    }
+  });
+}
+$("audQ").oninput   = ()=>{ drawActChips(); drawAudit(); };
+$("audSvc").onchange = ()=>{ drawActChips(); drawAudit(); };
+$("usgQ").oninput = drawUsage;
+$("usgSvc").onchange = drawUsage;
+$("audReload").onclick = loadAudit;
+
+/* 들어오자마자 서버에 한 번 물어본다.
+
+   머리에서 한 검사는 토큰에 적힌 값이라, 로그인한 뒤에 벌어진 일
+   (비밀번호 초기화·권한 회수·계정 삭제)은 모른다. 서버는 안다.
+   관리자 API 는 어차피 매번 다시 검사하므로 여기서 막지 않아도
+   데이터가 새지는 않지만, 열려 있는 화면을 보여줄 이유도 없다. */
+(async function(){
+  try{
+    const j = await api("/api/me");
+    if(!j) return;
+    const me = j.user || {};
+    if(me.must_change){ location.replace("/password"); return; }
+    if(!me.is_admin){ location.replace("/"); return; }
+  }catch(e){ /* 통신이 안 되면 아래 조회가 어차피 실패한다 */ }
+  loadServices();
+  loadUsers();
+})();
+</script>
+<div class="scroll-nav" id="scrollNav">
+  <button id="toTopBtn" title="맨 위로">▲</button>
+  <button id="toBottomBtn" title="맨 아래로">▼</button>
+</div>
+<script>
+/* ── 오른쪽 아래 위/아래 버튼 ────────────────────────────────
+   서비스와 사용자가 늘수록 목록이 길어진다. 맨 위의 「포탈로 돌아가기」 를
+   누르려고 한참 굴려 올라가는 일이 없게 한다. 매뉴얼 화면과 같은 동작이다.
+   갈 수 있는 방향의 버튼만 나타난다 — 맨 위에서 ▲ 는 할 일이 없다. */
+(function(){
+  var top = document.getElementById("toTopBtn");
+  var bot = document.getElementById("toBottomBtn");
+  top.onclick = function(){ window.scrollTo({top:0, behavior:"smooth"}); };
+  bot.onclick = function(){
+    window.scrollTo({top:document.documentElement.scrollHeight, behavior:"smooth"});
+  };
+  function upd(){
+    var y = window.scrollY;
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    var long = max > 300;                 // 굴릴 것이 별로 없으면 아예 숨긴다
+    top.classList.toggle("show", long && y > 250);
+    bot.classList.toggle("show", long && y < max - 250);
+  }
+  addEventListener("scroll", upd, {passive:true});
+  addEventListener("resize", upd);
+  // 표를 다시 그리면 페이지 길이가 달라진다. 그때마다 다시 판단한다.
+  new MutationObserver(function(){ requestAnimationFrame(upd); })
+    .observe(document.body, {childList:true, subtree:true});
+  upd();
+})();
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# ★ 프로젝트 이름을 못 박는다.
+#
+#   docker compose 는 이름을 안 적으면 **폴더 이름**으로 프로젝트를 정한다.
+#   그런데 이 저장소를 받은 사람이 같은 이름의 폴더로 다른 것을 이미
+#   띄워 두었을 수 있다. 그러면 compose 가 남의 컨테이너를 이 프로젝트
+#   것으로 보고, `docker compose exec` 가 **엉뚱한 컨테이너 안에서** 돈다.
+#   실제로 그 상황을 겪었다 — 체험판 자료를 넣는 명령이 남의 앱 안에서
+#   실행됐다. 그때는 파일이 없어서 실패로 끝났지만, 있었으면 남의 데이터에
+#   가짜 자료가 들어갔을 것이다.
+#
+#   컨테이너 이름에 demo- 를 붙이는 것과는 다른 이야기다.
+#   그건 이름이 겹치지 않게 하는 것이고, 이건 **누구 것인지**를 정하는 것이다.
+name: demo-leave-anomaly
+
+services:
+  leave-anomaly:
+    build: .
+    container_name: demo-leave-anomaly
+    restart: unless-stopped
+    env_file:
+      - .env
+    # ports 는 쓰지 않는다. 앞단 nginx 가 /leave-anomaly/ 경로로 넘겨주므로
+    # 바깥 포트가 필요 없고, 앱마다 8080 을 열면 두 번째 앱부터 충돌한다.
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/data
+    networks:
+      - demo-net
+
+networks:
+  demo-net:
+    external: true

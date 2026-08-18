@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>ITO 비용처리 체크리스트</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --border:#e3e8ef; --border-2:#d4dbe5;
+    --text:#1f2937; --sub:#6b7280; --mute:#9ca3af;
+    --accent:#2563eb; --accent-light:#eff6ff;
+    --green:#16a34a; --green-bg:#dcfce7; --amber:#d97706; --amber-bg:#fef3c7;
+    --red:#dc2626;
+    --radius:14px;
+    --shadow:0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.55;
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:34px 22px 80px}
+  a{color:inherit;text-decoration:none}
+
+  .top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .top h1{font-size:24px;margin:0}
+  .top .sub{margin:4px 0 0;color:var(--sub);font-size:13.5px}
+  .spacer{flex:1}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-2);
+    background:#fff;color:var(--sub);font-size:13px;font-weight:600;padding:7px 12px;
+    border-radius:9px;cursor:pointer;font-family:inherit;transition:.12s;white-space:nowrap}
+  .btn:hover{background:#f8fafc;color:var(--text)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#1d4ed8;color:#fff}
+  .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.sm{padding:4px 8px;font-size:12px}
+  .btn.danger{color:var(--red);border-color:#fecaca}
+  .btn.danger:hover{background:#fef2f2}
+
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .yr{display:flex;align-items:center;gap:2px;border:1px solid var(--border-2);border-radius:9px;background:#fff;overflow:hidden}
+  .yr button{border:0;background:none;padding:7px 10px;cursor:pointer;color:var(--sub);font-size:14px;font-family:inherit}
+  .yr button:hover{background:#f1f5f9;color:var(--text)}
+  .yr .y{font-weight:700;font-size:14px;padding:0 6px;min-width:56px;text-align:center}
+
+  .tab-bar{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:0}
+  .tab-btn{border:0;background:none;padding:9px 15px;cursor:pointer;font-family:inherit;
+    font-size:14px;font-weight:600;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab-btn:hover{color:var(--text)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn.special{color:var(--amber)}
+  .tab-btn.special.active{color:var(--amber);border-bottom-color:var(--amber)}
+  .tab-btn .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:5px;vertical-align:middle}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-top:0;
+    border-radius:0 0 var(--radius) var(--radius);box-shadow:var(--shadow);padding:18px 20px 22px}
+
+  .counter{font-size:13px;color:var(--sub);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .counter .done{color:var(--green);font-weight:800}
+  .prog{flex:1;max-width:220px;height:6px;border-radius:99px;background:#eef2f7;overflow:hidden}
+  .prog i{display:block;height:100%;background:var(--green);transition:width .2s}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11.5px;font-weight:700;color:var(--mute);letter-spacing:.02em;
+     padding:0 10px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:11px 10px;border-bottom:1px solid #f1f4f8;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tr.done-row td{background:#fbfefc}
+  td.c{width:34px;text-align:center}
+  input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--green)}
+  .vendor{font-weight:700}
+  .item-label{color:var(--accent);font-size:13px}
+  .desc{color:var(--text)}
+  tr.done-row .desc,tr.done-row .vendor{color:var(--mute);text-decoration:line-through}
+  .note{display:block;font-size:11px;color:var(--mute);margin-top:2px}
+  .attach-badge{display:inline-block;background:var(--accent-light);color:var(--accent);
+    font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;margin:1px 3px 1px 0}
+  .attach-badge.warn{background:var(--amber-bg);color:var(--amber)}
+  .no-attach{color:var(--mute)}
+
+  .in{width:100%;border:1px solid var(--border-2);border-radius:7px;padding:5px 8px;
+    font-family:inherit;font-size:13px;color:var(--text);background:#fff}
+  .in:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .in.sm{font-size:12px}
+  .rowtools{display:flex;gap:3px;white-space:nowrap}
+  .hint{font-size:11.5px;color:var(--mute);margin-top:10px}
+  .hint code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-size:11px}
+
+  .section-note{margin-top:14px;background:#fffbeb;border:1px solid #fde68a;color:#78350f;
+    border-radius:10px;padding:11px 13px;font-size:12.5px}
+  .empty{color:var(--mute);font-size:13px;padding:24px 0;text-align:center}
+  footer{margin-top:26px;color:var(--mute);font-size:12px;text-align:center}
+  @media (max-width:640px){
+    .wrap{padding:20px 12px 60px}
+    th:nth-child(3),td:nth-child(3){display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <h1>ITO 비용처리 체크리스트</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="spacer"></div>
+    <a class="btn" href="/" data-backportal>← 포탈로</a>
+    <button class="btn" id="btnEdit">항목 편집</button>
+    <button class="btn" id="btnMore">설정</button>
+  </div>
+
+  <div class="bar" id="editBar" style="display:none">
+    <div class="yr">
+      <button id="yPrev" title="이전 연도">◀</button>
+      <span class="y" id="yLabel">2026</span>
+      <button id="yNext" title="다음 연도">▶</button>
+    </div>
+    <label style="font-size:12.5px;color:var(--sub)">표시 월
+      <select class="in" id="mFrom" style="width:auto;display:inline-block;margin:0 2px"></select>
+      ~
+      <select class="in" id="mTo" style="width:auto;display:inline-block;margin:0 2px"></select>
+    </label>
+    <div class="spacer"></div>
+    <button class="btn sm" id="btnExport">내보내기</button>
+    <button class="btn sm" id="btnImport">가져오기</button>
+    <button class="btn sm danger" id="btnReset">기본값 복원</button>
+    <input type="file" id="fileIn" accept=".json" style="display:none">
+  </div>
+
+  <div class="tab-bar" id="tabBar"></div>
+  <div class="panel" id="panel"></div>
+
+  <footer>누리코스메틱 인사총무팀 IT · 체크 상태는 이 브라우저에만 저장됩니다</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   기본 항목 — '기본값 복원' 을 누르면 이 내용으로 돌아갑니다
+   ========================================================= */
+var DEFAULT_ITEMS = [
+  {vendor:"대성ITS",        label:"SAP ITO 유지보수",     desc:"{yyyy}년 {mm}월 ITO 유지보수료-대성ITS",            attach:[],                 note:""},
+  {vendor:"대성ITS",        label:"AWS 사용비용",         desc:"{yyyy}년 {mm}월 AWS 유지보수 비용",             attach:["이용내역서","엑셀 2개"], note:""},
+  {vendor:"다날",       label:"CDN 서비스",           desc:"{yyyy}년 {mm}월 다날인프라랩 CDN 서비스 이용료", attach:["이용내역서"],      note:""},
+  {vendor:"인성아이티", label:"본사 PC 유지보수",     desc:"{yyyy}년 {mm}월 본사 PC 유지보수 사용료",       attach:[],                 note:""},
+  {vendor:"넷링크",     label:"네트워크(백본) 점검",  desc:"{yyyy}년 네트워크(백본) 유지보수료",            attach:[],                 note:"적요 동일 (월 표기 없음)"},
+  {vendor:"이젬코",     label:"스마트팩토리 유지보수",desc:"{yyyy}년 스마트팩토리 유지보수비용",            attach:[],                 note:"적요 동일 (월 표기 없음)"},
+  {vendor:"한빛렌탈",   label:"노트북 렌탈",          desc:"{yyyy}년 {mm}월 한빛렌탈 PC 렌탈 사용료",       attach:["월말 결산 엑셀"],  note:""},
+  {vendor:"에이아이쓰리",label:"웍스 AI 솔루션",      desc:"{yyyy}년 {mm}월 웍스 AI 솔루션 사용료",         attach:["월별 사용량 PDF"], note:""}
+];
+var DEFAULT_SPECIAL = [
+  {vendor:"세움테크", label:"소프트웨어 라이선스", desc:"{yyyy}년 업무용 소프트웨어 라이센스 구매의 건",
+   attach:["구입품의서 PDF"], note:"라이선스 구매시에만 세금계산서 작성"}
+];
+var DEFAULT_CFG = {year:2026, from:6, to:12};
+var SPECIAL_NOTE = "세움테크은 월간 정기 비용이 아닙니다. 소프트웨어 라이선스를 구매하는 시점에만 비용 처리하며, 세금계산서도 그때만 작성합니다.";
+
+var KEY = "itoCostChecklist.v1";
+
+/* =========================================================
+   상태
+   ========================================================= */
+var seq = 0;
+function newId(){ seq++; return "i" + (new Date().getTime()) + "_" + seq; }
+function withIds(list){ return list.map(function(x){ return assign({id:newId()}, x); }); }
+function assign(a,b){ for(var k in b){ if(Object.prototype.hasOwnProperty.call(b,k)) a[k]=b[k]; } return a; }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+function freshState(){
+  return { cfg: clone(DEFAULT_CFG), items: withIds(clone(DEFAULT_ITEMS)),
+           special: withIds(clone(DEFAULT_SPECIAL)), checks: {} };
+}
+
+var S = load();
+var editing = false;
+var tab = null;          /* 'm7' | 'special' */
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if (!raw) return freshState();
+    var o = JSON.parse(raw);
+    if (!o || !o.items) return freshState();
+    o.cfg = assign(clone(DEFAULT_CFG), o.cfg || {});
+    o.special = o.special || [];
+    o.checks = o.checks || {};
+    o.items.concat(o.special).forEach(function(it){ if(!it.id) it.id = newId(); });
+    return o;
+  }catch(e){ return freshState(); }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch(e){ alert("저장하지 못했어요. 브라우저 저장공간을 확인해주세요."); }
+}
+
+/* =========================================================
+   도우미
+   ========================================================= */
+var $ = function(s){ return document.querySelector(s); };
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function pad(n){ return n<10 ? "0"+n : ""+n; }
+function months(){
+  var a=[], f=Math.min(S.cfg.from,S.cfg.to), t=Math.max(S.cfg.from,S.cfg.to);
+  for(var m=f;m<=t;m++) a.push(m);
+  return a;
+}
+function fillDesc(tpl, m){
+  return String(tpl||"")
+    .replace(/\{mm\}/g, m ? pad(m) : "")
+    .replace(/\{m\}/g,  m ? String(m) : "")
+    .replace(/\{yyyy\}/g, String(S.cfg.year));
+}
+function ckey(id, m){ return S.cfg.year + "-" + (m ? pad(m) : "S") + "-" + id; }
+function isDone(id, m){ return !!S.checks[ckey(id,m)]; }
+function setDone(id, m, v){
+  if (v) S.checks[ckey(id,m)] = 1; else delete S.checks[ckey(id,m)];
+  save();
+}
+function doneCount(m){
+  var n=0; S.items.forEach(function(it){ if(isDone(it.id,m)) n++; }); return n;
+}
+
+/* =========================================================
+   렌더
+   ========================================================= */
+function renderTabs(){
+  var ms = months(), html = "";
+  ms.forEach(function(m){
+    var full = S.items.length>0 && doneCount(m)===S.items.length;
+    html += '<button class="tab-btn'+(tab==="m"+m?" active":"")+'" data-tab="m'+m+'">'+m+'월'+
+            (full?'<span class="dot"></span>':'')+'</button>';
+  });
+  html += '<button class="tab-btn special'+(tab==="special"?" active":"")+'" data-tab="special">수시</button>';
+  $("#tabBar").innerHTML = html;
+}
+
+function attachHTML(list, warn){
+  if (!list || !list.length) return '<span class="no-attach">-</span>';
+  return list.map(function(a){
+    return '<span class="attach-badge'+(warn?" warn":"")+'">'+esc(a)+'</span>';
+  }).join("");
+}
+
+function rowView(it, m, warn){
+  var done = isDone(it.id, m);
+  return '<tr class="'+(done?"done-row":"")+'">'+
+    '<td class="c"><input type="checkbox" data-check="'+esc(it.id)+'"'+(done?" checked":"")+'></td>'+
+    '<td><span class="vendor">'+esc(it.vendor)+'</span></td>'+
+    '<td><span class="item-label">'+esc(it.label)+'</span></td>'+
+    '<td><span class="desc">'+esc(fillDesc(it.desc, m))+'</span>'+
+      (it.note ? '<span class="note">'+esc(it.note)+'</span>' : '')+'</td>'+
+    '<td>'+attachHTML(it.attach, warn)+'</td>'+
+  '</tr>';
+}
+
+function rowEdit(it, i, kind, len){
+  return '<tr data-kind="'+kind+'" data-idx="'+i+'">'+
+    '<td class="c">'+
+      '<div class="rowtools" style="flex-direction:column">'+
+        '<button class="btn sm" data-move="up"'  +(i===0?" disabled":"")+'>▲</button>'+
+        '<button class="btn sm" data-move="down"'+(i===len-1?" disabled":"")+'>▼</button>'+
+      '</div>'+
+    '</td>'+
+    '<td><input class="in" data-f="vendor" value="'+esc(it.vendor)+'" placeholder="업체"></td>'+
+    '<td><input class="in" data-f="label"  value="'+esc(it.label)+'" placeholder="항목"></td>'+
+    '<td><input class="in" data-f="desc"   value="'+esc(it.desc)+'" placeholder="적요 (예: 2026년 {mm}월 ...)">'+
+        '<input class="in sm" data-f="note" value="'+esc(it.note||"")+'" placeholder="비고 (선택)" style="margin-top:4px"></td>'+
+    '<td><input class="in sm" data-f="attach" value="'+esc((it.attach||[]).join(", "))+'" placeholder="첨부 (쉼표로 구분)">'+
+        '<div style="margin-top:4px"><button class="btn sm danger" data-del="1">삭제</button></div></td>'+
+  '</tr>';
+}
+
+function renderPanel(){
+  var el = $("#panel");
+  var special = (tab === "special");
+  var m = special ? null : parseInt(String(tab).slice(1), 10);
+  var list = special ? S.special : S.items;
+  var head = '<thead><tr><th></th><th>업체</th><th>항목</th><th>적요</th><th>첨부</th></tr></thead>';
+  var html = "";
+
+  if (!special){
+    var done = doneCount(m), total = S.items.length;
+    var pct = total ? Math.round(done/total*100) : 0;
+    html += '<div class="counter">완료: <span class="done">'+done+'</span> / '+total+
+            '<span class="prog"><i style="width:'+pct+'%"></i></span></div>';
+  } else {
+    html += '<div class="counter">구매가 발생한 달에만 처리하는 항목이에요.</div>';
+  }
+
+  if (!list.length){
+    html += '<p class="empty">항목이 없어요. <b>항목 편집</b> 에서 추가해주세요.</p>';
+  } else {
+    html += '<table>'+head+'<tbody>';
+    list.forEach(function(it,i){
+      html += editing ? rowEdit(it, i, special?"special":"item", list.length)
+                      : rowView(it, m, special);
+    });
+    html += '</tbody></table>';
+  }
+
+  if (editing){
+    html += '<div style="margin-top:12px"><button class="btn primary" id="btnAdd">+ 항목 추가</button></div>';
+    html += '<p class="hint">적요에 <code>{mm}</code> 을 쓰면 <b>07</b> 처럼 두 자리 월로, <code>{m}</code> 은 <b>7</b>, '+
+            '<code>{yyyy}</code> 는 연도로 바뀝니다. 월 표기가 없는 항목은 그냥 고정 문구로 적으세요.</p>';
+  } else if (special && S.special.length){
+    html += '<div class="section-note"><strong>참고:</strong> '+esc(SPECIAL_NOTE)+'</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function renderAll(){
+  var ms = months();
+  if (!tab || (tab !== "special" && ms.indexOf(parseInt(String(tab).slice(1),10)) === -1)){
+    var now = new Date().getMonth() + 1;
+    tab = "m" + (ms.indexOf(now) > -1 ? now : ms[0]);
+  }
+  $("#yLabel").textContent = S.cfg.year;
+  $("#sub").textContent = S.cfg.year + "년 " + S.cfg.from + "월 ~ " + S.cfg.to + "월 · 월간 정기 " +
+                          S.items.length + "건 + 수시 " + S.special.length + "건";
+  renderTabs();
+  renderPanel();
+}
+
+/* =========================================================
+   이벤트
+   ========================================================= */
+$("#tabBar").addEventListener("click", function(e){
+  var b = e.target.closest(".tab-btn"); if (!b) return;
+  tab = b.getAttribute("data-tab");
+  renderTabs(); renderPanel();
+});
+
+$("#panel").addEventListener("change", function(e){
+  var t = e.target;
+  if (t.hasAttribute("data-check")){
+    var m = (tab==="special") ? null : parseInt(tab.slice(1),10);
+    setDone(t.getAttribute("data-check"), m, t.checked);
+    /* 전체를 다시 그리면 체크가 튀어 보이므로 바뀐 부분만 갱신 */
+    var tr = t.closest("tr");
+    if (tr) tr.className = t.checked ? "done-row" : "";
+    if (m){
+      var done = doneCount(m), total = S.items.length;
+      var c = $("#panel .counter");
+      if (c) c.innerHTML = '완료: <span class="done">'+done+'</span> / '+total+
+        '<span class="prog"><i style="width:'+(total?Math.round(done/total*100):0)+'%"></i></span>';
+    }
+    renderTabs();
+  }
+});
+
+$("#panel").addEventListener("input", function(e){
+  var t = e.target;
+  if (!t.hasAttribute("data-f")) return;
+  var tr = t.closest("tr");
+  var list = tr.getAttribute("data-kind")==="special" ? S.special : S.items;
+  var it = list[parseInt(tr.getAttribute("data-idx"),10)];
+  var f = t.getAttribute("data-f");
+  if (f === "attach"){
+    it.attach = t.value.split(",").map(function(x){return x.trim();}).filter(Boolean);
+  } else {
+    it[f] = t.value;
+  }
+  save();
+  $("#sub").textContent = S.cfg.year + "년 " + S.cfg.from + "월 ~ " + S.cfg.to + "월 · 월간 정기 " +
+                          S.items.length + "건 + 수시 " + S.special.length + "건";
+});
+
+$("#panel").addEventListener("click", function(e){
+  var add = e.target.closest("#btnAdd");
+  if (add){
+    var sp = (tab === "special");
+    (sp ? S.special : S.items).push({id:newId(), vendor:"", label:"", desc:"", attach:[], note:""});
+    save(); renderPanel();
+    var ins = $("#panel").querySelectorAll('tr[data-idx] input[data-f="vendor"]');
+    if (ins.length) ins[ins.length-1].focus();
+    return;
+  }
+  var tr = e.target.closest("tr[data-idx]"); if (!tr) return;
+  var list = tr.getAttribute("data-kind")==="special" ? S.special : S.items;
+  var i = parseInt(tr.getAttribute("data-idx"),10);
+
+  if (e.target.closest("[data-del]")){
+    if (!confirm("이 항목을 지울까요? 체크 기록도 함께 지워집니다.")) return;
+    var id = list[i].id;
+    Object.keys(S.checks).forEach(function(k){ if (k.indexOf("-"+id) > -1 || k.slice(-id.length)===id) delete S.checks[k]; });
+    list.splice(i,1); save(); renderAll(); return;
+  }
+  var mv = e.target.closest("[data-move]");
+  if (mv){
+    var d = mv.getAttribute("data-move")==="up" ? -1 : 1;
+    var j = i + d;
+    if (j < 0 || j >= list.length) return;
+    var tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    save(); renderPanel();
+  }
+});
+
+$("#btnEdit").addEventListener("click", function(){
+  editing = !editing;
+  this.classList.toggle("on", editing);
+  this.textContent = editing ? "편집 끝내기" : "항목 편집";
+  $("#editBar").style.display = editing ? "flex" : "none";
+  renderPanel();
+});
+
+$("#btnMore").addEventListener("click", function(){
+  var on = $("#editBar").style.display !== "none";
+  $("#editBar").style.display = on ? "none" : "flex";
+});
+
+/* 연도 · 표시 월 */
+function bindCfg(){
+  var f = $("#mFrom"), t = $("#mTo"), h = "";
+  for (var m=1;m<=12;m++) h += '<option value="'+m+'">'+m+'월</option>';
+  f.innerHTML = h; t.innerHTML = h;
+  f.value = S.cfg.from; t.value = S.cfg.to;
+  f.onchange = function(){ S.cfg.from = +this.value; save(); renderAll(); };
+  t.onchange = function(){ S.cfg.to   = +this.value; save(); renderAll(); };
+}
+$("#yPrev").addEventListener("click", function(){ S.cfg.year--; save(); renderAll(); });
+$("#yNext").addEventListener("click", function(){ S.cfg.year++; save(); renderAll(); });
+
+/* 내보내기 / 가져오기 / 복원 */
+$("#btnExport").addEventListener("click", function(){
+  var blob = new Blob([JSON.stringify(S, null, 2)], {type:"application/json"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "ITO_비용처리_체크리스트_" + S.cfg.year + ".json";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+});
+$("#btnImport").addEventListener("click", function(){ $("#fileIn").click(); });
+$("#fileIn").addEventListener("change", function(e){
+  var f = e.target.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(ev){
+    try{
+      var o = JSON.parse(ev.target.result);
+      if (!o.items) throw new Error("형식이 다릅니다.");
+      S = o;
+      S.cfg = assign(clone(DEFAULT_CFG), S.cfg||{});
+      S.special = S.special||[]; S.checks = S.checks||{};
+      S.items.concat(S.special).forEach(function(it){ if(!it.id) it.id = newId(); });
+      save(); bindCfg(); renderAll();
+      alert("불러왔어요.");
+    }catch(err){ alert("파일을 읽지 못했어요: " + err.message); }
+  };
+  fr.readAsText(f);
+  e.target.value = "";
+});
+$("#btnReset").addEventListener("click", function(){
+  if (!confirm("항목과 체크 기록을 모두 지우고 기본값으로 되돌릴까요?")) return;
+  S = freshState(); save(); bindCfg(); renderAll();
+});
+
+bindCfg();
+renderAll();
+})();
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

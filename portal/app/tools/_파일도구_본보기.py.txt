@@ -1,0 +1,126 @@
+# =====================================================================
+# 파일을 받아 분석하는 앱을 챗에 붙일 때 쓰는 본보기.
+#
+# 확장자가 .py 가 아니라 .py.txt 인 이유:
+#   app/tools/ 안의 .py 는 실제 도구로 등록된다. 본보기가 도구 목록에
+#   섞이면 직원이 없는 서비스를 부르게 된다.
+#
+# 쓰는 법
+#   1. 이 파일을 app/tools/서비스ID.py 로 복사한다
+#   2. 아래 ■ 표시된 다섯 곳을 바꾼다
+#   3. app/main.py 의 from .tools import ... 줄에 추가한다
+#   4. .env 에 API 주소를 넣는다
+#
+# 예로 든 것은 "이력서를 받아 적합도를 매기는 앱"이다.
+# =====================================================================
+"""이력서 분석(resume-check) 연결 도구.
+
+포털은 이력서를 열어보지 않는다. 파일을 그대로 앱에 넘기고,
+앱이 돌려준 결과를 문장으로 옮긴다.
+
+    직원이 챗에 이력서를 붙임
+        → 포털이 파일을 보관하고 file_id 를 만든다
+        → 모델이 이 도구를 file_id 와 함께 부른다
+        → 이 도구가 파일을 앱의 /api/analyze 로 넘긴다
+        → 앱이 분석해서 점수를 돌려준다
+        → 포털이 한두 문장으로 줄여서 답한다
+
+앱 쪽이 지켜야 할 것은 표준 규칙 v2 의 25번에 적혀 있다.
+"""
+
+import json
+import os
+import urllib.error
+import urllib.request
+
+from .. import uploads
+from ..registry import User, tool
+from ..schemas import ToolResult, fail
+
+# ■ 1. 앱 주소 — 같은 도커 네트워크이므로 컨테이너 이름으로 부른다
+API = os.environ.get("RESUME_API", "http://resume-check:8080").rstrip("/")
+
+# ■ 2. 직원이 눌러서 들어갈 주소 — nginx 경로와 맞춘다
+APP_URL = os.environ.get("RESUME_URL", "/resume-check/")
+
+# 파일 분석은 조회보다 오래 걸린다. 넉넉하게 잡되 무한정은 아니다.
+TIMEOUT = float(os.environ.get("RESUME_TIMEOUT", "60"))
+
+SERVICE_TOKEN = os.environ.get("AUDIT_TOKEN", "")
+
+
+@tool(
+    # ■ 3. 도구 이름 — 영문. 모델이 이 이름으로 부른다
+    name="analyze_resume",
+    label="이력서 분석",
+    # ■ 4. 설명 — 정확도를 가장 크게 좌우한다.
+    #      직원이 실제로 쓸 표현을 넣고, 언제 쓰면 안 되는지도 적는다.
+    description=(
+        "붙인 이력서 파일을 분석해서 직무 적합도 점수와 요약을 돌려준다. "
+        "'이 이력서 봐줘', '적합도 좀 매겨줘', '이 사람 어때' 처럼 "
+        "**파일이 첨부된 상태에서** 묻는 질문에 쓴다. "
+        "파일이 첨부되지 않았으면 이 도구를 부르지 말고 파일을 올려 달라고 안내한다. "
+        "지원 형식: pdf, docx, hwp."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "file_id": {
+                "type": "string",
+                "description": "첨부된 파일의 file_id. [첨부한 파일] 목록에 적혀 있다.",
+            },
+            "position": {
+                "type": "string",
+                "description": "지원 직무. 예: 백엔드 개발자. 모르면 비워 둔다.",
+            },
+        },
+        "required": ["file_id"],
+    },
+    # ■ 5. 이 도구가 속한 서비스 ID — 관리자 화면의 ID 와 같아야 한다.
+    #      그 서비스의 접근 범위가 곧 이 도구의 권한이 된다.
+    service="resume-check",
+)
+def analyze_resume(user: User, file_id: str, position: str | None = None) -> ToolResult:
+    # 파일을 꺼낸다. **본인이 올린 것만** 나온다.
+    # 남의 file_id 를 넣어도 여기서 None 이 된다.
+    got = uploads.read(file_id, user.user_id)
+    if not got:
+        return fail("첨부한 파일을 찾지 못했습니다. 파일을 다시 올려주세요.")
+    meta, blob = got
+
+    # multipart 로 앱에 넘긴다. 표준 라이브러리만 쓴다.
+    body, content_type = uploads.multipart(
+        "file", meta["name"], blob,
+        extra={"position": position or "", "user_id": user.user_id},
+    )
+    headers = {"Content-Type": content_type, "Accept": "application/json"}
+    if SERVICE_TOKEN:
+        # 사람이 아니라 포털이 부른 것임을 알린다
+        headers["X-Service-Token"] = SERVICE_TOKEN
+    # 앱 쪽 기록에 "누가 요청했는지"가 남게 한다
+    headers["X-User-Id"] = user.user_id
+
+    req = urllib.request.Request(API + "/api/analyze", data=body,
+                                 headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        return fail(f"이력서 분석 서비스가 요청을 거절했습니다. (HTTP {e.code})")
+    except urllib.error.URLError as e:
+        # 앱이 꺼져 있는 것과 분석 결과가 없는 것은 다른 상황이다.
+        return fail(f"이력서 분석 서비스에 연결하지 못했습니다. ({API}) — {e.reason}")
+    except Exception as e:  # noqa: BLE001
+        return fail(f"이력서 분석에 실패했습니다. {type(e).__name__}: {e}")
+
+    # 앱이 돌려주는 형태에 맞춰 고친다
+    score = d.get("score")
+    summary = d.get("summary") or "분석을 마쳤습니다."
+    return ToolResult(
+        summary=(f"{meta['name']} — 적합도 {score}점. {summary}"
+                 if score is not None else f"{meta['name']} — {summary}"),
+        data=d,
+        # 자세한 내용은 앱 화면에서 보게 한다.
+        # 챗 답변에 분석 리포트를 통째로 쏟아내면 아무도 안 읽는다.
+        detail_url=APP_URL,
+    )

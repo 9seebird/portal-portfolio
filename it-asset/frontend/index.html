@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IT 자산 관리</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- 로그인은 사내 포털이 처리한다. 이 화면은 쓰지 않는다.
+         app.js 가 아래 세 개의 id 를 시작할 때 찾으므로 통째로 지우지 말 것.
+         (#loginForm / #loginStatus / #apiBase — 없으면 화면이 통째로 안 뜬다) -->
+    <section id="loginGate" class="login-page" hidden>
+      <form id="loginForm" class="login-card">
+        <!-- 이 앱은 포털 아래 /it-asset/ 로 붙는다. 비워 두면 화면이 포털
+             최상위의 /api 를 찾아가서 전부 404 가 난다. -->
+        <input id="apiBase" value="/it-asset/api" hidden />
+        <strong id="loginStatus" class="login-status"></strong>
+      </form>
+    </section>
+
+    <aside id="sidebar" class="sidebar" hidden>
+      <div class="brand">
+        <span class="brand-mark">IT</span>
+        <div>
+          <strong>자산 관리</strong>
+          <small>직원 기준 자산 관리</small>
+        </div>
+      </div>
+      <!-- 좁은 화면에서만 보이는 메뉴 여닫기 단추.
+           메뉴가 열 개라 폰에서는 첫 화면이 통째로 메뉴로 덮인다.
+           넓은 화면에서는 CSS 가 이 단추를 감춘다 (.nav-toggle). -->
+      <button id="navToggle" class="nav-toggle" type="button"
+              aria-expanded="false" aria-controls="mainNav" aria-label="메뉴 열기">
+        <span></span><span></span><span></span>
+      </button>
+      <nav id="mainNav">
+        <button class="nav-item active" data-view="dashboard">대시보드</button>
+        <button class="nav-item" data-view="workspace">직원별 현황</button>
+        <button class="nav-item" data-view="seats">자리 배치</button>
+        <button class="nav-item" data-view="assets">자산 등록</button>
+        <button class="nav-item" data-view="employees">직원 명단</button>
+        <button class="nav-item" data-view="ips">IP 관리</button>
+        <button class="nav-item" data-view="extensions">내선 관리</button>
+        <button class="nav-item" data-view="software">소프트웨어</button>
+        <button class="nav-item" data-view="rentals">렌탈</button>
+        <!-- 담당자만. 누가 어느 화면을 보는지 여기서 정한다. -->
+        <button class="nav-item" data-view="permissions">권한</button>
+      </nav>
+      <div class="login-box">
+        <strong id="sessionStatus"></strong>
+        <!-- 나가는 문은 위쪽 막대로 옮겼다 (다른 앱과 같은 자리).
+             이 버튼은 app.js 가 시작할 때 찾으므로 지우지 않고 감춰 둔다. -->
+        <button type="button" id="sideLogoutBtn" class="secondary" hidden>포털로 돌아가기</button>
+      </div>
+    </aside>
+
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="drawer" class="drawer" hidden></aside>
+
+    <!-- 자산·직원 편집. 목록에서 행을 누르면 여기에 뜬다 -->
+    <div id="editBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="editModal" class="drawer edit-modal" hidden></aside>
+
+    <!-- 내선번호 자료 올리기. 미리보기 먼저 보여주고 한 번 더 눌러야 들어간다 -->
+    <div id="importBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="importModal" class="drawer edit-modal wide" hidden></aside>
+
+    <!-- 확인창. 브라우저 기본 alert 대신 화면과 같은 모양으로 띄운다 -->
+    <div id="confirmBackdrop" class="confirm-backdrop" hidden>
+      <div id="confirmBox" class="confirm-box" role="alertdialog" aria-modal="true"
+           aria-labelledby="confirmText">
+        <p id="confirmText"></p>
+        <div class="confirm-actions">
+          <button type="button" id="confirmCancel" class="secondary">취소</button>
+          <button type="button" id="confirmOk">확인</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 「CSV 내려받기」는 이 하나뿐이다. 화면을 옮길 때마다 그 화면의
+         .csv-slot 자리로 옮겨 붙는다 (app.js 의 paintCsvBtn).
+         화면마다 만들면 하나만 고치는 일이 생긴다. -->
+    <button id="csvBtn" class="secondary" hidden>CSV 내려받기</button>
+
+    <main id="appShell" class="main" hidden>
+      <header class="topbar">
+        <h1 id="pageTitle">대시보드</h1>
+        <div class="topbar-actions">
+          <button id="refreshBtn" class="secondary">새로고침</button>
+          <!-- 다른 앱들과 같은 자리(오른쪽 위)에 둔다.
+               포털에서 열린 탭이면 그 탭을 닫고 포털 탭으로 돌아간다
+               (portal/static/back.js). -->
+          <a class="backportal" href="/" data-backportal>← 포탈로</a>
+        </div>
+      </header>
+
+      <!-- 직원별 현황: 한 직원 = 한 줄. 펼치면 그 자리에서 지급/회수/IP/SW 처리 -->
+      <section id="workspace" class="view">
+        <div class="toolbar">
+          <input id="workspaceSearch" placeholder="이름, 사번, 부서, 자산번호, IP 검색" />
+          <select id="workspaceStatus">
+            <option value="">전체 직원</option>
+            <option value="ACTIVE">재직</option>
+            <option value="INACTIVE">퇴사</option>
+          </select>
+          <select id="pageSize">
+            <option value="30">30개씩</option>
+            <option value="50" selected>50개씩</option>
+            <option value="100">100개씩</option>
+            <option value="200">200개씩</option>
+          </select>
+          <span class="spacer"></span>
+          <span id="storageCount" class="chip"></span>
+          <span class="csv-slot"></span>
+          </div>
+        <div class="admin-hint" id="adminHint">읽기 전용입니다. 관리자로 로그인하면 지급·회수·수정이 가능합니다.</div>
+
+        <div class="rowlist">
+          <!-- 머리글을 누르면 정렬. 자산 등록·직원 명단 표와 같은 조작 -->
+          <div class="rowlist-head" id="workspaceHead"></div>
+          <div id="workspaceRows"></div>
+        </div>
+
+        <div class="pagination">
+          <button id="prevPage" class="secondary">이전</button>
+          <span id="pageInfo"></span>
+          <button id="nextPage" class="secondary">다음</button>
+        </div>
+      </section>
+
+      <section id="dashboard" class="view active">
+        <div id="summaryCards" class="summary-grid"></div>
+        <div class="chart-grid">
+          <figure class="chart-card">
+            <figcaption>자산 상태별 비율</figcaption>
+            <div id="statusChart"></div>
+          </figure>
+          <figure class="chart-card">
+            <figcaption>자산 유형별 비율</figcaption>
+            <div id="typeChart"></div>
+          </figure>
+        </div>
+      </section>
+
+      <!-- 자산 등록: 자산 그 자체를 다루는 곳 (자산번호 수정 · 삭제) -->
+      <section id="assets" class="view">
+        <form id="assetForm" class="form-grid">
+          <input name="asset_no" placeholder="자산번호" required />
+          <input name="label_no" placeholder="라벨번호" />
+          <select name="asset_type" required>
+            <option value="">자산 유형</option>
+            <option value="LAPTOP">노트북</option>
+            <option value="DESKTOP">데스크탑</option>
+            <option value="MONITOR">모니터</option>
+            <option value="SERVER">서버</option>
+            <option value="OTHER">기타</option>
+          </select>
+          <select name="purchase_type">
+            <option value="PURCHASE">구매</option>
+            <option value="RENTAL">임대</option>
+          </select>
+          <input name="manufacturer" placeholder="제조사" />
+          <input name="model" placeholder="모델명" />
+          <input name="serial_no" placeholder="시리얼번호" />
+          <input name="cpu" placeholder="CPU" />
+          <input name="memory_gb" type="number" min="0" placeholder="메모리(GB)" />
+          <input name="storage_gb" type="number" min="0" placeholder="저장장치(GB)" />
+          <input name="os" placeholder="운영체제" />
+          <button>자산 등록</button>
+        </form>
+
+        <div class="toolbar">
+          <input id="assetSearch" placeholder="자산번호, 라벨, 모델, 사용자 검색" />
+          <select id="assetStatusFilter">
+            <option value="">전체 상태</option>
+            <option value="IN_USE">사용 중</option>
+            <option value="STORAGE">보관</option>
+            <option value="REPAIR">수리</option>
+            <option value="DISPOSED">폐기</option>
+          </select>
+          <!-- 값 정리는 자산의 제조사·모델·CPU·OS 를 다듬는 것이라 자산 권한이다.
+               (전에 내선으로 잘못 적혀 있었다) -->
+          <button type="button" id="specCleanBtn" class="secondary admin-only" data-need="assets">값 정리</button>
+          <span class="spacer"></span>
+          <!-- 받기와 넣기는 붙여 둔다. 양식을 받으러 딴 데 갔다 오지 않게. -->
+          <span class="csv-slot"></span>
+          <button type="button" id="assetImportBtn" class="secondary admin-only" data-need="assets">자료 넣기</button>
+          <span id="assetCount" class="chip"></span>
+        </div>
+        <div id="assetsTable" class="table-wrap"></div>
+      </section>
+
+      <!-- 직원 등록: 직원 그 자체를 다루는 곳 (삭제) -->
+      <section id="employees" class="view">
+        <form id="employeeForm" class="form-grid">
+          <input name="emp_no" placeholder="사번" required />
+          <input name="name" placeholder="이름" required />
+          <input name="department" placeholder="부서" list="dl-dept" />
+          <input name="position" placeholder="직책" list="dl-position" />
+          <input name="rank" placeholder="직급" list="dl-rank" />
+          <input name="email" placeholder="이메일" />
+          <input name="phone" placeholder="연락처" />
+          <button>직원 등록</button>
+        </form>
+
+        <div class="toolbar">
+          <input id="employeeSearch" placeholder="이름, 사번, 부서 검색" />
+          <span class="spacer"></span>
+          <!-- 받기와 넣기는 붙여 둔다. 양식을 받으러 딴 데 갔다 오지 않게. -->
+          <span class="csv-slot"></span>
+          <button type="button" id="empImportBtn" class="secondary admin-only" data-need="employees">자료 넣기</button>
+          <span id="employeeCount" class="chip"></span>
+        </div>
+        <div id="employeesTable" class="table-wrap"></div>
+      </section>
+
+      <section id="ips" class="view split">
+        <div>
+          <form id="ipRangeForm" class="form-grid compact">
+            <input name="name" placeholder="대역명" required />
+            <select name="kind">
+              <option value="NETWORK">네트워크 (PC·서버)</option>
+              <option value="PHONE">전화기</option>
+            </select>
+            <input name="start_ip" placeholder="시작 IP" required />
+            <input name="end_ip" placeholder="종료 IP" required />
+            <input name="vlan" placeholder="VLAN" />
+            <button>IP 대역 등록</button>
+          </form>
+          <div id="ipRangesTable" class="table-wrap"></div>
+        </div>
+        <div>
+          <!-- IP 하나씩 넣기. 대역만 등록해두면 실제 배정을 화면에서 못 한다 -->
+          <form id="ipAssignForm" class="form-grid compact">
+            <select name="kind">
+              <option value="NETWORK">네트워크 (PC·서버)</option>
+              <option value="PHONE">전화기</option>
+            </select>
+            <select name="target" id="ipTarget"></select>
+            <input name="ip_address" list="dl-free-ip" placeholder="IP 주소" required />
+            <input name="hostname" placeholder="호스트명 (선택)" />
+            <button>IP 추가</button>
+          </form>
+          <datalist id="dl-free-ip"></datalist>
+          <p id="ipAssignHint" class="admin-hint" hidden></p>
+
+          <div class="toolbar">
+            <div id="ipKindTabs" class="seg">
+              <button type="button" class="seg-btn on" data-ip-kind="">전체</button>
+              <button type="button" class="seg-btn" data-ip-kind="NETWORK">네트워크 IP</button>
+              <button type="button" class="seg-btn" data-ip-kind="PHONE">전화기 IP</button>
+            </div>
+            <span class="spacer"></span>
+            <!-- 내선 관리의 「자료 넣기」와 같은 창을 쓴다. 미리보기 먼저. -->
+            <span class="csv-slot"></span>
+            <button type="button" id="ipImportBtn" class="secondary admin-only" data-need="ips">자료 넣기</button>
+            <span id="ipCount" class="chip"></span>
+          </div>
+          <div id="ipAssignmentsTable" class="table-wrap"></div>
+        </div>
+      </section>
+
+      <!-- 내선 관리: 번호 하나에 사람 하나. IP 와 달리 장비가 아니라 사람에게 붙는다 -->
+      <section id="extensions" class="view">
+        <form id="extensionForm" class="form-grid compact">
+          <input name="number" placeholder="내선번호" required />
+          <input name="zone" placeholder="구역 (3층 등)" list="dl-ext-zone" />
+          <input name="ip_address" placeholder="전화기 IP (10.10.100.x)" />
+          <input name="note" placeholder="메모" />
+          <button>내선번호 등록</button>
+        </form>
+
+        <div class="toolbar">
+          <input id="extensionSearch" placeholder="번호, 이름, 부서 검색" />
+          <select id="extensionFilter">
+            <option value="">전체</option>
+            <option value="used">쓰는 중</option>
+            <option value="free">빈 번호</option>
+          </select>
+          <span class="spacer"></span>
+          <!-- 받기와 넣기는 붙여 둔다. 양식을 받으러 딴 데 갔다 오지 않게. -->
+          <span class="csv-slot"></span>
+          <button type="button" id="extImportBtn" class="secondary admin-only" data-need="extensions">자료 넣기</button>
+          <span id="extensionCount" class="chip"></span>
+        </div>
+        <div id="extensionsTable" class="table-wrap"></div>
+      </section>
+
+      <section id="software" class="view split">
+        <div class="toolbar"><span class="spacer"></span><span class="csv-slot"></span></div>
+        <div>
+          <form id="softwareForm" class="form-grid compact">
+            <input name="name" placeholder="제품명" required />
+            <input name="vendor" placeholder="벤더" />
+            <input name="license_type" placeholder="라이선스 유형" />
+            <button>제품 등록</button>
+          </form>
+          <div id="softwareTable" class="table-wrap"></div>
+        </div>
+        <div id="licensesTable" class="table-wrap"></div>
+      </section>
+
+      <section id="rentals" class="view">
+        <div class="toolbar"><span class="spacer"></span><span class="csv-slot"></span></div>
+        <div id="rentalsTable" class="table-wrap"></div>
+      </section>
+
+      <!-- 자리 배치: 엑셀 배치도를 격자로 옮긴 화면. 자리를 누르면 그 사람의 자산이 뜬다 -->
+      <section id="seats" class="view">
+        <div class="toolbar">
+          <input id="seatSearch" placeholder="이름, 부서, 자리 이름 검색" />
+          <div id="seatFloors" class="seg"></div>
+          <span class="csv-slot"></span>
+          <button type="button" id="seatEditBtn" class="secondary admin-only" data-need="seats">배치 편집</button>
+          <!-- 실수로 끌어 옮겼을 때. 편집 모드에서 할 일이 쌓여야 나온다. -->
+          <button type="button" id="seatUndoBtn" class="secondary admin-only" data-need="seats" hidden>되돌리기</button>
+          <span class="spacer"></span>
+          <strong id="seatSummary" class="muted"></strong>
+        </div>
+        <div id="seatMap" class="seat-map"></div>
+        <div class="seat-legend">
+          <span><i class="sw seated"></i> 배치됨</span>
+          <span><i class="sw empty"></i> 빈 자리</span>
+          <span><i class="sw room"></i> 공간</span>
+          <span><i class="sw boss"></i> 직책자</span>
+          <span><i class="sw hit"></i> 검색 결과</span>
+          <span class="muted">자리를 누르면 그 사람의 자산·IP·라이선스가 열립니다.</span>
+        </div>
+      </section>
+
+      <!-- 권한 — 담당자만 본다 -->
+      <section id="permissions" class="view">
+        <p class="muted" style="margin:0 0 14px">
+          이 앱에 <b>한 번이라도 들어온 사람</b>이 목록에 뜹니다.
+          체크한 화면만 그 사람에게 보입니다. 하나도 체크하지 않으면
+          기본값(<span id="permDefaults"></span>)이 적용됩니다.
+          <br>고치는 기능은 체크와 상관없이 <b>담당자만</b> 됩니다 —
+          담당자는 포털 관리자 화면에서 정합니다.
+        </p>
+        <div class="toolbar">
+          <input id="permSearch" placeholder="이름, 부서, 아이디 검색" />
+        </div>
+        <div id="permTable"></div>
+      </section>
+    </main>
+
+    <div class="floating-scroll">
+      <button type="button" id="scrollTopBtn" title="맨 위로">↑</button>
+      <button type="button" id="scrollBottomBtn" title="맨 아래로">↓</button>
+    </div>
+
+    <datalist id="dl-ext-zone"></datalist>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <!-- 메뉴 여닫기. 켜고 끄는 것은 body 의 클래스 하나뿐이고,
+         어떻게 보일지는 전부 styles.css 가 정한다.
+         app.js 는 건드리지 않는다 — 이 동작은 화면 넓이 문제라
+         자산 관리 로직과 아무 상관이 없다. -->
+    <script>
+      (function () {
+        var btn = document.getElementById("navToggle");
+        var nav = document.getElementById("mainNav");
+        if (!btn || !nav) return;
+
+        function setOpen(on) {
+          document.body.classList.toggle("nav-open", on);
+          btn.setAttribute("aria-expanded", on ? "true" : "false");
+          btn.setAttribute("aria-label", on ? "메뉴 닫기" : "메뉴 열기");
+        }
+
+        btn.addEventListener("click", function () {
+          setOpen(!document.body.classList.contains("nav-open"));
+        });
+
+        // 메뉴를 고르면 닫는다. 안 닫으면 고른 화면이 메뉴에 가려
+        // 「눌렀는데 아무 일도 안 일어난다」로 보인다.
+        nav.addEventListener("click", function (e) {
+          if (e.target.closest(".nav-item")) setOpen(false);
+        });
+
+        // 창을 넓히면 메뉴는 늘 보이는 상태가 되므로 열린 표시를 지운다.
+        // 남겨 두면 다시 좁혔을 때 메뉴가 열린 채로 시작한다.
+        window.matchMedia("(min-width: 861px)").addEventListener("change", function (ev) {
+          if (ev.matches) setOpen(false);
+        });
+      })();
+    </script>
+    <script src="./app.js"></script>
+  <!-- 「포털로 돌아가기」 공통 동작. 포털에서 열린 탭이면 그 탭을 닫는다.
+     포털이 한 벌만 준다 (portal/static/back.js). app.js 보다 먼저 와야
+     window.goPortal 이 준비된다 — defer 는 적힌 차례대로 돈다. -->
+<script src="/back.js" defer></script>
+</body>
+</html>

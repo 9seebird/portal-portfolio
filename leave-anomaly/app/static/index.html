@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>휴가 이상감지</title>
+<!-- 주소는 모두 상대경로. 이 앱은 포털 아래 /leave-anomaly/ 로 붙는다. -->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>휴가 이상감지</h1>
+      <p>연차 사용·발생 내역으로 <b>이상 사용 패턴</b>, <b>저사용(쌓아두기)</b>, <b>급증</b> 세 가지를 함께 봅니다.</p>
+    </div>
+    <div class="hdr-right">
+      <div class="who" id="whoBox">확인 중…</div>
+      <!-- 포털 뒤에 붙어 있으니 돌아갈 길이 있어야 한다.
+           href="/" 하나면 된다 — 프록시가 / 를 포털로 넘긴다. -->
+      <a class="backportal" href="/">← 포탈로</a>
+    </div>
+  </header>
+
+  <div class="card" id="denyCard" hidden>
+    <h3>접속 확인이 필요합니다</h3>
+    <p class="sub">사내 포털을 통해 열어 주세요. 포털에서 접속하면 별도의 권한 신청 없이 바로 사용할 수 있습니다.</p>
+  </div>
+
+  <div id="appBody" hidden>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h3>데이터 올리기</h3>
+          <p class="sub">웍스 등에서 내려받은 연차 <b>사용내역</b>·<b>발생내역</b> 엑셀(.xlsx)을 올려주세요.</p>
+        </div>
+        <label class="field">기준일
+          <input type="date" id="refDate">
+        </label>
+      </div>
+
+      <div class="upload-grid">
+        <label class="upload-box" id="usageDrop">
+          <input id="usageFile" type="file" accept=".xlsx,.csv">
+          <span class="tag">사용</span>
+          <span><b>연차 사용내역</b><small id="usageStatus">끌어다 놓거나 클릭</small></span>
+        </label>
+        <label class="upload-box" id="accrualDrop">
+          <input id="accrualFile" type="file" accept=".xlsx,.csv">
+          <span class="tag alt">발생</span>
+          <span><b>연차 발생내역</b><small id="accrualStatus">끌어다 놓거나 클릭</small></span>
+        </label>
+      </div>
+
+      <div class="note hidden" id="metaNote"></div>
+      <div class="warn hidden" id="warnNote"></div>
+      <div class="err hidden" id="errNote"></div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="btnReload">다시 분석</button>
+        <button id="btnDelUsage" class="ghost-danger">사용내역 삭제</button>
+        <button id="btnDelAccrual" class="ghost-danger">발생내역 삭제</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <details class="criteria">
+        <summary>감지 기준 자세히 보기</summary>
+        <div class="criteria-body" id="criteriaBody"></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:10px">회사 자체 휴일</h3>
+      <p class="sub">창립기념일처럼 법정 공휴일이 아닌 회사 휴일을 넣어두면, 그 날에 붙은 연차는 고립으로 보지 않습니다.</p>
+      <div class="row">
+        <label class="field">날짜<input type="date" id="holDate"></label>
+        <label class="field">이름<input type="text" id="holName" placeholder="예) 창립기념일"></label>
+        <button id="btnAddHoliday">추가</button>
+      </div>
+      <div class="chip-list" id="holidayChips" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="tabbar" id="tabs">
+        <button data-view="pattern" class="active">이상 패턴 <em id="tabPattern">0</em></button>
+        <button data-view="low">저사용 <em id="tabLow">0</em></button>
+        <button data-view="spike">급증 <em id="tabSpike">0</em></button>
+      </div>
+      <div id="body"><div class="empty-state">연차 사용내역을 올리면 결과가 여기에 표시됩니다.</div></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

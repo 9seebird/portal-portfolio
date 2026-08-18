@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>매뉴얼 가져오기 · 누리코스메틱 IT</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --line:#e3e8ef; --line2:#f0f2f5;
+    --tx:#1f2937; --tx2:#5b6472; --tx3:#8a94a3;
+    --accent:#2563eb; --accent-soft:#eff6ff;
+    --warn:#d97706; --warn-soft:#fffbeb; --ok:#16a34a; --ok-soft:#f0fdf4;
+    --red:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-size:15px;line-height:1.6;
+    font-family:"Pretendard","맑은 고딕","Malgun Gothic",-apple-system,system-ui,sans-serif}
+  /* 우리말은 낱말 사이에서 끊는다. 기본값은 영어 기준이라 한 글자만 떨어진다. */
+  body,p,li,td,th,label{word-break:keep-all;overflow-wrap:break-word}
+  p,.sub{text-wrap:pretty}
+  button{font:inherit;cursor:pointer}
+  .wrap{max-width:980px;margin:0 auto;padding:26px 20px 70px}
+
+  header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:18px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{margin:0;color:var(--tx2);font-size:13px}
+  .backportal{flex:0 0 auto;white-space:nowrap;border:1px solid var(--line);background:#fff;
+    color:var(--tx3);border-radius:6px;padding:5px 10px;font-size:12.5px;text-decoration:none}
+  .backportal:hover{background:#f3f4f6;color:var(--tx)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 4px}
+  .card .d{font-size:12.5px;color:var(--tx3);margin:0 0 14px}
+
+  .note{background:var(--warn-soft);border:1px solid var(--warn);border-radius:9px;
+    padding:12px 14px;font-size:13px;margin-bottom:16px}
+
+  .drop{border:2px dashed var(--line);border-radius:11px;padding:30px;text-align:center;
+    color:var(--tx3);font-size:14px;transition:.15s;background:#fbfcfd}
+  .drop.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;font-size:13.5px}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:650}
+  .btn.primary:hover{background:#1d4ed8;color:#fff}
+  .btn:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
+
+  .fld{display:block;font-size:13px;font-weight:650;margin:14px 0 5px}
+  .fld span{font-weight:400;color:var(--tx3);margin-left:5px}
+  input[type=text]{width:100%;border:1px solid var(--line);border-radius:7px;padding:9px 11px;
+    font:inherit;font-size:14px;background:#fff;color:var(--tx)}
+  input[type=text]:focus{outline:none;border-color:var(--accent)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* ============ 반응형 ============
+     표는 칸이 셋(장·항목 이름·내용)뿐이라 폰에서도 그대로 들어간다.
+     손볼 것은 바깥 여백뿐이다 — 좌우 20px 은 980px 화면 기준이라
+     390px 짜리 화면에서는 글 읽을 자리를 40px 이나 잡아먹는다. */
+  @media(max-width:640px){
+    .grid2{grid-template-columns:1fr}
+    .wrap{padding:18px 13px 52px}
+    .card{padding:15px 14px}
+    th,td{padding:8px 5px}
+    .cnt{width:auto}
+  }
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:12px;color:var(--tx3);font-weight:650;
+    padding:9px 8px;border-bottom:1px solid var(--line)}
+  td{padding:9px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .no{width:42px;color:var(--tx3)}
+  .cnt{width:120px;color:var(--tx2);white-space:nowrap;font-size:12.5px}
+  .steps{color:var(--tx2);font-size:12.5px;margin:4px 0 0;padding-left:16px}
+  .steps li{margin-bottom:2px}
+  .empty{color:var(--warn);font-size:12.5px}
+  .merged{margin-left:6px;padding:1px 7px;border-radius:9px;font-size:11.5px;
+          background:#eef2ff;color:#4338ca;white-space:nowrap}
+
+  .msg{padding:11px 13px;border-radius:9px;font-size:13.5px;margin-top:14px;display:none}
+  .msg.on{display:block}
+  .msg.err{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+  .msg.ok{background:var(--ok-soft);color:var(--ok);border:1px solid #86efac}
+  .hidden{display:none!important}
+  .chip{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:999px;
+    padding:1px 8px;margin-left:6px;color:var(--tx3)}
+  .chip.rep{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+  .chip.dim{opacity:.6}
+  .mrow{padding:5px 0;border-bottom:1px solid var(--line)}
+  .mrow:last-child{border-bottom:0}
+  .lnk{margin-left:8px;font-size:12px;color:var(--accent);background:none;border:0;
+       padding:0;cursor:pointer;text-decoration:underline}
+  .lnk.del{color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>매뉴얼 가져오기</h1>
+      <p class="sub">PowerPoint 파일을 올리면 IT 매뉴얼로 바꿔 드립니다. 담당자 전용입니다.</p>
+    </div>
+    <a class="backportal" href="/">← 포탈로</a>
+  </header>
+
+  <div class="note">
+    <b>PPT 가 원본입니다.</b> 내용을 고칠 일이 생기면 PPT 를 고쳐서 다시 올리세요.
+    매뉴얼 화면의 편집 모드로 고친 것은 <b>다음 업로드 때 덮어써집니다.</b>
+    두 곳에 같은 내용을 두면 반드시 갈라지기 때문에 한쪽을 원본으로 정했습니다.
+  </div>
+
+  <div class="card">
+    <h2>1. PPT 고르기</h2>
+    <p class="d">슬라이드 한 장이 항목 하나가 됩니다. 올린다고 바로 바뀌지 않습니다 —
+      먼저 어떻게 읽었는지 보여드립니다.</p>
+
+    <div class="drop" id="drop">
+      여기에 <b>.pptx</b> 파일을 끌어다 놓거나
+      <button class="btn" id="pick" style="margin-left:6px">파일 고르기</button>
+      <input type="file" id="file" accept=".pptx,.pptm" hidden>
+      <div id="fname" style="margin-top:8px;color:var(--tx2);font-size:13px"></div>
+    </div>
+    <div class="msg err" id="err1"></div>
+  </div>
+
+  <div class="card hidden" id="step2">
+    <h2>2. 읽은 결과 <span id="sum" style="font-weight:400;color:var(--tx3);font-size:13px"></span></h2>
+    <p class="d">항목 이름과 절차가 제대로 잡혔는지 보세요. 이상하면 PPT 쪽을 고치는 편이 낫습니다.</p>
+    <table><thead><tr>
+      <th class="no">장</th><th>항목 이름</th><th class="cnt">내용</th>
+    </tr></thead><tbody id="rows"></tbody></table>
+  </div>
+
+  <div class="card hidden" id="step3">
+    <h2>3. 어디에 넣을까요</h2>
+    <p class="d">같은 ID 가 이미 있으면 <b>그 매뉴얼을 통째로 바꿉니다.</b>
+      바꾸기 전에 자동으로 백업을 남깁니다.</p>
+
+    <div class="grid2">
+      <div>
+        <label class="fld" for="mid">매뉴얼 ID <span>영문 소문자·숫자·하이픈</span></label>
+        <input type="text" id="mid" placeholder="예) sap-gui" autocomplete="off">
+        <div id="idnote" style="font-size:12.5px;color:var(--tx3);margin-top:5px"></div>
+      </div>
+      <div>
+        <label class="fld" for="mtitle">매뉴얼 이름</label>
+        <input type="text" id="mtitle" placeholder="예) SAP GUI 매뉴얼" autocomplete="off">
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="fld" for="micon">아이콘 <span>글자 한두 자</span></label>
+        <input type="text" id="micon" placeholder="예) SAP" maxlength="4" autocomplete="off">
+      </div>
+      <div>
+        <label class="fld" for="msub">한 줄 설명 <span>비워도 됩니다</span></label>
+        <input type="text" id="msub" placeholder="예) 설치부터 권한 추가까지" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn primary" id="apply">매뉴얼에 반영</button>
+      <span style="font-size:12.5px;color:var(--tx3)">되돌릴 수 있게 백업을 먼저 남깁니다</span>
+    </div>
+    <div class="msg err" id="err2"></div>
+    <div class="msg ok" id="done"></div>
+  </div>
+
+  <div class="card">
+    <h2>지금 있는 매뉴얼</h2>
+    <p class="d">ID 를 여기서 골라 쓰시면 기존 매뉴얼을 바꿉니다.</p>
+    <div id="list" style="font-size:13.5px;color:var(--tx2)">불러오는 중…</div>
+  </div>
+
+</div>
+
+<script>
+/* 서버 주소는 반드시 상대경로로 부른다. 이 앱은 포털 아래 /manual-import/ 에
+   붙기 때문에, "/api/..." 처럼 슬래시로 시작하면 포털 최상위를 찾아가 404 가 난다. */
+const $ = (id) => document.getElementById(id);
+let PICKED = null, EXISTING = [];
+// 자동으로 고른 ID 와 그 까닭. 사람이 손으로 고치면 까닭은 안 보여 준다.
+let ID_AUTO = "", ID_WHY = "";
+
+function show(id, cls, text){
+  const e = $(id);
+  e.textContent = text;
+  e.className = "msg " + cls + (text ? " on" : "");
+}
+function esc(v){ return String(v ?? "").replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function api(path, opt){
+  const r = await fetch(path, { cache:"no-store", ...opt });
+  const t = await r.text();
+  let j = null; try{ j = JSON.parse(t); }catch(e){}
+  if(!r.ok) throw new Error((j && j.detail) || `요청 실패 (${r.status})`);
+  return j;
+}
+
+/* ── 목록 ── */
+async function loadList(){
+  try{
+    const j = await api("api/manuals");
+    EXISTING = j.manuals || [];
+    $("list").innerHTML = EXISTING.length
+      ? EXISTING.map(m => `<div class="mrow">
+           <code style="color:var(--accent)">${esc(m.id)}</code> — ${esc(m.title)}
+           <span class="chip">${m.sections}항목</span>
+           ${m.source
+             ? `<a class="lnk" href="api/source/${encodeURIComponent(m.id)}">PPT 원본 받기</a>`
+             : `<span class="chip dim">PPT 원본 없음</span>`}
+           <button class="lnk del" data-id="${esc(m.id)}">지우기</button>
+         </div>`).join("")
+      : "아직 매뉴얼이 없습니다.";
+    $("list").querySelectorAll("button.del").forEach(b => b.onclick = () => delManual(b.dataset.id));
+  }catch(e){ $("list").textContent = e.message; }
+}
+
+async function delManual(id){
+  const m = EXISTING.find(x => x.id === id) || {};
+  if(!confirm(`「${m.title || id}」 매뉴얼을 지웁니다.\n`
+            + `내용 ${m.sections || 0}항목과 그림, PPT 원본이 함께 지워집니다.\n\n`
+            + `지우기 전에 백업을 뜨므로 되돌릴 수는 있습니다. 진행할까요?`)) return;
+  try{
+    await api(`api/manuals/${encodeURIComponent(id)}`, { method:"DELETE" });
+    await loadList();
+    show("done", "ok", `「${m.title || id}」 을 지웠습니다. 매뉴얼 화면을 새로고침하면 반영됩니다.`);
+  }catch(e){ show("done", "err", e.message); }
+}
+
+/* ── 파일 고르기 ── */
+$("pick").onclick = () => $("file").click();
+$("file").onchange = () => { if($("file").files[0]) preview($("file").files[0]); };
+
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("on");
+}));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("on");
+}));
+drop.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0];
+  if(f) preview(f);
+});
+
+/* ── 미리 읽기 ── */
+async function preview(f){
+  PICKED = f;
+  $("fname").textContent = f.name;
+  show("err1", "err", "");
+  show("err2", "err", "");
+  show("done", "ok", "");
+  $("step2").classList.add("hidden");
+  $("step3").classList.add("hidden");
+
+  try{
+    const fd = new FormData(); fd.append("file", f);
+    const j = await api("api/preview", { method:"POST", body: fd });
+
+    $("sum").textContent =
+      `— 슬라이드 ${j.slideCount}장 → 항목 ${j.sections.length}개 · `
+      + `절차 ${j.totalSteps}줄 · 그림 ${j.totalImages}장`;
+    $("rows").innerHTML = j.sections.map(s => `
+      <tr>
+        <td class="no">${s.no}</td>
+        <td>
+          <b>${esc(s.title)}</b>
+          ${s.slides && s.slides.length > 1
+            ? `<span class="merged">슬라이드 ${s.slides.join("·")}장을 묶었습니다</span>` : ""}
+          ${s.stepCount ? `<ul class="steps">${s.steps.slice(0,4).map(x=>`<li>${esc(x)}</li>`).join("")}
+             ${s.stepCount > 4 ? `<li>… 외 ${s.stepCount-4}줄</li>` : ""}</ul>`
+            : `<div class="empty">글자가 없습니다 — 그림만 있는 장입니다</div>`}
+        </td>
+        <td class="cnt">절차 ${s.stepCount}줄<br>그림 ${s.imageCount}장</td>
+      </tr>`).join("")
+      + (j.contactNote ? `<tr><td class="no">–</td><td colspan="2">
+          <b>문의 안내</b>
+          <div class="empty">맺음말 장은 항목이 아니라 매뉴얼 아래쪽 안내로 넣습니다 —
+          ${esc(j.contactNote)}</div></td></tr>` : "");
+
+    ID_AUTO = j.suggestId || ""; ID_WHY = j.idReason || "";
+    $("mid").value = ID_AUTO;
+    $("mtitle").value = j.suggestTitle || "";
+    $("micon").value = (j.suggestTitle || "").slice(0,3);
+    EXISTING = j.existing || EXISTING;
+    checkId();
+
+    $("step2").classList.remove("hidden");
+    $("step3").classList.remove("hidden");
+    $("step2").scrollIntoView({behavior:"smooth", block:"start"});
+  }catch(e){
+    show("err1", "err", e.message);
+  }
+}
+
+/* ID 가 기존 것과 겹치는지 그 자리에서 알려준다.
+   덮어쓰기는 되돌리기 어려우므로 누르기 전에 알아야 한다. */
+function checkId(){
+  const v = ($("mid").value || "").trim().toLowerCase();
+  const hit = EXISTING.find(m => m.id === v);
+  const note = $("idnote");
+  if(!v){ note.textContent = "비워 두면 반영할 수 없습니다."; note.style.color = "var(--tx3)"; return; }
+  if(!/^[a-z0-9][a-z0-9-]{0,40}$/.test(v)){
+    note.textContent = "영문 소문자·숫자·하이픈만 쓸 수 있습니다.";
+    note.style.color = "var(--red)"; return;
+  }
+  if(hit){
+    note.innerHTML = `<b>「${esc(hit.title)}」 을 통째로 바꿉니다.</b> (지금 ${hit.sections}항목)`
+      + (ID_WHY && v === ID_AUTO ? `<br><span style="color:var(--tx3)">— ${esc(ID_WHY)}</span>` : "");
+    note.style.color = "var(--warn)";
+  }else{
+    note.textContent = "새 매뉴얼로 추가됩니다.";
+    note.style.color = "var(--ok)";
+  }
+}
+$("mid").oninput = checkId;
+
+/* ── 반영 ── */
+$("apply").onclick = async function(){
+  if(!PICKED) return;
+  const mid = ($("mid").value || "").trim().toLowerCase();
+  const hit = EXISTING.find(m => m.id === mid);
+  if(hit && !confirm(`「${hit.title}」 을 이 PPT 내용으로 통째로 바꿉니다.\n계속할까요?`)) return;
+
+  this.disabled = true; this.textContent = "반영하는 중…";
+  show("err2", "err", ""); show("done", "ok", "");
+  try{
+    const fd = new FormData();
+    fd.append("file", PICKED);
+    fd.append("manual_id", mid);
+    fd.append("title", $("mtitle").value.trim());
+    fd.append("icon", $("micon").value.trim());
+    fd.append("subtitle", $("msub").value.trim());
+    const j = await api("api/apply", { method:"POST", body: fd });
+    show("done", "ok",
+      `${j.how === "replaced" ? "바꿨습니다" : "추가했습니다"} — `
+      + `항목 ${j.sections}개 · 그림 ${j.images}장. `
+      + `매뉴얼 화면을 새로고침하면 보입니다.`
+      + (j.backup ? ` (백업: ${j.backup})` : ""));
+    loadList();
+  }catch(e){
+    show("err2", "err", e.message);
+  }finally{
+    this.disabled = false; this.textContent = "매뉴얼에 반영";
+  }
+};
+
+loadList();
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>
