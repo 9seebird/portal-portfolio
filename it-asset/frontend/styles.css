@@ -342,6 +342,32 @@ h1 {
   font-size: 13px;
 }
 
+/* 권한 화면에서 담당자에게만 뜨는 한 줄.
+   .admin-hint 처럼 노랗게 하지 않는다 — 그건 "못 한다"는 경고 색이고
+   이건 "그래서 다 보인다"는 설명이라, 같은 색이면 뜻이 뒤집혀 읽힌다. */
+.perm-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #cfe0ef;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* 표 안에서 자기 줄에 붙는 작은 표시 */
+.perm-tag {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-weak);
+  color: var(--accent-strong);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -1893,8 +1919,35 @@ tr.clickable:hover td.sticky-col { background: #f8fbfa; }
 .slot:hover { opacity: 1; border-color: var(--accent); }
 .slot.over { opacity: 1; background: var(--accent-weak); border-color: var(--accent); border-style: solid; }
 
-.seat-map.editing .seat { cursor: grab; }
-.seat-map.editing .seat.dragging { opacity: 0.35; cursor: grabbing; }
+/* 편집 중인 칸은 브라우저의 기본 터치 동작에서 뺀다.
+   이게 없으면 폰에서 칸을 눌러 끄는 순간 브라우저가 그 손짓을
+   「화면 넘기기」로 가져가고, 자리 옮기기는 시작조차 못 한다.
+
+   ★ 배치도 전체(.seat-map)에 주면 안 된다.
+     배치도는 폭이 1150px 로 고정이라 폰에서는 좌우로 밀어서 봐야 하는데,
+     전체에 주면 그 밀기까지 막혀 화면 밖은 볼 수 없게 된다.
+     빈 격자(.slot)는 그대로 두었으므로 거기서 밀면 평소처럼 넘어간다. */
+.seat-map.editing .seat {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;   /* 길게 눌렀을 때 뜨는 메뉴를 막는다 */
+}
+
+/* 끌리는 칸은 손가락을 따라 움직이고(transform 은 JS 가 준다),
+   ★ pointer-events 를 끈다. 안 그러면 elementFromPoint 가 손가락 밑에서
+     늘 이 칸만 집어서 「놓을 자리」를 영영 못 찾는다. */
+.seat-map.editing .seat.dragging {
+  opacity: 0.85;
+  cursor: grabbing;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 8px 20px rgba(20, 28, 40, 0.28);
+}
+
+/* 마우스로 끌 때 옆 칸의 글자가 파랗게 칠해지는 것을 막는다 */
+body.seat-dragging { -webkit-user-select: none; user-select: none; }
 
 /* 편집 중에는 자리를 눌러 사람을 보는 동작이 방해되므로 안내를 띄운다 */
 .seat-map.editing { outline: 2px dashed var(--accent); outline-offset: 3px; }

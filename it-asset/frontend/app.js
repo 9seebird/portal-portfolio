@@ -2474,7 +2474,12 @@ function seatCell(seat, query) {
   const hit = query && seatMatches(seat, query) ? " hit" : "";
 
   // 편집 모드에서만 끌 수 있다. 평소에 끌리면 지나가다 배치가 틀어진다.
-  const drag = state.seatEdit ? ` draggable="true" data-drag="${seat.id}"` : "";
+  //
+  // ★ draggable="true" 를 뺐다. 끌기는 이제 포인터 이벤트로 한다.
+  //   둘을 같이 두면 데스크톱에서 마우스를 누른 채 움직이는 순간
+  //   브라우저의 기본 끌어놓기가 먼저 시작되고, 그 바람에 포인터 이벤트가
+  //   pointercancel 로 끊긴다 — 마우스에서만 안 되는 이상한 상태가 된다.
+  const drag = state.seatEdit ? ` data-drag="${seat.id}"` : "";
 
   if (seat.kind !== "DESK") {
     const cls = seat.kind === "ROOM" ? "room" : "label";
@@ -2562,7 +2567,28 @@ async function loadPermissions() {
   $("#permDefaults").textContent = permData.defaults
     .map((v) => (permData.views.find((x) => x.id === v) || {}).label || v)
     .join(" · ");
+  paintPermAdminNote();
   renderPermissions();
+}
+
+/* 담당자에게만 뜨는 한 줄.
+
+   담당자는 체크를 하나도 안 남겨도 메뉴가 전부 보인다 (canSee 가
+   담당자면 무조건 통과시키고, 서버의 views_of 도 담당자에게는 전체를 준다).
+   그런데 화면에는 그 말이 없어서, 자기 줄의 체크를 지우고 저장한 다음
+   메뉴가 그대로면 "저장이 안 됐나" 로 읽힌다.
+
+   체험 계정이 담당자이므로 포트폴리오를 눌러 보는 사람은 대부분
+   이 상태로 이 화면을 만난다. 한 줄이면 오해가 끝난다. */
+function paintPermAdminNote() {
+  const note = $("#permAdminNote");
+  if (!note) return;
+  note.hidden = !isAdmin();
+  if (note.hidden) return;
+  note.innerHTML =
+    `지금 로그인한 <b>${escapeHtml(state.user?.username || "")}</b> 계정은 ` +
+    "<b>담당자</b>입니다 — 아래 체크와 상관없이 모든 화면이 보이고 고치기도 됩니다. " +
+    "여기서 정하는 것은 <b>담당자가 아닌 사람</b>이 볼 화면입니다.";
 }
 
 /* ★ 칸마다 data-label 을 단다. 좁은 화면(860px 이하)에서는 표가
@@ -2604,6 +2630,14 @@ function renderPermissions() {
               <div class="muted" style="font-size:12px">
                 ${escapeHtml(p.dept || "-")} · ${escapeHtml(p.user_id)}
                 ${p.custom ? "" : ' · <span title="따로 정하지 않아 기본값이 적용됩니다">기본</span>'}
+                ${/* 지금 보고 있는 사람이 담당자면 자기 줄에 표시해 둔다.
+                      위쪽 안내와 같은 이야기지만, 표가 길어지면 안내가
+                      화면 밖으로 나가 버려서 자기 줄에서 다시 보여야 한다.
+                      남이 담당자인지는 이 앱이 모른다 — 담당자 여부는
+                      포털이 정하고 요청 헤더로만 넘어온다. */""}
+                ${isAdmin() && p.user_id === state.user?.username
+                  ? ' · <span class="perm-tag" title="담당자는 체크와 상관없이 모든 화면이 보입니다">담당자 — 체크와 무관</span>'
+                  : ""}
               </div>
             </td>
             ${permData.views.map((v) => `
@@ -2908,46 +2942,175 @@ $("#seatEditBtn").addEventListener("click", () => {
   renderSeatMap();
 });
 
-let draggingSeat = null;
+/* ── 칸 끌어 옮기기 (마우스 · 손가락 · 펜) ────────────────────
+   예전에는 HTML5 끌어놓기(draggable + dragstart/drop)였다.
+   그건 **마우스에만 있는 기능**이다. 폰이나 태블릿에서 칸을 눌러 끌면
+   dragstart 가 아예 나지 않고, 브라우저는 그 손짓을 「화면 넘기기」로
+   읽어 배치도만 위아래로 밀렸다. 편집 모드를 켜 놓고도 자리를 못 옮기니
+   폰에서는 이 화면이 사실상 보기 전용이었다.
 
-$("#seatMap").addEventListener("dragstart", (event) => {
+   그래서 포인터 이벤트로 바꿨다. 마우스 · 손가락 · 펜이 같은 이벤트로
+   들어오므로 코드가 한 벌이면 된다. 데스크톱에서 하던 동작은 그대로다.
+
+   바꾸면서 지켜야 했던 것 네 가지
+   ─────────────────────────────────────────────────────────
+   1. 톡 눌러 여는 동작
+      칸을 그냥 누르면 그 사람의 자산·IP 가 열린다. 끌기와 구분이 없으면
+      옮기려고 손을 댈 때마다 서랍이 열린다. 그래서 DRAG_MIN_PX 만큼
+      움직이기 전에는 아무 일도 하지 않는다. 손가락은 가만히 눌러도
+      두세 픽셀은 흔들리기 때문에 0 으로 둘 수 없다.
+
+   2. 끌고 난 뒤의 click
+      마우스는 끌었다 놓아도 click 이 한 번 더 난다. 그대로 두면
+      옮기자마자 서랍이 열린다. 캡처 단계에서 그 한 번만 삼킨다.
+
+   3. 손가락일 때의 화면 스크롤
+      touch-action:none 을 줘야 브라우저가 스크롤로 가져가지 않는다.
+      단 **편집 중인 칸에만** 준다. 배치도 전체에 주면 폭이 1150px 인
+      배치도를 폰에서 좌우로 넘길 수 없게 된다 (빈 격자에서 밀면 넘어간다).
+
+   4. 어디에 놓이는지 보이기
+      끄는 동안 칸이 손가락을 따라오고, 놓일 자리에 테두리가 생긴다.
+      이게 없으면 옮기는 중인지 화면이 멎은 것인지 알 수 없다.
+
+   ★ 포인터 잡기(setPointerCapture)는 **배치도**에 건다.
+     끌리는 칸에 걸면 손가락이 칸 밖으로 나가도 이벤트는 오지만,
+     그 칸이 계속 손가락 밑에 있는 셈이라 놓을 자리를 찾을 때
+     자기 자신만 잡힌다. */
+
+const DRAG_MIN_PX = 6;     // 이만큼 움직여야 '옮기기'로 본다
+const EDGE_PX = 56;        // 가장자리 이만큼 안으로 들어오면 저절로 밀어 준다
+const EDGE_STEP = 16;      // 한 번에 미는 거리
+
+let seatDrag = null;         // 지금 끌고 있는 것 (없으면 null)
+let seatDragAte = false;     // 방금 끌었으니 click 을 한 번 삼켜야 한다
+let seatEdgeRaf = null;
+
+function seatDragStop() {
+  const d = seatDrag;
+  seatDrag = null;
+  if (seatEdgeRaf) { cancelAnimationFrame(seatEdgeRaf); seatEdgeRaf = null; }
+  if (!d) return null;
+  d.slot?.classList.remove("over");
+  d.cell.classList.remove("dragging");
+  d.cell.style.transform = "";
+  document.body.classList.remove("seat-dragging");
+  try { d.map.releasePointerCapture(d.pointerId); } catch { /* 이미 놓았다 */ }
+  return d;
+}
+
+/* 손가락 밑에 있는 '놓을 자리'.
+
+   끌리는 칸은 CSS 에서 pointer-events 를 꺼 두었다. 안 그러면
+   elementFromPoint 가 늘 그 칸만 집어서 놓을 자리를 영영 못 찾는다. */
+function seatSlotAt(d) {
+  const el = document.elementFromPoint(d.x, d.y);
+  if (!el) return d.slot;                       // 창 밖 — 마지막 자리를 지킨다
+  const slot = el.closest("[data-slot]");
+  if (slot) return slot;
+  // 칸 사이의 4px 틈에서는 배치도 자체가 잡힌다. 그때마다 자리를 놓으면
+  // 손이 조금만 떨려도 테두리가 깜빡인다. 마지막 자리를 지킨다.
+  if (el.closest("#seatMap") && !el.closest(".seat")) return d.slot;
+  return null;                                  // 다른 칸 위 — 거긴 이미 찼다
+}
+
+/* 화면 끝까지 끌고 갔을 때 저절로 밀어 준다.
+   배치도는 폭이 1150px 로 고정이라 폰에서는 한 화면에 다 안 들어온다.
+   이게 없으면 지금 보이는 범위 밖으로는 옮길 방법이 아예 없다. */
+function seatEdgeScroll() {
+  if (!seatDrag?.moved) { seatEdgeRaf = null; return; }
+  const { x, y } = seatDrag;
+  const box = document.getElementById("seats");     // 가로로 밀리는 상자
+  if (box) {
+    const r = box.getBoundingClientRect();
+    if (x < r.left + EDGE_PX) box.scrollLeft -= EDGE_STEP;
+    else if (x > r.right - EDGE_PX) box.scrollLeft += EDGE_STEP;
+  }
+  if (y < EDGE_PX) window.scrollBy(0, -EDGE_STEP);
+  else if (y > window.innerHeight - EDGE_PX) window.scrollBy(0, EDGE_STEP);
+  seatEdgeRaf = requestAnimationFrame(seatEdgeScroll);
+}
+
+$("#seatMap").addEventListener("pointerdown", (event) => {
+  if (!state.seatEdit) return;
+  // 마우스는 왼쪽 버튼만. 오른쪽 버튼으로 끌리면 메뉴와 엉킨다.
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  // 칸 안의 연필·선택 상자는 누르는 것이지 끄는 것이 아니다
+  if (event.target.closest("button, select, input, a")) return;
   const cell = event.target.closest("[data-drag]");
   if (!cell) return;
-  draggingSeat = cell.dataset.drag;
-  event.dataTransfer.effectAllowed = "move";
-  // 파이어폭스는 데이터가 없으면 드래그를 시작하지 않는다
-  event.dataTransfer.setData("text/plain", draggingSeat);
-  cell.classList.add("dragging");
+
+  seatDrag = {
+    id: cell.dataset.drag, cell, map: $("#seatMap"),
+    pointerId: event.pointerId,
+    startX: event.clientX, startY: event.clientY,
+    x: event.clientX, y: event.clientY,
+    moved: false, slot: null,
+  };
+  // ★ 여기서 preventDefault 를 하면 안 된다.
+  //   뒤따라 오는 click 까지 같이 사라져서 '톡 눌러 여는' 동작이 죽는다.
 });
 
-$("#seatMap").addEventListener("dragend", (event) => {
-  event.target.closest("[data-drag]")?.classList.remove("dragging");
-  draggingSeat = null;
+// 움직임·놓기는 창에서 받는다. 손가락이 배치도 밖으로 나가도
+// 끌던 것이 그대로 남아 있지 않게 하려는 것이다.
+window.addEventListener("pointermove", (event) => {
+  const d = seatDrag;
+  if (!d || event.pointerId !== d.pointerId) return;
+  d.x = event.clientX;
+  d.y = event.clientY;
+
+  if (!d.moved) {
+    if (Math.hypot(d.x - d.startX, d.y - d.startY) < DRAG_MIN_PX) return;
+    d.moved = true;
+    try { d.map.setPointerCapture(d.pointerId); } catch { /* 놓친 포인터 */ }
+    d.cell.classList.add("dragging");
+    document.body.classList.add("seat-dragging");
+    seatEdgeRaf = requestAnimationFrame(seatEdgeScroll);
+  }
+
+  d.cell.style.transform = `translate(${d.x - d.startX}px, ${d.y - d.startY}px)`;
+
+  const under = seatSlotAt(d);
+  if (under !== d.slot) {
+    d.slot?.classList.remove("over");
+    under?.classList.add("over");
+    d.slot = under;
+  }
 });
 
-$("#seatMap").addEventListener("dragover", (event) => {
-  const slot = event.target.closest("[data-slot]");
-  if (!slot || !draggingSeat) return;
-  event.preventDefault();                 // 이걸 해야 놓을 수 있다
-  slot.classList.add("over");
-});
+window.addEventListener("pointerup", (event) => {
+  const d = seatDrag;
+  if (!d || event.pointerId !== d.pointerId) return;
+  const { moved, slot, id } = d;
+  seatDragStop();
+  if (!moved) return;              // 그냥 누른 것 — click 이 알아서 한다
 
-$("#seatMap").addEventListener("dragleave", (event) => {
-  event.target.closest("[data-slot]")?.classList.remove("over");
-});
+  // 끌고 놓으면 click 이 한 번 더 온다. 그 한 번만 삼킨다.
+  // 혹시 click 이 안 오는 브라우저가 있어도 표시가 남지 않도록 시간을 둔다.
+  seatDragAte = true;
+  setTimeout(() => { seatDragAte = false; }, 500);
 
-$("#seatMap").addEventListener("drop", async (event) => {
-  const slot = event.target.closest("[data-slot]");
-  if (!slot || !draggingSeat) return;
-  event.preventDefault();
-  slot.classList.remove("over");
-
+  if (!slot) return;               // 빈 곳이 아닌 데 놓았다 — 아무 일도 없다
   const [row, col] = slot.dataset.slot.split(":").map(Number);
-  const id = draggingSeat;
-  draggingSeat = null;
+  moveSeat(id, row, col);
+});
 
+window.addEventListener("pointercancel", (event) => {
+  if (seatDrag && event.pointerId === seatDrag.pointerId) seatDragStop();
+});
+
+// 캡처 단계라 아래의 click 처리기보다 먼저 온다. 여기서 끊어야 삼켜진다.
+$("#seatMap").addEventListener("click", (event) => {
+  if (!seatDragAte) return;
+  seatDragAte = false;
+  event.preventDefault();
+  event.stopPropagation();
+}, true);
+
+async function moveSeat(id, row, col) {
   // 옮기기 전 자리를 기억해 둔다. 되돌리려면 그 값이 있어야 한다.
   const before = state.seats.find((x) => x.id === id);
+  if (before && before.row_idx === row && before.col_idx === col) return;
   const back = before ? { row_idx: before.row_idx, col_idx: before.col_idx } : null;
 
   try {
@@ -2963,7 +3126,7 @@ $("#seatMap").addEventListener("drop", async (event) => {
   } catch (error) {
     toast(error.message);
   }
-});
+}
 
 $("#seatMap").addEventListener("click", async (event) => {
   const button = event.target.closest("button");

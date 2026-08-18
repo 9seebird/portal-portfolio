@@ -120,6 +120,11 @@ case("POST",   "/api/services/register",      True, "← 바깥에서는 앱 등
 case("POST",   "/it-asset/api/assets",        True)
 case("PUT",    "/it-asset/api/employees/1",   True)
 case("DELETE", "/it-asset/api/assets/1",      True)
+# 자리 배치는 **옮기기만** 열었다. 아래 셋은 그대로 막혀야 한다.
+# 칸을 지우거나 새로 만든 것은 화면의 되돌리기로도 안 돌아온다.
+case("POST",   "/it-asset/api/seats",         True, "← 칸 만들기는 막는다")
+case("DELETE", "/it-asset/api/seats/1",       True, "← 칸 삭제는 막는다")
+case("PUT",    "/it-asset/api/seats/1/employee", True, "← 사람 앉히기도 막는다")
 case("POST",   "/manual-import/api/apply",    True)
 case("DELETE", "/manual-import/api/manuals/1", True)
 case("POST",   "/leave-anomaly/api/holidays", True)
@@ -138,6 +143,9 @@ case("POST", "/biz-plan/api/export",          False)
 case("POST", "/intake/api/check/회의실예약",   False)
 case("POST", "/manual-import/api/preview",    False)
 case("GET",  "/it-asset/api/assets",          False, "← 읽기는 전부 열려 있다")
+# 배치도를 끌어 옮기는 것. 이 앱에서 제일 보여줄 만한 화면이라 열어 두었다.
+# 되돌리기 버튼이 있고, 틀어져도 배치 자료를 다시 넣으면 원래대로 돌아온다.
+case("PATCH", "/it-asset/api/seats/1",        False, "← 자리 옮기기는 열어 두었다")
 case("GET",  "/",                             False)
 
 print(f"\n{ok}개 통과 · {fail}개 실패")
