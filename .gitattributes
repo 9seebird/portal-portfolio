@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────
+# 줄바꿈 통일.
+#
+# 회사 PC · 집 PC(둘 다 윈도우) 와 Azure 서버(리눅스) 를 오가다 보니,
+# 손대지도 않은 파일 40여 개가 통째로 "바뀜" 으로 잡히는 일이 있었다.
+# 내용이 아니라 줄 끝(CRLF ↔ LF)만 다른 것이다. 그대로 두면
+#
+#   · 커밋 하나가 13,000줄짜리로 부풀어 진짜 바뀐 곳이 묻히고
+#   · 서버에서 git pull 이 "local changes would be overwritten" 으로 막히고
+#   · .sh 가 CRLF 로 넘어가면 리눅스에서 `\r: command not found` 로 죽는다
+#
+# 그래서 **저장소 안에는 언제나 LF 로 넣는다.** 아래 한 줄이 그 규칙이다.
+# ─────────────────────────────────────────────────────────────
+* text=auto eol=lf
+
+# 윈도우에서만 도는 것은 CRLF 로 받아야 편하다.
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# 손대면 깨지는 것들 — 줄바꿈 변환을 하지 않는다.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.xlsx binary
+*.xls  binary
+*.pptx binary
+*.docx binary
+*.db   binary
+*.sqlite binary
+*.woff  binary
+*.woff2 binary
+*.zip  binary

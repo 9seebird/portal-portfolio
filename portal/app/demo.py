@@ -42,6 +42,17 @@ DEMO_MODE=0 이면 이 파일의 모든 것이 꺼진다. 그대로 사내에 �
 그쪽은 nginx 에서 같은 기준으로 한 번 더 막는다
 (`proxy/conf.d/00-demo-guard.conf`). 두 겹인 이유는 서로 놓치는
 자리가 다르기 때문이다 — 포털은 자기 주소만, nginx 는 전부.
+
+────────────────────────────────────────────────────────────
+만든 사람은 어떻게 고치나
+
+문을 하나 더 냈다. `proxy/conf.d/02-admin.conf` 가 8082 포트에 같은 화면을
+띄우는데, 그 입구에는 위의 두 겹이 다 없다. 8082 는 127.0.0.1 로만 열려
+있어서 인터넷에서도 사내망에서도 닿지 않는다 — 서버에서는 SSH 터널을
+뚫어야 들어온다. 안전장치가 비밀번호가 아니라 **서버 SSH 키**인 셈이라,
+비밀번호 하나가 새면 끝나는 구조를 피할 수 있었다.
+
+    ssh -L 8082:127.0.0.1:8082 <계정>@<서버>   →  http://127.0.0.1:8082/
 """
 
 import logging
@@ -227,6 +238,16 @@ def install(app) -> None:
     async def _guard(request: Request, call_next):
         path = request.url.path
         method = request.method.upper()
+
+        # ★ 주인 전용 입구로 들어온 요청은 그냥 통과시킨다.
+        #
+        #   이 헤더는 nginx 가 넣는다(proxy/conf.d/_routes.inc). 공개 입구(80)
+        #   에서는 늘 "0" 으로 **덮어써지므로** 브라우저가 직접 넣어도 소용없다.
+        #   "1" 이 되려면 8082 로 들어와야 하고, 8082 는 127.0.0.1 로만 열려
+        #   있어서 서버에서는 SSH 로 들어온 사람만 닿는다.
+        #   즉 안전장치는 비밀번호가 아니라 **서버 SSH 키**다.
+        if request.headers.get("x-demo-admin") == "1":
+            return await call_next(request)
 
         if method in UNSAFE:
             if path.startswith(BLOCK_PREFIX) or path in BLOCK_EXACT:

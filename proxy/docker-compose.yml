@@ -45,6 +45,12 @@ services:
     container_name: demo-proxy
     ports:
       - "${PROXY_PUBLISH:-80:80}"
+      # 주인 전용 입구(conf.d/02-admin.conf). 체험판 가드가 없는 문이라
+      # **반드시 127.0.0.1 을 앞에 붙인다.** 이걸 빼면 사내망·인터넷에서
+      # 데모를 마음대로 고칠 수 있는 뒷문이 된다.
+      # 로컬은 그냥 http://127.0.0.1:8082/ 로 들어가고,
+      # 서버는 ssh -L 8082:127.0.0.1:8082 <계정>@<서버> 로 터널을 뚫는다.
+      - "127.0.0.1:8082:8082"
     volumes:
       - ./conf.d:/etc/nginx/conf.d:ro
       # 앱 하나에 파일 하나. portal.conf 가 여기를 include 한다.

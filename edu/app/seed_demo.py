@@ -226,10 +226,16 @@ def _fill(force: bool) -> int:
         "개인정보보호 교육 (연 1회 의무)",
         "개인정보를 다루는 모든 직원이 연 1회 들어야 하는 교육입니다.",
         (today + timedelta(days=12)).isoformat(), 1)
+    # ★ 과정 1 과 **다른 영상**을 쓴다.
+    #   전에는 과정 1 의 첫 차시(바이브코딩 입문)를 그대로 재활용했는데,
+    #   제목은 「개인정보보호 기본」인데 화면에는 코딩 강의가 떠서
+    #   체험판을 보는 사람이 먼저 그걸 보게 된다.
+    #   duration_sec 은 대충 넣어도 된다 — 재생기가 뜨면서 실제 길이로
+    #   set_lesson_duration 이 갱신한다. 첫 화면에 잠깐 보일 뿐이다.
     l2 = db.get_lesson(db.create_lesson(c2, {
         "title": "개인정보보호 기본 — 무엇이 개인정보인가",
-        "kind": "youtube", "url": "https://www.youtube.com/watch?v=iRrfzddtuio",
-        "youtube_id": "iRrfzddtuio", "note": "", "duration_sec": 714,
+        "kind": "youtube", "url": "https://www.youtube.com/watch?v=OeMqczSw_fk",
+        "youtube_id": "OeMqczSw_fk", "note": "", "duration_sec": 600,
         "min_ratio": 0.8, "required": 1}))
     print("  과정 2 — 차시 1개")
 
