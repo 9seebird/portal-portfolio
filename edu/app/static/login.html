@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>온라인 교육 · 로그인</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--line:#e3e6ea;--text:#1c2024;--muted:#6b7480;--brand:#2563eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);min-height:100vh;
+       display:flex;align-items:center;justify-content:center;padding:20px;
+       font-family:"Malgun Gothic","맑은 고딕",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       font-size:15px;line-height:1.6}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:12px;
+       padding:34px 30px;width:100%;max-width:380px}
+  h1{font-size:19px;margin:0 0 4px}
+  p.sub{color:var(--muted);font-size:13.5px;margin:0 0 22px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 5px}
+  input{width:100%;border:1px solid var(--line);border-radius:8px;padding:11px 12px;
+        font:inherit;background:#fff}
+  input:focus{outline:2px solid #c7d7fb;border-color:var(--brand)}
+  button{width:100%;margin-top:22px;background:var(--brand);color:#fff;border:0;
+         border-radius:8px;padding:12px;font:inherit;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .err{background:#fdeaea;color:#a01e1e;border:1px solid #f3c6c6;border-radius:8px;
+       padding:11px 13px;margin-top:16px;font-size:13.5px;display:none}
+  .note{color:var(--muted);font-size:12.5px;margin-top:20px;padding-top:16px;
+        border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<form class="box" id="f">
+  <h1>온라인 교육</h1>
+  <p class="sub">아이디와 비밀번호를 입력해 주세요.</p>
+
+  <label for="uid">아이디</label>
+  <input id="uid" name="uid" autocomplete="username" required autofocus>
+
+  <label for="pw">비밀번호</label>
+  <input id="pw" name="pw" type="password" autocomplete="current-password" required>
+
+  <button type="submit" id="btn">들어가기</button>
+  <div class="err" id="err"></div>
+
+  <p class="note">포털 아이디를 그대로 쓰시면 됩니다. 사번으로 넣으셔도 됩니다.<br>
+    처음 비밀번호는 교육 담당자가 안내한 것을 쓰시고, 들어가신 뒤 바꾸실 수 있습니다.<br>
+    아이디가 확인되지 않거나 비밀번호를 잊으셨으면 교육 담당자에게 문의해 주세요.</p>
+</form>
+
+<script>
+const f = document.getElementById('f'), btn = document.getElementById('btn'), err = document.getElementById('err');
+f.addEventListener('submit', async e => {
+  e.preventDefault();
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = '확인 중…';
+  try {
+    const r = await fetch('api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: document.getElementById('uid').value,
+                             password: document.getElementById('pw').value })
+    });
+    if (!r.ok) {
+      let m = '로그인하지 못했습니다.';
+      try { m = (await r.json()).detail || m; } catch (e) {}
+      throw new Error(m);
+    }
+    // 로그인 뒤에는 원래 가려던 곳으로. 없으면 교육 목록으로.
+    const back = new URLSearchParams(location.search).get('next');
+    location.href = back && back.startsWith('/') === false ? back : './';
+  } catch (e2) {
+    err.textContent = e2.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = '들어가기';
+  }
+});
+</script>
+</body>
+</html>

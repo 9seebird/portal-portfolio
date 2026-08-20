@@ -1,0 +1,25 @@
+# ★ 프로젝트 이름을 못 박는다.
+#   compose 는 이름을 안 적으면 폴더 이름으로 프로젝트를 정한다. 이 저장소를
+#   받은 사람이 같은 이름의 폴더로 다른 것을 띄워 두었으면, compose 가 남의
+#   컨테이너를 이 프로젝트 것으로 보고 exec 가 엉뚱한 곳에서 돈다.
+name: demo-edu
+
+services:
+  edu:
+    build: .
+    container_name: demo-edu
+    restart: unless-stopped
+    env_file:
+      - .env
+    # ports 는 쓰지 않는다. 앞단 nginx 가 /edu/ 경로로 넘겨주므로
+    # 바깥 포트가 필요 없고, 앱마다 8080 을 열면 두 번째 앱부터 충돌한다.
+    expose:
+      - "8080"
+    volumes:
+      - ./data:/data
+    networks:
+      - demo-net
+
+networks:
+  demo-net:
+    external: true

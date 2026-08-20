@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>온라인 교육 · 담당자</title>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--line:#e3e6ea;--text:#1c2024;--muted:#6b7480;
+        --brand:#2563eb;--ok:#0f9d58;--warn:#c2410c;--bar:#eceff3;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:"Malgun Gothic","맑은 고딕",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+       font-size:14.5px;line-height:1.6}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 20px;
+         display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+  header h1{font-size:17px;margin:0}
+  header .who{margin-left:auto;color:var(--muted);font-size:13px}
+  header a{font-size:13px;color:var(--brand);text-decoration:none;border:1px solid var(--line);
+           padding:5px 10px;border-radius:6px}
+  main{max-width:1080px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:18px}
+  .card h2{font-size:16px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .kpi{background:var(--bar);border-radius:8px;padding:14px}
+  .kpi b{display:block;font-size:26px;line-height:1.2}
+  .kpi small{color:var(--muted);font-size:12.5px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  /* 고치는 중인 줄은 칸을 넘겨 쓰므로 줄바꿈을 허용한다.
+     nowrap 인 채로 입력칸을 여러 개 넣으면 옆 칸을 덮으며 밀려 나간다. */
+  tr.edit > td{white-space:normal;background:#fafbfc;padding:14px 12px}
+  .editform{display:grid;grid-template-columns:1fr 130px 90px;gap:10px;align-items:end}
+  .editform .full{grid-column:1 / -1}
+  .editform label{margin:0 0 4px}
+  .editform .foot{grid-column:1 / -1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .editform .foot .url{color:var(--muted);font-size:12px;word-break:break-all;flex:1;min-width:200px}
+  .chk{display:flex;align-items:center;gap:6px;font-size:13px;padding-bottom:9px}
+  .chk input{width:auto}
+  th{color:var(--muted);font-weight:600;background:#fafbfc}
+  td.num,th.num{text-align:right}
+  .bar{height:7px;background:var(--bar);border-radius:5px;overflow:hidden;min-width:70px}
+  .bar>i{display:block;height:100%;background:var(--brand)}
+  .bar.ok>i{background:var(--ok)}
+  .tag{font-size:11.5px;padding:2px 8px;border-radius:20px;background:var(--bar);color:var(--muted)}
+  .tag.ok{background:#e7f6ed;color:var(--ok)} .tag.no{background:#fdeaea;color:#c02626}
+  .tag.mid{background:#fff2e8;color:var(--warn)}
+  input,select,textarea,button{font:inherit}
+  input,select,textarea{border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%;background:#fff}
+  textarea{min-height:60px;resize:vertical}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px}
+  button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:8px 14px;cursor:pointer}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  button.danger{color:#c02626;border-color:#f0caca}
+  button.sm{padding:4px 9px;font-size:12.5px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .toolbar .sp{margin-left:auto}
+  .msg{border-radius:8px;padding:10px 13px;margin-bottom:14px;font-size:13.5px;display:none}
+  .msg.err{background:#fdeaea;color:#a01e1e;border:1px solid #f3c6c6}
+  .msg.ok{background:#e7f6ed;color:#0b6b3d;border:1px solid #bfe4cd}
+  .scroll{max-height:440px;overflow:auto}
+  .muted{color:var(--muted);font-size:12.5px}
+  details summary{cursor:pointer;color:var(--brand);font-size:13.5px}
+
+  /* ── 화면 안에서 뜨는 창 ──────────────────────────────────
+     브라우저 기본 prompt·confirm 은 주소가 그대로 보이고 생김새를 맞출 수 없다.
+     같은 자리에서 같은 모양으로 뜨게 직접 만든다. */
+  .modal-back{position:fixed;inset:0;background:rgba(20,24,28,.45);display:flex;
+              align-items:center;justify-content:center;z-index:100;padding:20px}
+  .modal-box{background:var(--card);border-radius:12px;max-width:440px;width:100%;
+             padding:22px 24px;box-shadow:0 14px 44px rgba(0,0,0,.2)}
+  .modal-box h3{margin:0 0 6px;font-size:17px}
+  .modal-box p.msub{margin:0 0 4px;color:var(--muted);font-size:13.5px;white-space:pre-line}
+  .modal-box label{display:block;font-size:12.5px;color:var(--muted);margin:14px 0 5px}
+  .modal-box input,.modal-box textarea{width:100%;border:1px solid var(--line);border-radius:8px;
+             padding:10px 12px;font:inherit;background:#fff}
+  .modal-box input:focus,.modal-box textarea:focus{outline:2px solid #c7d7fb;border-color:var(--brand)}
+  .modal-box textarea{min-height:64px;resize:vertical}
+  .modal-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:22px}
+  .modal-foot button{padding:9px 16px}
+  button.primary.danger{background:#c02626;border-color:#c02626;color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>온라인 교육 · 담당자</h1>
+  <span class="who" id="who"></span>
+  <a href="./">직원 화면</a>
+  <a href="#" id="logoutLink" style="display:none">로그아웃</a>
+</header>
+<main>
+  <div class="msg err" id="err"></div>
+  <div class="msg ok" id="ok"></div>
+
+  <!-- 과정 선택 및 편집 -->
+  <section class="card">
+    <div class="toolbar">
+      <select id="courseSel" style="max-width:340px"></select>
+      <button class="sm" id="btnNew">＋ 과정 만들기</button>
+      <span class="sp"></span>
+      <span class="muted" id="rosterInfo"></span>
+    </div>
+    <div id="courseEdit"></div>
+  </section>
+
+  <!-- 대상자 명단 -->
+  <section class="card">
+    <div class="toolbar">
+      <h2 style="margin:0">대상자 명단</h2>
+      <span class="muted" id="rosterMeta"></span>
+      <span class="sp"></span>
+      <input id="rosterQ" placeholder="아이디·이름·부서·사번 검색" style="max-width:210px">
+      <select id="rosterDept" style="width:auto"><option value="">부서 전체</option></select>
+      <button class="sm" id="btnTemplate">양식 내려받기</button>
+      <label class="sm" for="rosterFile"
+             style="margin:0;color:var(--text);border:1px solid var(--line);border-radius:7px;
+                    padding:5px 10px;cursor:pointer">파일로 올리기</label>
+      <input type="file" id="rosterFile" accept=".csv,.xlsx" style="display:none;width:auto">
+      <button class="sm" id="btnSyncRoster">포털에서 가져오기</button>
+    </div>
+    <p class="muted" style="margin:-4px 0 12px">
+      이수율과 미수강자 명단은 ‘들어야 할 사람’ 전체가 있어야 나옵니다.
+      CSV·엑셀 파일을 올리거나, 챗 포털이 있으면 그쪽 직원 명단을 그대로 가져오세요.
+      첫 줄에 <b>아이디 / 이름 / 부서</b> 열이 있으면 됩니다. (사번·담당자 열은 선택)
+      단독 모드로 쓸 때는 새로 들어온 사람에게 초기 비밀번호(<code>.env</code> 의
+      <code>DEFAULT_PASSWORD</code>)가 자동으로 들어갑니다.
+      이미 비밀번호를 바꾼 사람은 그대로 유지됩니다.
+    </p>
+    <div class="toolbar" style="margin-bottom:10px">
+      <input id="newId" placeholder="아이디" style="max-width:140px">
+      <input id="newName" placeholder="이름" style="max-width:120px">
+      <input id="newDept" placeholder="부서" style="max-width:150px">
+      <input id="newEmp" placeholder="사번 (선택)" style="max-width:130px">
+      <button class="sm primary" id="btnAddPerson">＋ 한 명 추가</button>
+    </div>
+    <div id="portalLogin" style="display:none;background:var(--bar);border-radius:8px;padding:14px;margin-bottom:12px">
+      <p class="muted" style="margin:0 0 8px">
+        포털 관리자 아이디와 비밀번호를 한 번만 입력하면 직원 명단을 받아 옵니다.
+        <b>비밀번호는 저장하지 않습니다.</b>
+      </p>
+      <div class="row3">
+        <div><label>포털 아이디</label><input id="portalId" autocomplete="off"></div>
+        <div><label>비밀번호</label><input id="portalPw" type="password" autocomplete="off"></div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button class="primary" id="btnDoSync">가져오기</button>
+          <button id="btnCancelSync">취소</button>
+        </div>
+      </div>
+    </div>
+    <p class="muted" id="rosterCount" style="margin:0 0 6px"></p>
+    <div class="scroll" style="max-height:320px"><table id="rosterTable"></table></div>
+  </section>
+
+  <!-- 차시 -->
+  <section class="card">
+    <h2>차시</h2>
+    <div id="lessons"></div>
+    <details style="margin-top:14px">
+      <summary>＋ 차시 추가</summary>
+      <div style="margin-top:12px">
+        <div class="row3">
+          <div><label>제목</label><input id="lTitle" placeholder="예: 바이브코딩이란 무엇인가"></div>
+          <div><label>종류</label>
+            <select id="lKind">
+              <option value="youtube">유튜브 영상 (진도 자동)</option>
+              <option value="doc">사내 자료 PDF (열람 확인)</option>
+              <option value="link">바깥 링크 (열람 확인)</option>
+            </select>
+          </div>
+          <div><label>이수 기준</label>
+            <select id="lRatio">
+              <option value="">기본값 (90%)</option>
+              <option value="0.8">80%</option>
+              <option value="0.95">95%</option>
+              <option value="1">100%</option>
+            </select>
+          </div>
+        </div>
+        <div id="lSrcYoutube">
+          <label>유튜브 주소 (주소창의 주소를 그대로 붙여 넣으세요)</label>
+          <input id="lUrl" placeholder="https://www.youtube.com/watch?v=...">
+        </div>
+        <div id="lSrcDoc" style="display:none">
+          <label>PDF 파일 (PPT 를 PDF 로 저장해서 올리세요 · 최대 <span id="maxmb">30</span>MB)</label>
+          <input type="file" id="lFile" accept="application/pdf">
+        </div>
+        <div id="lSrcLink" style="display:none">
+          <label>링크 주소</label>
+          <input id="lLink" placeholder="https://">
+        </div>
+        <label>한 줄 안내 (선택)</label>
+        <input id="lNote" placeholder="예: 1.5배속으로 봐도 진도는 정상 기록됩니다">
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <label style="margin:0;display:flex;align-items:center;gap:6px;color:var(--text)">
+            <input type="checkbox" id="lReq" checked style="width:auto"> 필수 (이수 판정에 포함)
+          </label>
+          <button class="primary" id="btnAddLesson" style="margin-left:auto">추가</button>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- 현황 -->
+  <section class="card">
+    <div class="toolbar">
+      <h2 style="margin:0">이수 현황</h2>
+      <span class="sp"></span>
+      <input id="peopleQ" placeholder="아이디·이름·부서·사번 검색" style="max-width:210px">
+      <select id="peopleDept" style="width:auto"><option value="">부서 전체</option></select>
+      <select id="filter" style="width:auto">
+        <option value="all">전체</option>
+        <option value="not">미이수만</option>
+        <option value="none">아직 시작도 안 한 사람</option>
+        <option value="done">이수자만</option>
+      </select>
+      <button class="sm" id="btnCsv">CSV 내려받기</button>
+    </div>
+    <div class="grid" id="kpis"></div>
+    <div class="row2" style="margin-top:18px">
+      <div>
+        <h2 style="font-size:14px">부서별</h2>
+        <div class="scroll"><table id="deptTable"></table></div>
+      </div>
+      <div>
+        <h2 style="font-size:14px">차시별 완료 인원</h2>
+        <div class="scroll"><table id="lessonTable"></table></div>
+      </div>
+    </div>
+    <h2 style="font-size:14px;margin-top:20px">사람별 <span class="muted" id="peopleCount"></span></h2>
+    <div class="scroll"><table id="peopleTable"></table></div>
+  </section>
+</main>
+
+<script>
+let ME = null, COURSES = [], CUR = null, STATS = null, CFG = {}, editingLesson = null;
+
+async function api(path, opts) {
+  const o = Object.assign({}, opts || {});
+  if (!(o.body instanceof FormData)) o.headers = Object.assign({ 'Content-Type': 'application/json' }, o.headers || {});
+  const r = await fetch(path, o);
+  if (r.status === 401) { location.href = 'login'; throw new Error('로그인이 필요합니다.'); }
+  if (!r.ok) {
+    let m = r.status + ' 오류';
+    try { m = (await r.json()).detail || m; } catch (e) {}
+    throw new Error(m);
+  }
+  return r.json();
+}
+function esc(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function say(msg, isErr) {
+  const el = document.getElementById(isErr ? 'err' : 'ok');
+  const other = document.getElementById(isErr ? 'ok' : 'err');
+  other.style.display = 'none';
+  el.textContent = msg; el.style.display = 'block';
+  if (!isErr) setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+function fmtTime(s){ if(!s) return ''; return s.replace('T',' ').replace(/(\+.*|Z)$/,''); }
+
+
+// ── 화면 안에서 뜨는 창 ─────────────────────────────────────────────────────
+// modal({...}) 은 [확인] 을 누르면 입력값 묶음을, [취소]·Esc·바깥 클릭이면 null 을 준다.
+function modal(opt) {
+  return new Promise(resolve => {
+    const back = document.createElement('div');
+    back.className = 'modal-back';
+    back.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true">
+        <h3>${opt.title || ''}</h3>
+        ${opt.sub ? `<p class="msub">${opt.sub}</p>` : ''}
+        ${opt.html || ''}
+        <div class="modal-foot">
+          <button type="button" data-x="cancel">${opt.cancelText || '취소'}</button>
+          <button type="button" class="primary${opt.danger ? ' danger' : ''}" data-x="ok">${opt.okText || '확인'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+
+    const collect = () => {
+      const o = {};
+      back.querySelectorAll('[data-field]').forEach(el => {
+        o[el.dataset.field] = el.type === 'checkbox' ? el.checked : el.value;
+      });
+      return o;
+    };
+    const close = v => { document.removeEventListener('keydown', onKey); back.remove(); resolve(v); };
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); close(null); }
+      // 한 줄짜리 입력칸에서 엔터를 치면 확인으로 본다. 여러 줄 칸은 그냥 줄바꿈.
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); close(collect()); }
+    };
+    document.addEventListener('keydown', onKey);
+    back.addEventListener('click', e => { if (e.target === back) close(null); });
+    back.querySelector('[data-x="cancel"]').onclick = () => close(null);
+    back.querySelector('[data-x="ok"]').onclick = () => close(collect());
+
+    const first = back.querySelector('[data-field]');
+    (first || back.querySelector('[data-x="ok"]')).focus();
+    if (first && first.select) first.select();
+  });
+}
+
+// 예/아니오만 묻는 창. true 면 진행한다.
+function confirmBox(title, sub, okText, danger) {
+  return modal({ title, sub, okText: okText || '확인', danger: danger !== false })
+    .then(v => v !== null);
+}
+
+// ── 과정 ────────────────────────────────────────────────────────────────────
+async function loadCourses(keepId) {
+  COURSES = (await api('api/admin/courses')).courses;
+  const sel = document.getElementById('courseSel');
+  sel.innerHTML = COURSES.map(c =>
+    `<option value="${c.id}">${esc(c.title)}${c.active ? '' : ' (비공개)'}</option>`).join('');
+  if (!COURSES.length) { CUR = null; renderCourse(); renderLessons(); renderStats(null); return; }
+  const want = keepId && COURSES.some(c => c.id === keepId) ? keepId : COURSES[0].id;
+  sel.value = want;
+  await selectCourse(want);
+}
+
+async function selectCourse(id) {
+  CUR = COURSES.find(c => c.id === id) || null;
+  renderCourse(); renderLessons();
+  await loadStats();
+}
+
+function renderCourse() {
+  const box = document.getElementById('courseEdit');
+  if (!CUR) { box.innerHTML = '<p class="muted">아직 과정이 없습니다. ‘＋ 과정 만들기’로 시작하세요.</p>'; return; }
+  box.innerHTML = `
+    <div class="row3">
+      <div><label>과정 이름</label><input id="cTitle" value="${esc(CUR.title)}"></div>
+      <div><label>마감일</label><input id="cDeadline" type="date" value="${esc(CUR.deadline || '')}"></div>
+      <div><label>공개</label>
+        <select id="cActive">
+          <option value="1" ${CUR.active ? 'selected' : ''}>공개 (직원 화면에 보임)</option>
+          <option value="0" ${CUR.active ? '' : 'selected'}>비공개 (준비 중)</option>
+        </select></div>
+    </div>
+    <label>안내문</label>
+    <textarea id="cDesc">${esc(CUR.description || '')}</textarea>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="primary" id="btnSaveCourse">저장</button>
+      <button class="danger" id="btnDelCourse" style="margin-left:auto">과정 삭제</button>
+    </div>`;
+  document.getElementById('btnSaveCourse').onclick = saveCourse;
+  document.getElementById('btnDelCourse').onclick = delCourse;
+}
+
+async function saveCourse() {
+  try {
+    await api('api/admin/courses/' + CUR.id, { method: 'PATCH', body: JSON.stringify({
+      title: document.getElementById('cTitle').value,
+      deadline: document.getElementById('cDeadline').value,
+      description: document.getElementById('cDesc').value,
+      active: document.getElementById('cActive').value === '1',
+    })});
+    say('저장했습니다.');
+    await loadCourses(CUR.id);
+  } catch (e) { say(e.message, true); }
+}
+
+async function delCourse() {
+  if (!await confirmBox('과정을 지울까요?',
+      `‘${CUR.title}’ 과정과 그 아래 차시, 직원들의 진도 기록이 함께 사라집니다.\n되돌릴 수 없습니다.`,
+      '지우기')) return;
+  try { await api('api/admin/courses/' + CUR.id, { method: 'DELETE' }); say('삭제했습니다.'); await loadCourses(); }
+  catch (e) { say(e.message, true); }
+}
+
+document.getElementById('btnNew').onclick = async () => {
+  const v = await modal({
+    title: '새 교육 과정',
+    sub: '만들면 비공개로 시작합니다. 차시를 채운 뒤 공개로 바꾸세요.',
+    okText: '만들기',
+    html: `
+      <label>과정 이름</label>
+      <input data-field="title" placeholder="예: 2026 바이브코딩 기초">
+      <label>마감일 (선택)</label>
+      <input data-field="deadline" type="date">
+      <label>안내문 (선택)</label>
+      <textarea data-field="description" placeholder="직원 화면에 함께 보입니다"></textarea>`,
+  });
+  if (!v || !v.title.trim()) return;
+  try {
+    const r = await api('api/admin/courses', { method: 'POST', body: JSON.stringify({
+      title: v.title, deadline: v.deadline, description: v.description, active: false }) });
+    say('만들었습니다. 차시를 추가한 뒤 공개로 바꾸세요.');
+    await loadCourses(r.id);
+  } catch (e) { say(e.message, true); }
+};
+document.getElementById('courseSel').onchange = e => selectCourse(parseInt(e.target.value, 10));
+
+// ── 차시 ────────────────────────────────────────────────────────────────────
+function renderLessons() {
+  const box = document.getElementById('lessons');
+  if (!CUR) { box.innerHTML = ''; return; }
+  if (!CUR.lessons.length) { box.innerHTML = '<p class="muted">차시가 없습니다. 아래에서 추가하세요.</p>'; return; }
+  box.innerHTML = `<table><tr><th style="width:40px">#</th><th>제목</th><th>종류</th>
+      <th>기준</th><th>필수</th><th style="width:200px"></th></tr>` +
+    CUR.lessons.map((l, i) => l.id === editingLesson ? lessonEditRow(l, i) : lessonViewRow(l, i))
+      .join('') + '</table>';
+  bindLessons();
+}
+
+function lessonViewRow(l, i) {
+  return `<tr>
+    <td>${i + 1}</td>
+    <td>${esc(l.title)}${l.note ? `<br><span class="muted">${esc(l.note)}</span>` : ''}
+      ${l.kind === 'youtube' && !l.durationSec
+        ? '<br><span class="muted">길이 미확인 — 누군가 한 번 재생하면 잡힙니다</span>' : ''}</td>
+    <td>${({youtube:'영상',doc:'자료',link:'링크'})[l.kind] || l.kind}</td>
+    <td>${Math.round((l.minRatio || 0.9) * 100)}%</td>
+    <td>${l.required ? '필수' : '선택'}</td>
+    <td>
+      <button class="sm" data-up="${l.id}">▲</button>
+      <button class="sm" data-down="${l.id}">▼</button>
+      <button class="sm" data-ledit="${l.id}">수정</button>
+      <button class="sm danger" data-del="${l.id}">삭제</button>
+    </td></tr>`;
+}
+
+function lessonEditRow(l, i) {
+  const ratios = [['', '기본 (90%)'], ['0.8', '80%'], ['0.9', '90%'], ['0.95', '95%'], ['1', '100%']];
+  const cur = l.minRatio && Math.abs(l.minRatio - 0.9) > 0.001 ? String(l.minRatio) : '';
+  const kind = ({ youtube: '영상', doc: '자료', link: '링크' })[l.kind] || l.kind;
+  return `<tr class="edit"><td colspan="6">
+    <div class="editform">
+      <div><label>제목</label><input id="leTitle" value="${esc(l.title)}"></div>
+      <div><label>이수 기준</label><select id="leRatio">${ratios.map(([v, t]) =>
+          `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="chk"><input type="checkbox" id="leReq" ${l.required ? 'checked' : ''}> 필수</div>
+
+      <div class="full"><label>한 줄 안내 (선택)</label>
+        <input id="leNote" value="${esc(l.note || '')}" placeholder="예: 1.5배속으로 봐도 진도는 정상 기록됩니다"></div>
+
+      <div class="full"><label>${kind} 주소 — 바꿀 때만 넣으세요. 비워 두면 지금 주소가 그대로 남습니다</label>
+        <input id="leUrl" placeholder="${l.kind === 'youtube'
+          ? 'https://www.youtube.com/watch?v=... (영상을 바꾸면 이 차시 진도가 초기화됩니다)'
+          : 'https://...'}"></div>
+
+      <div class="foot">
+        <span class="url">지금: ${esc(l.url || '(없음)')}${
+          l.kind === 'youtube' && l.durationSec ? ` · ${Math.round(l.durationSec / 60)}분` : ''}</span>
+        <button class="primary" data-lsave="${l.id}">저장</button>
+        <button data-lcancel="1">취소</button>
+      </div>
+    </div>
+  </td></tr>`;
+}
+
+function bindLessons() {
+  const box = document.getElementById('lessons');
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delLesson(parseInt(b.dataset.del, 10)));
+  box.querySelectorAll('[data-up]').forEach(b => b.onclick = () => move(parseInt(b.dataset.up, 10), -1));
+  box.querySelectorAll('[data-down]').forEach(b => b.onclick = () => move(parseInt(b.dataset.down, 10), 1));
+  box.querySelectorAll('[data-ledit]').forEach(b => b.onclick = () => {
+    editingLesson = parseInt(b.dataset.ledit, 10); renderLessons();
+  });
+  box.querySelectorAll('[data-lcancel]').forEach(b => b.onclick = () => {
+    editingLesson = null; renderLessons();
+  });
+  box.querySelectorAll('[data-lsave]').forEach(b => b.onclick = async () => {
+    const id = parseInt(b.dataset.lsave, 10);
+    const url = document.getElementById('leUrl').value.trim();
+    const body = {
+      title: document.getElementById('leTitle').value,
+      note: document.getElementById('leNote').value,
+      required: document.getElementById('leReq').checked,
+      minRatio: document.getElementById('leRatio').value || null,
+    };
+    // 주소는 실제로 새로 넣었을 때만 보낸다. 비워 두면 지금 주소가 그대로 남는다.
+    if (url) {
+      const l = CUR.lessons.find(x => x.id === id);
+      if (l.kind === 'youtube') body.youtubeId = url; else body.url = url;
+      if (!await confirmBox('영상을 바꿀까요?',
+          '이 차시의 진도 기록이 초기화됩니다.\n옛 영상에서 본 만큼이 새 영상 진도로 둔갑하는 것을 막기 위해서입니다.',
+          '바꾸기')) return;
+    }
+    try {
+      const r = await api('api/admin/lessons/' + id, { method: 'PATCH', body: JSON.stringify(body) });
+      editingLesson = null;
+      say('저장했습니다.' + (r.progressCleared ? ` 진도 ${r.progressCleared}건을 초기화했습니다.` : ''));
+      await loadCourses(CUR.id);
+    } catch (e) { say(e.message, true); }
+  });
+}
+
+async function move(id, dir) {
+  const idx = CUR.lessons.findIndex(l => l.id === id);
+  const other = CUR.lessons[idx + dir];
+  if (!other) return;
+  const a = CUR.lessons[idx];
+  try {
+    await api('api/admin/lessons/' + a.id, { method: 'PATCH', body: JSON.stringify({ seq: other.seq }) });
+    await api('api/admin/lessons/' + other.id, { method: 'PATCH', body: JSON.stringify({ seq: a.seq }) });
+    await loadCourses(CUR.id);
+  } catch (e) { say(e.message, true); }
+}
+
+async function delLesson(id) {
+  const l = CUR.lessons.find(x => x.id === id);
+  if (!await confirmBox('차시를 지울까요?',
+      `‘${l.title}’ 과 이 차시의 진도 기록이 함께 사라집니다.`, '지우기')) return;
+  try { await api('api/admin/lessons/' + id, { method: 'DELETE' }); say('삭제했습니다.'); await loadCourses(CUR.id); }
+  catch (e) { say(e.message, true); }
+}
+
+document.getElementById('lKind').onchange = e => {
+  const k = e.target.value;
+  document.getElementById('lSrcYoutube').style.display = k === 'youtube' ? '' : 'none';
+  document.getElementById('lSrcDoc').style.display = k === 'doc' ? '' : 'none';
+  document.getElementById('lSrcLink').style.display = k === 'link' ? '' : 'none';
+};
+
+document.getElementById('btnAddLesson').onclick = async () => {
+  if (!CUR) return say('먼저 과정을 만들어 주세요.', true);
+  const kind = document.getElementById('lKind').value;
+  const body = {
+    title: document.getElementById('lTitle').value,
+    kind,
+    note: document.getElementById('lNote').value,
+    required: document.getElementById('lReq').checked,
+    minRatio: document.getElementById('lRatio').value || null,
+  };
+  try {
+    if (kind === 'youtube') {
+      body.url = document.getElementById('lUrl').value;
+    } else if (kind === 'link') {
+      body.url = document.getElementById('lLink').value;
+    } else {
+      const f = document.getElementById('lFile').files[0];
+      if (!f) return say('PDF 파일을 선택해 주세요.', true);
+      const fd = new FormData(); fd.append('file', f);
+      const up = await api('api/admin/upload', { method: 'POST', body: fd });
+      body.url = up.url;
+      if (!body.title) body.title = up.filename.replace(/\.pdf$/i, '');
+    }
+    await api('api/admin/courses/' + CUR.id + '/lessons', { method: 'POST', body: JSON.stringify(body) });
+    ['lTitle', 'lUrl', 'lLink', 'lNote'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('lFile').value = '';
+    say('차시를 추가했습니다.');
+    await loadCourses(CUR.id);
+  } catch (e) { say(e.message, true); }
+};
+
+// ── 대상자 명단 ─────────────────────────────────────────────────────────────
+let ROSTER = [];
+
+async function loadRoster() {
+  try {
+    const r = await api('api/admin/roster');
+    ROSTER = r.people || [];
+    fillDeptOptions(document.getElementById('rosterDept'), ROSTER,
+                    document.getElementById('rosterDept').value);
+    const src = { portal: '포털에서 가져옴', file: '파일로 올림', bootstrap: '최초 설정' }[r.source] || '';
+    document.getElementById('rosterInfo').textContent =
+      r.count ? `대상자 ${r.count}명` : '대상자 명단 없음';
+    document.getElementById('rosterMeta').textContent =
+      r.count ? `${r.count}명 · ${src} · ${fmtTime(r.syncedAt)}` : '아직 없습니다';
+    renderRoster();
+  } catch (e) { say(e.message, true); }
+}
+
+let editing = null;   // 지금 고치는 중인 아이디
+
+// 검색어가 아이디·이름·부서·사번 어디에든 들어 있으면 남긴다.
+// 74명이 한 화면에 다 나오면 찾는 것보다 훑는 것이 더 오래 걸린다.
+function matches(p, q) {
+  if (!q) return true;
+  q = q.trim().toLowerCase();
+  return [p.user_id, p.name, p.dept, p.emp_no].some(v => (v || '').toLowerCase().includes(q));
+}
+
+function fillDeptOptions(sel, list, keep) {
+  const depts = [...new Set(list.map(x => x.dept || '').filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">부서 전체</option>' +
+    depts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+  if (keep && depts.includes(keep)) sel.value = keep;
+}
+
+function renderRoster() {
+  const t = document.getElementById('rosterTable');
+  if (!ROSTER.length) {
+    document.getElementById('rosterCount').textContent = '';
+    t.innerHTML = '<tr><td class="muted">명단이 없습니다. 위에서 파일을 올리거나 포털에서 가져오세요.</td></tr>';
+    return;
+  }
+  const q = document.getElementById('rosterQ').value;
+  const d = document.getElementById('rosterDept').value;
+  const rows = ROSTER.filter(p => matches(p, q) && (!d || (p.dept || '') === d));
+  document.getElementById('rosterCount').textContent =
+    rows.length === ROSTER.length ? '' : `${rows.length}명 찾음`;
+
+  if (!rows.length) {
+    t.innerHTML = '<tr><td class="muted">찾는 사람이 없습니다.</td></tr>';
+    return;
+  }
+  t.innerHTML = '<tr><th>아이디</th><th>이름</th><th>부서</th><th>사번</th><th>담당자</th>' +
+                '<th style="width:210px"></th></tr>' +
+    rows.map(p => p.user_id === editing ? editRow(p) : viewRow(p)).join('');
+  bindRoster();
+}
+
+function viewRow(p) {
+  return `<tr>
+    <td>${esc(p.user_id)}</td>
+    <td>${esc(p.name)}${p.active ? '' : ' <span class="tag">퇴사</span>'}</td>
+    <td>${esc(p.dept)}</td><td>${esc(p.emp_no || '')}</td>
+    <td><button class="sm ${p.is_admin ? 'primary' : ''}" data-admin="${esc(p.user_id)}"
+          data-want="${p.is_admin ? 0 : 1}">${p.is_admin ? '담당자' : '지정'}</button></td>
+    <td>
+      <button class="sm" data-edit="${esc(p.user_id)}">수정</button>
+      <button class="sm" data-pw="${esc(p.user_id)}">비번 초기화</button>
+      <button class="sm danger" data-del="${esc(p.user_id)}">삭제</button>
+    </td></tr>`;
+}
+
+function editRow(p) {
+  // 아이디는 진도 기록을 잇는 열쇠라 바꾸지 않는다. 바꿔야 하면 지우고 새로 넣는다.
+  return `<tr class="edit"><td colspan="6">
+    <div class="editform" style="grid-template-columns:1fr 1fr 1fr 90px">
+      <div><label>아이디 (바꿀 수 없음)</label>
+        <input value="${esc(p.user_id)}" disabled style="background:#f2f3f5;color:var(--muted)"></div>
+      <div><label>이름</label><input id="edName" value="${esc(p.name || '')}"></div>
+      <div><label>부서</label><input id="edDept" value="${esc(p.dept || '')}"></div>
+      <div><label>사번</label><input id="edEmp" value="${esc(p.emp_no || '')}"></div>
+      <div class="foot">
+        <label class="chk" style="padding:0"><input type="checkbox" id="edActive"
+          ${p.active ? 'checked' : ''}> 재직 중</label>
+        <span class="url">체크를 풀면 로그인이 막히고 이수율 계산에서 빠집니다. 지난 기록은 남습니다.</span>
+        <button class="primary" data-save="${esc(p.user_id)}">저장</button>
+        <button data-cancel="1">취소</button>
+      </div>
+    </div>
+  </td></tr>`;
+}
+
+function bindRoster() {
+  const t = document.getElementById('rosterTable');
+  t.querySelectorAll('[data-admin]').forEach(b => b.onclick = async () => {
+    try {
+      await api(`api/admin/roster/${encodeURIComponent(b.dataset.admin)}/admin`,
+                { method: 'PATCH', body: JSON.stringify({ isAdmin: b.dataset.want === '1' }) });
+      await loadRoster();
+    } catch (e) { say(e.message, true); }
+  });
+  t.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+    editing = b.dataset.edit; renderRoster();
+  });
+  t.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => {
+    editing = null; renderRoster();
+  });
+  t.querySelectorAll('[data-save]').forEach(b => b.onclick = async () => {
+    try {
+      await api(`api/admin/roster/${encodeURIComponent(b.dataset.save)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: document.getElementById('edName').value,
+          dept: document.getElementById('edDept').value,
+          empNo: document.getElementById('edEmp').value,
+          active: document.getElementById('edActive').checked,
+        })
+      });
+      editing = null; say('저장했습니다.');
+      await loadRoster(); await loadStats();
+    } catch (e) { say(e.message, true); }
+  });
+  t.querySelectorAll('[data-pw]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.pw;
+    if (!await confirmBox('비밀번호를 초기화할까요?',
+        `${id} 의 비밀번호가 초기 비밀번호로 돌아갑니다. 본인에게 알려 주세요.`, '초기화')) return;
+    try {
+      const r = await api(`api/admin/roster/${encodeURIComponent(id)}/password`, { method: 'POST' });
+      say(`${id} 의 비밀번호를 ${r.password} 로 되돌렸습니다. 본인에게 알려 주세요.`);
+    } catch (e) { say(e.message, true); }
+  });
+  t.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.del;
+    if (!await confirmBox('명단에서 지울까요?',
+        `${id} 를 명단에서 뺍니다.\n이수 기록은 남고 현황에 ‘명단 밖’으로 표시됩니다.\n퇴사 처리라면 [수정] 에서 재직 체크만 푸는 편이 낫습니다.`,
+        '지우기')) return;
+    try {
+      await api(`api/admin/roster/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      say('지웠습니다.');
+      await loadRoster(); await loadStats();
+    } catch (e) { say(e.message, true); }
+  });
+}
+
+document.getElementById('btnAddPerson').onclick = async () => {
+  const v = id => document.getElementById(id).value;
+  try {
+    const r = await api('api/admin/roster/person', { method: 'POST', body: JSON.stringify({
+      userId: v('newId'), name: v('newName'), dept: v('newDept'), empNo: v('newEmp') })});
+    ['newId', 'newName', 'newDept', 'newEmp'].forEach(i => document.getElementById(i).value = '');
+    say(`추가했습니다. 초기 비밀번호는 ${r.initialPassword} 입니다.`);
+    await loadRoster(); await loadStats();
+  } catch (e) { say(e.message, true); }
+};
+
+document.getElementById('rosterQ').addEventListener('input', () => { editing = null; renderRoster(); });
+document.getElementById('rosterDept').addEventListener('change', () => { editing = null; renderRoster(); });
+
+document.getElementById('btnTemplate').onclick = () => {
+  window.location = 'api/admin/roster/template';
+};
+
+document.getElementById('rosterFile').onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const fd = new FormData(); fd.append('file', f);
+    const r = await api('api/admin/roster/upload', { method: 'POST', body: fd });
+    say(`명단 ${r.count}명을 등록했습니다.` + (r.newPasswords ? ` ${r.newPasswords}명에게 초기 비밀번호를 넣었습니다.` : ''));
+    await loadRoster(); await loadStats();
+  } catch (e2) { say(e2.message, true); }
+  e.target.value = '';
+};
+
+document.getElementById('btnSyncRoster').onclick = () => {
+  // 포털 뒤에서 돌고 있으면 쿠키가 있으므로 바로 가져온다.
+  // 단독으로 돌고 있으면 포털 관리자 계정을 한 번 물어본다.
+  if (CFG.standalone) {
+    if (!CFG.portalAvailable) return say('포털 주소(PORTAL_API_URL)가 설정되어 있지 않습니다. 명단 파일을 올려 주세요.', true);
+    document.getElementById('portalLogin').style.display = '';
+    document.getElementById('portalId').focus();
+  } else {
+    doSync({});
+  }
+};
+document.getElementById('btnCancelSync').onclick = () => {
+  document.getElementById('portalLogin').style.display = 'none';
+  document.getElementById('portalPw').value = '';
+};
+document.getElementById('btnDoSync').onclick = () => doSync({
+  portalId: document.getElementById('portalId').value,
+  portalPassword: document.getElementById('portalPw').value,
+});
+
+async function doSync(body) {
+  try {
+    const r = await api('api/admin/roster/sync', { method: 'POST', body: JSON.stringify(body) });
+    say(`직원 명단 ${r.count}명을 가져왔습니다.` + (r.newPasswords ? ` ${r.newPasswords}명에게 초기 비밀번호를 넣었습니다.` : ''));
+    document.getElementById('portalLogin').style.display = 'none';
+    document.getElementById('portalPw').value = '';
+    await loadRoster(); await loadStats();
+  } catch (e) { say(e.message, true); }
+}
+
+// ── 현황 ────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  if (!CUR) return renderStats(null);
+  try { STATS = await api('api/admin/stats?courseId=' + CUR.id); renderStats(STATS); }
+  catch (e) { say(e.message, true); }
+}
+
+function renderStats(s) {
+  const kp = document.getElementById('kpis');
+  if (!s) { kp.innerHTML = ''; document.getElementById('peopleTable').innerHTML = ''; return; }
+  const m = s.summary;
+  kp.innerHTML = `
+    <div class="kpi"><b>${m.percent}%</b><small>이수율</small></div>
+    <div class="kpi"><b>${m.total}</b><small>대상 인원</small></div>
+    <div class="kpi"><b>${m.completed}</b><small>이수 완료</small></div>
+    <div class="kpi"><b>${m.inProgress}</b><small>듣는 중</small></div>
+    <div class="kpi"><b>${m.notStarted}</b><small>미시작</small></div>
+    <div class="kpi"><b>${s.course.daysLeft === null ? '-' : (s.course.daysLeft >= 0 ? 'D-' + s.course.daysLeft : '지남')}</b><small>${esc(s.course.deadline || '마감 없음')}</small></div>`;
+
+  document.getElementById('deptTable').innerHTML =
+    '<tr><th>부서</th><th class="num">이수</th><th class="num">대상</th><th style="width:110px">진행</th></tr>' +
+    s.byDept.map(d => `<tr><td>${esc(d.dept)}</td><td class="num">${d.done}</td>
+      <td class="num">${d.total}</td>
+      <td><div class="bar ${d.percent === 100 ? 'ok' : ''}"><i style="width:${d.percent}%"></i></div>
+      <span class="muted">${d.percent}%</span></td></tr>`).join('');
+
+  document.getElementById('lessonTable').innerHTML =
+    '<tr><th>차시</th><th>종류</th><th class="num">완료</th></tr>' +
+    s.lessons.map(l => `<tr><td>${esc(l.title)}${l.required ? '' : ' <span class="tag">선택</span>'}</td>
+      <td>${({youtube:'영상',doc:'자료',link:'링크'})[l.kind] || l.kind}</td>
+      <td class="num">${l.doneCount}</td></tr>`).join('');
+
+  renderPeople();
+}
+
+function renderPeople() {
+  if (!STATS) return;
+  const f = document.getElementById('filter').value;
+  const q = document.getElementById('peopleQ').value;
+  const d = document.getElementById('peopleDept').value;
+  let rows = STATS.people;
+  if (f === 'not') rows = rows.filter(r => !r.completed);
+  if (f === 'none') rows = rows.filter(r => !r.started);
+  if (f === 'done') rows = rows.filter(r => r.completed);
+  // 현황 쪽 사람 모양은 명단과 열 이름이 달라(id / empNo) 맞춰서 넘긴다.
+  rows = rows.filter(r => matches({ user_id: r.id, name: r.name, dept: r.dept, emp_no: r.empNo }, q)
+                          && (!d || (r.dept || '') === d));
+  document.getElementById('peopleCount').textContent =
+    `(${rows.length}명${rows.length === STATS.people.length ? '' : ' / 전체 ' + STATS.people.length + '명'})`;
+  if (!rows.length) {
+    document.getElementById('peopleTable').innerHTML =
+      '<tr><td class="muted">찾는 사람이 없습니다.</td></tr>';
+    return;
+  }
+  document.getElementById('peopleTable').innerHTML =
+    '<tr><th>아이디</th><th>사번</th><th>이름</th><th>부서</th><th>상태</th>' +
+    '<th style="width:150px">시청률</th><th class="num">차시</th><th>이수일시</th></tr>' +
+    rows.map(r => {
+      const tag = r.completed ? '<span class="tag ok">이수</span>'
+        : (r.started ? '<span class="tag mid">듣는 중</span>' : '<span class="tag no">미시작</span>');
+      const extra = r.inRoster ? '' : ' <span class="tag">명단 밖</span>';
+      return `<tr><td>${esc(r.id)}</td><td class="muted">${esc(r.empNo || '')}</td>
+        <td>${esc(r.name)}</td><td>${esc(r.dept)}</td>
+        <td>${tag}${extra}</td>
+        <td><div class="bar ${r.completed ? 'ok' : ''}"><i style="width:${r.watchPercent}%"></i></div>
+        <span class="muted">${r.watchPercent}%</span></td>
+        <td class="num muted">${r.doneRequired}/${r.totalRequired}</td>
+        <td class="muted">${fmtTime(r.completedAt)}</td></tr>`;
+    }).join('');
+}
+document.getElementById('filter').onchange = renderPeople;
+document.getElementById('peopleQ').addEventListener('input', renderPeople);
+document.getElementById('peopleDept').addEventListener('change', renderPeople);
+document.getElementById('btnCsv').onclick = () => {
+  if (!CUR) return;
+  // 화면에서 걸러 둔 조건을 그대로 넘긴다. '미수강자만' 뽑아 리마인드 보낼 때 쓰인다.
+  const qs = new URLSearchParams({ courseId: CUR.id });
+  const f = document.getElementById('filter').value;
+  if (f !== 'all') qs.set('status', f);
+  const d = document.getElementById('peopleDept').value;
+  if (d) qs.set('dept', d);
+  const q = document.getElementById('peopleQ').value.trim();
+  if (q) qs.set('q', q);
+  window.location = 'api/admin/export?' + qs.toString();
+};
+
+(async function init() {
+  try {
+    ME = await api('api/me');
+    document.getElementById('who').textContent = `${ME.name} (${ME.dept})`;
+    CFG = await api('api/config');
+    document.getElementById('maxmb').textContent = CFG.maxUploadMB;
+    if (CFG.standalone) {
+      const lo = document.getElementById('logoutLink');
+      lo.style.display = '';
+      lo.onclick = async ev => { ev.preventDefault();
+        await fetch('api/logout', { method: 'POST' }); location.href = 'login'; };
+    }
+    await loadRoster();
+    await loadCourses();
+  } catch (e) { say(e.message, true); }
+})();
+</script>
+</body>
+</html>
