@@ -3,6 +3,19 @@
 #
 #   .\demo.ps1                내 PC. 80 을 그대로 쓴다
 #   .\demo.ps1 -Behind        앞에 nginx 를 둘 때 (127.0.0.1:8081 로만)
+#   .\demo.ps1 -Reseed        자료만 싹 다시 넣는다
+#
+# ── -Reseed 는 왜 따로 있나 ──────────────────────────────────
+# 평소 실행은 「데이터가 있으면 건드리지 않는다」이다. 방문자가 만들어 둔
+# 화면을 배포 한 번에 날리지 않으려는 것이다.
+#
+# 그런데 **지어낸 자료 자체를 바꿨을 때**는 반대가 필요하다. 회사 이름을
+# 바꾸거나 교육 과정을 지웠는데 옛 자료가 DB 에 그대로 남는다. 그때마다
+# 앱마다 컨테이너 이름과 씨앗 명령을 외워서 --force 를 붙여야 했고,
+# 이름을 틀려서 「No such container」를 보기 일쑤였다. 그래서 한 줄로 묶었다.
+#
+# 띄우지도 않고 .env 도 건드리지 않는다. **이미 떠 있는 앱에 자료만** 넣는다.
+# 지금 들어 있는 체험판 데이터는 지워진다 — 그것이 목적이다.
 #
 # 쓰는 법이 서버와 같다.
 #
@@ -26,7 +39,7 @@
 #   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 # =====================================================================
 [CmdletBinding()]
-param([switch]$Behind, [int]$Port = 8090, [string[]]$Skip = @())
+param([switch]$Behind, [switch]$Reseed, [int]$Port = 8090, [string[]]$Skip = @())
 
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $OutputEncoding = [System.Text.Encoding]::UTF8
@@ -38,6 +51,52 @@ function Ok  ($m) { Write-Host "  ✓ $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "  ! $m" -ForegroundColor Yellow }
 function Bad ($m) { Write-Host "  ✗ $m" -ForegroundColor Red }
 function Head($m) { Write-Host ''; Write-Host "▸ $m" -ForegroundColor Cyan }
+
+# ── 자료 만들기 · 넣기 ───────────────────────────────────────
+# 평소 실행과 -Reseed 가 **같은 함수**를 쓴다. 갈라 두면 한쪽만 고치는 일이
+# 반드시 생긴다 (앱을 새로 붙였을 때 씨앗 목록을 한 곳에만 적는 식으로).
+
+# ★ -Force 를 잊으면 아무 일도 안 일어난 것처럼 보인다.
+#   make_demo_data.py 는 파일이 있으면 「이미 있음」 하고 건너뛴다. 그래서
+#   회사 이름을 바꾸고 -Reseed 를 돌려도, 옛 이름이 든 씨앗 파일을 그대로
+#   다시 심는다. 화면은 그대로인데 명령은 성공했다고 나온다 — 실제로 그랬다.
+function Make-Data([switch]$Force) {
+    Head '가짜 데이터'
+    $mf = if ($Force) { @('--force') } else { @() }
+    $havePy = $false
+    foreach ($py in @('python', 'python3', 'py')) {
+        # ★ 있는지부터 본다. 없는 명령을 그냥 부르면 예외로 스크립트가 죽는다.
+        #   윈도우에는 python.exe 가 「앱 설치」 창을 여는 껍데기로 깔려 있기도 해서,
+        #   실제로 꾸러미를 불러 보는 것까지 확인해야 한다.
+        if (-not (Get-Command $py -ErrorAction SilentlyContinue)) { continue }
+        & $py -c "import openpyxl, pptx, PIL" 2>$null
+        if ($LASTEXITCODE -eq 0) { & $py tools\make_demo_data.py $mf; $havePy = $true; break }
+    }
+    if (-not $havePy) {
+        Ok '이 PC 에 파이썬 꾸러미가 없어 컨테이너로 만듭니다 (처음 한 번만 좀 걸립니다)'
+        docker build -q -t portfolio-tools tools | Out-Null
+        docker run --rm -v "$($ROOT):/w" -w /w portfolio-tools python tools/make_demo_data.py $mf
+    }
+}
+
+function Seed($container, $label, [string[]]$cmd) {
+    $running = docker ps --format '{{.Names}}' | Where-Object { $_ -eq $container }
+    if (-not $running) { Warn "$container 가 떠 있지 않습니다 — $label 건너뜀"; return }
+    Write-Host "  $label"
+    # docker 는 실패해도 예외를 던지지 않고 종료 코드만 남긴다.
+    # $cmd 는 배열인데, 네이티브 명령에 넘기면 원소 하나가 인자 하나가 된다.
+    docker exec -i $container $cmd
+    if ($LASTEXITCODE -ne 0) { Warn "$label 자료를 넣지 못했습니다." }
+}
+
+# 앱을 새로 붙이면 **여기 한 줄만** 늘린다.
+function Seed-All([switch]$Force) {
+    $f = if ($Force) { @('--force') } else { @() }
+    Seed 'demo-asset-api'     '자산관리'      (@('python','scripts/seed_demo.py') + $f)
+    Seed 'demo-leave-anomaly' '연차 이상패턴' (@('python','-m','app.seed_demo') + $f)
+    Seed 'demo-manual-import' '매뉴얼'        (@('python','-m','app.seed_demo') + $f)
+    Seed 'demo-edu'           '온라인 교육'   (@('python','-m','app.seed_demo') + $f)
+}
 
 # .env 는 BOM 없이 써야 한다. docker compose 가 BOM 을 키 이름의 일부로 읽는다.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -72,6 +131,19 @@ if ($LASTEXITCODE -ne 0) {
     Bad 'Docker 가 응답하지 않습니다. Docker Desktop 을 켜고 다시 실행하세요.'
     exit 1
 }
+
+# ★ -Reseed 는 여기서 갈라진다.
+#   .env 도 안 만들고 컨테이너도 안 띄운다. 자료만 다시 넣고 끝낸다.
+if ($Reseed) {
+    Head '자료만 다시 넣습니다 (지금 들어 있는 체험판 데이터는 지워집니다)'
+    Make-Data -Force
+    Head '각 앱에 자료 넣기'
+    Seed-All -Force
+    Write-Host ''
+    Ok '끝났습니다. 화면을 새로고침하세요.'
+    exit 0
+}
+
 
 # ── 1. 평소 준비 ─────────────────────────────────────────────
 Head '기본 준비 (setup.ps1)'
@@ -136,21 +208,7 @@ if (-not $key -or $key -like '발급받은*') {
 # 엑셀·PPT 를 만들어야 해서 openpyxl · python-pptx · Pillow 가 필요하다.
 # 이 PC 에 있으면 그걸 쓰고, 없으면 컨테이너 안에서 돌린다.
 # 「Docker Desktop 만 있으면 된다」를 지키려는 것이다.
-Head '가짜 데이터'
-$havePy = $false
-foreach ($py in @('python', 'python3', 'py')) {
-    # ★ 있는지부터 본다. 없는 명령을 그냥 부르면 예외로 스크립트가 죽는다.
-    #   윈도우에는 python.exe 가 「앱 설치」 창을 여는 껍데기로 깔려 있기도 해서,
-    #   실제로 꾸러미를 불러 보는 것까지 확인해야 한다.
-    if (-not (Get-Command $py -ErrorAction SilentlyContinue)) { continue }
-    & $py -c "import openpyxl, pptx, PIL" 2>$null
-    if ($LASTEXITCODE -eq 0) { & $py tools\make_demo_data.py; $havePy = $true; break }
-}
-if (-not $havePy) {
-    Ok '이 PC 에 파이썬 꾸러미가 없어 컨테이너로 만듭니다 (처음 한 번만 좀 걸립니다)'
-    docker build -q -t portfolio-tools tools | Out-Null
-    docker run --rm -v "$($ROOT):/w" -w /w portfolio-tools python tools/make_demo_data.py
-}
+Make-Data
 
 # ── 5. 띄우기 ────────────────────────────────────────────────
 #
@@ -182,20 +240,7 @@ Head '앱에 자료 넣기'
 #
 #   docker exec 는 **컨테이너 이름 하나만** 본다. demo- 로 시작하는 이름은
 #   이 저장소만 쓰므로, 헷갈릴 여지가 없다.
-function Seed($container, $label, [string[]]$cmd) {
-    $running = docker ps --format '{{.Names}}' | Where-Object { $_ -eq $container }
-    if (-not $running) { Warn "$container 가 떠 있지 않습니다 — $label 건너뜀"; return }
-    Write-Host "  $label"
-    # docker 는 실패해도 예외를 던지지 않고 종료 코드만 남긴다.
-    # $cmd 는 배열인데, 네이티브 명령에 넘기면 원소 하나가 인자 하나가 된다.
-    docker exec -i $container $cmd
-    if ($LASTEXITCODE -ne 0) { Warn "$label 자료를 넣지 못했습니다." }
-}
-
-Seed 'demo-asset-api'     '자산관리'      @('python','scripts/seed_demo.py')
-Seed 'demo-leave-anomaly' '연차 이상패턴' @('python','-m','app.seed_demo')
-Seed 'demo-manual-import' '매뉴얼'        @('python','-m','app.seed_demo')
-Seed 'demo-edu'           '온라인 교육'   @('python','-m','app.seed_demo')
+Seed-All
 
 # ── 6-1. 안 띄운 앱은 목록에서도 뺀다 ────────────────────────
 #

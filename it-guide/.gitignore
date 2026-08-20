@@ -14,3 +14,9 @@ data/
 # 파일만 !로 풀면 아무 일도 일어나지 않는다.
 !web/manuals/data/
 !web/manuals/data/manuals.js
+
+# ── 매뉴얼 원본(pptx)은 올리지 않는다 ────────────────────────
+# manual-import 가 pptx 를 받아 글·이미지로 풀어 놓고, 원본은 여기에 둔다.
+# 화면이 쓰는 것은 data/manuals.js 와 images/ 뿐이라 원본은 필요 없고,
+# 체험판 샘플은 tools/make_demo_data.py 가 다시 만든다.
+web/manuals/sources/

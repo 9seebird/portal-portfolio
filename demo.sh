@@ -4,6 +4,7 @@
 #
 #   ./demo.sh              80 포트로 바로 (혼자 보는 서버 · 노트북)
 #   ./demo.sh --behind     앞에 nginx 를 두는 경우 (127.0.0.1:8081 로만)
+#   ./demo.sh --reseed     자료만 싹 다시 넣는다 (아래 참고)
 #
 # 하는 일은 네 가지다.
 #   1. setup.sh 를 불러 .env 들을 만들고 앱끼리 쓰는 토큰을 맞춘다
@@ -16,17 +17,102 @@
 #
 # AI 키만은 사람이 넣어야 한다. 이 스크립트가 지어낼 수 있는 값이 아니다.
 #   portal/.env 의 OPENAI_API_KEY
+#
+# ── --reseed 는 왜 따로 있나 ────────────────────────────────
+# 평소 실행은 「데이터가 있으면 건드리지 않는다」이다. 방문자가 만들어 둔
+# 화면을 배포 한 번에 날리지 않으려는 것이다.
+#
+# 그런데 **지어낸 자료 자체를 바꿨을 때**는 반대가 필요하다. 회사 이름을
+# 바꾸거나 교육 과정을 지웠는데, 이미 들어 있는 옛 자료가 그대로 남는다.
+# 그때마다 앱마다 컨테이너 이름과 씨앗 명령을 외워서 --force 를 붙여야 했고,
+# 이름을 틀려서 「No such container」를 보기 일쑤였다. 그래서 한 줄로 묶었다.
+#
+#   ./demo.sh --reseed        자료를 다시 만들고, 앱마다 지우고 다시 넣는다
+#
+# 띄우지도 않고 .env 도 건드리지 않는다. **이미 떠 있는 앱에 자료만** 넣는다.
+# 지금 들어 있는 체험판 데이터는 지워진다 — 그것이 목적이다.
 # =====================================================================
 set -euo pipefail
 cd "$(dirname "$0")"
 
 MODE="--local"
-[ "${1:-}" = "--behind" ] && MODE="--server"
+RESEED=0
+for a in "$@"; do
+  case "$a" in
+    --behind) MODE="--server" ;;
+    --reseed) RESEED=1 ;;
+    *) printf '모르는 옵션: %s\n' "$a"; exit 2 ;;
+  esac
+done
 
 say()  { printf '%s\n' "$*"; }
 ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 die()  { printf '  \033[31m✗\033[0m %s\n' "$*"; exit 1; }
+
+# ── 자료 만들기 · 넣기 ──────────────────────────────────────
+# 평소 실행과 --reseed 가 **같은 함수**를 쓴다. 갈라 두면 한쪽만 고치는
+# 일이 반드시 생긴다 (앱을 새로 붙였을 때 씨앗 목록을 한 곳에만 적는 식으로).
+
+up() { docker ps --format '{{.Names}}' | grep -qx "$1"; }
+
+# make_data [--force]
+#
+# ★ --force 를 잊으면 아무 일도 안 일어난 것처럼 보인다.
+#   make_demo_data.py 는 파일이 있으면 「이미 있음」 하고 건너뛴다. 그래서
+#   회사 이름을 바꾸고 --reseed 를 돌려도, 옛 이름이 든 씨앗 파일을 그대로
+#   다시 심는다. 화면은 그대로인데 명령은 성공했다고 나온다 — 실제로 그랬다.
+make_data() {
+  local f="${1:-}"
+  say ""
+  say "▸ 가짜 데이터"
+
+  # ★ data/ 를 **내 소유로 먼저 만들어 둔다.**
+  #
+  #   앱 컨테이너는 대개 root 로 돈다. 그래서 deploy 를 먼저 하면 컨테이너가
+  #   없는 data/ 를 root 소유로 만들어 버리고, 뒤이어 도는 이 단계(tools 는
+  #   -u $(id -u) 로 나로 돈다)가 거기에 못 쓴다 — Permission denied 로 멈춘다.
+  #
+  #   새 앱을 붙일 때마다 반복되던 일이다. 폴더가 먼저 있으면 컨테이너는
+  #   그것을 그대로 쓰므로, 여기서 미리 만들어 두면 생기지 않는다.
+  #   compose 가 ./data 를 실제로 붙이는 앱만 만든다.
+  local d
+  for d in */; do
+    [ -f "${d}docker-compose.yml" ] || continue
+    grep -q '\./data' "${d}docker-compose.yml" || continue
+    mkdir -p "${d}data" 2>/dev/null || true
+  done
+
+  # 엑셀·PPT 를 만들어야 해서 openpyxl · python-pptx · Pillow 가 필요하다.
+  # 이 PC 에 있으면 그걸 쓰고, 없으면 컨테이너 안에서 돌린다.
+  # 「도커만 있으면 된다」를 지키려는 것이다.
+  if python3 -c "import openpyxl, pptx, PIL" 2>/dev/null; then
+    python3 tools/make_demo_data.py ${f:+$f}
+  else
+    ok "이 PC 에 파이썬 꾸러미가 없어 컨테이너로 만듭니다 (처음 한 번만 좀 걸립니다)"
+    docker build -q -t portfolio-tools tools >/dev/null
+    # 리눅스에서는 컨테이너가 root 로 파일을 만들면 나중에 내가 못 고친다.
+    docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/w" -w /w \
+      portfolio-tools python tools/make_demo_data.py ${f:+$f}
+  fi
+}
+
+seed() {   # seed <컨테이너> <설명> <명령...>
+  local c="$1" label="$2"; shift 2
+  if ! up "$c"; then warn "$c 가 떠 있지 않습니다 — $label 건너뜀"; return 0; fi
+  say "  $label"
+  docker exec -i "$c" "$@" 2>&1 | sed 's/^/  /' || warn "$label 자료를 넣지 못했습니다"
+}
+
+# seed_all [--force]
+# 앱을 새로 붙이면 **여기 한 줄만** 늘린다.
+seed_all() {
+  local f="${1:-}"
+  seed demo-asset-api     "자산관리"      python scripts/seed_demo.py ${f:+$f}
+  seed demo-leave-anomaly "연차 이상패턴"  python -m app.seed_demo ${f:+$f}
+  seed demo-manual-import "매뉴얼"        python -m app.seed_demo ${f:+$f}
+  seed demo-edu           "온라인 교육"    python -m app.seed_demo ${f:+$f}
+}
 
 # 값을 **덮어쓴다.** setup.sh 의 setval 은 비어 있을 때만 채우는데,
 # 체험판 값은 그러면 안 된다. 이미 뭔가 들어 있어도 체험판 기준으로
@@ -42,6 +128,17 @@ put() {   # put <파일> <키> <값>
   fi
 }
 cur() { sed -n "s/^$2=//p" "$1" 2>/dev/null | head -1; }
+
+# ★ --reseed 는 여기서 갈라진다.
+#   .env 도 안 만들고 컨테이너도 안 띄운다. 자료만 다시 넣고 끝낸다.
+if [ "$RESEED" = 1 ]; then
+  say "▸ 자료만 다시 넣습니다 (지금 들어 있는 체험판 데이터는 지워집니다)"
+  make_data --force
+  seed_all --force
+  say ""
+  ok "끝났습니다. 화면을 새로고침하세요."
+  exit 0
+fi
 
 # ── 1. 평소 준비 ────────────────────────────────────────────
 say ""
@@ -107,8 +204,6 @@ fi
 # 엑셀·PPT 를 만들어야 해서 openpyxl · python-pptx · Pillow 가 필요하다.
 # 이 PC 에 있으면 그걸 쓰고, 없으면 컨테이너 안에서 돌린다.
 # 「도커만 있으면 된다」를 지키려는 것이다 (윈도우에는 파이썬이 없는 쪽이 보통이다).
-say ""
-say "▸ 가짜 데이터"
 
 # ★ data/ 를 **내 소유로 먼저 만들어 둔다.**
 #
@@ -121,21 +216,7 @@ say "▸ 가짜 데이터"
 #   이미 있으면 mkdir -p 가 아무 일도 하지 않는다.
 #   compose 가 ./data 를 실제로 붙이는 앱만 만든다. 전부 만들면 쓰지도 않는
 #   빈 폴더가 생겨서 「이건 뭐지」 하게 된다.
-for d in */; do
-  [ -f "${d}docker-compose.yml" ] || continue
-  grep -q '\./data' "${d}docker-compose.yml" || continue
-  mkdir -p "${d}data" 2>/dev/null || true
-done
-
-if python3 -c "import openpyxl, pptx, PIL" 2>/dev/null; then
-  python3 tools/make_demo_data.py
-else
-  ok "이 PC 에 파이썬 꾸러미가 없어 컨테이너로 만듭니다 (처음 한 번만 좀 걸립니다)"
-  docker build -q -t portfolio-tools tools >/dev/null
-  # 리눅스에서는 컨테이너가 root 로 파일을 만들면 나중에 내가 못 고친다.
-  docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/w" -w /w \
-    portfolio-tools python tools/make_demo_data.py
-fi
+make_data
 
 # ── 5. 띄우기 ───────────────────────────────────────────────
 #
@@ -180,19 +261,7 @@ say "▸ 앱에 자료 넣기"
 #
 #   docker exec 는 **컨테이너 이름 하나만** 본다. demo- 로 시작하는 이름은
 #   이 저장소만 쓰므로, 헷갈릴 여지가 없다.
-up() { docker ps --format '{{.Names}}' | grep -qx "$1"; }
-
-seed() {   # seed <컨테이너> <설명> <명령...>
-  local c="$1" label="$2"; shift 2
-  if ! up "$c"; then warn "$c 가 떠 있지 않습니다 — $label 건너뜀"; return 0; fi
-  say "  $label"
-  docker exec -i "$c" "$@" 2>&1 | sed 's/^/  /' || warn "$label 자료를 넣지 못했습니다"
-}
-
-seed demo-asset-api     "자산관리"      python scripts/seed_demo.py
-seed demo-leave-anomaly "연차 이상패턴"  python -m app.seed_demo
-seed demo-manual-import "매뉴얼"        python -m app.seed_demo
-seed demo-edu           "온라인 교육"    python -m app.seed_demo
+seed_all
 
 # ── 6-1. 안 띄운 앱은 목록에서도 뺀다 ──────────────────────
 #

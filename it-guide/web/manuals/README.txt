@@ -11,8 +11,9 @@
     data/
       manuals.js          <- 모든 글 내용이 들어있는 파일
     images/
-      worksai/*.jpg       <- 웍스AI 매뉴얼 이미지
-      m365/*.jpg          <- M365 매뉴얼 이미지
+      hancom/*.jpg        <- 한컴오피스 설치 매뉴얼 이미지
+      kaspersky/*.jpg     <- 카스퍼스키 관리 툴 매뉴얼 이미지
+      sample-*/*.jpg      <- 샘플 매뉴얼 이미지
     README.txt            <- 이 파일
 
   * 이 폴더는 통째로 하나입니다. 옮기거나 복사할 때 폴더째로 하세요.
@@ -80,9 +81,9 @@
 
   권장 방법 (파일이 가벼움):
     1. 이미지를 images/<매뉴얼폴더>/ 안에 넣는다
-       예) images/worksai/새화면.jpg
+       예) images/hancom/새화면.jpg
     2. 편집 모드에서 [+ 이미지] -> [취소] 선택
-    3. 경로 입력: worksai/새화면.jpg
+    3. 경로 입력: hancom/새화면.jpg
 
   간단한 방법:
     [+ 이미지] -> [확인] -> 내 PC에서 파일 선택
