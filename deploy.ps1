@@ -64,11 +64,19 @@ if ($LASTEXITCODE -ne 0) {
 # ── 깃에서 당기기 (물어봤을 때만) ────────────────────────────
 if ($Pull -and (Test-Path (Join-Path $ROOT '.git'))) {
     Write-Host '▸ git pull'
+    $before = (git rev-parse HEAD)
     git pull --ff-only
     if ($LASTEXITCODE -ne 0) {
         Bad '당기지 못했습니다. 고치던 파일이 있는지 보세요.'
         Note 'git status --short'
         exit 1
+    }
+    # 당긴 뒤에 setup 을 부른다 (deploy.sh 와 같은 이유 — 그쪽 주석 참고).
+    # 새 앱은 pull 로 도착하므로, 먼저 돌린 setup 은 그 앱을 못 본다.
+    if ((git rev-parse HEAD) -ne $before -and (Test-Path "$ROOT\setup.ps1")) {
+        Write-Host '▸ 받은 것이 있어 setup.ps1 을 돌립니다 (새 앱의 .env·토큰)'
+        & "$ROOT\setup.ps1"
+        if ($LASTEXITCODE -ne 0) { Bad 'setup.ps1 실패'; exit 1 }
     }
 }
 

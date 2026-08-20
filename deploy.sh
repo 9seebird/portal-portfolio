@@ -29,19 +29,39 @@ set -- "${ARGS[@]+"${ARGS[@]}"}"
 
 if [ "$PULL" = "1" ] && [ -d "$ROOT/.git" ]; then
   echo "▸ git pull"
+  BEFORE="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo none)"
   if git -C "$ROOT" pull --ff-only; then
-    :
+    AFTER="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo none)"
+
+    # ★ 당긴 뒤에 setup 을 부른다. 순서가 반대면 안 된다.
+    #
+    #   전에는 「setup.sh 먼저, 그다음 deploy.sh」라고 안내했는데,
+    #   deploy.sh 가 맨 앞에서 당기기 때문에 **새 앱은 setup 이 끝난 뒤에야
+    #   도착한다.** 그래서 앱을 새로 붙인 커밋을 받으면 늘 이렇게 됐다.
+    #
+    #       ./setup.sh   → 그 앱이 아직 없어서 .env 를 안 만듦
+    #       ./deploy.sh  → 당겨 오고 나서 띄우려다 .env 가 없어 실패
+    #       ./setup.sh   → 이제야 만듦
+    #       ./deploy.sh  → 됨
+    #
+    #   사람이 순서를 외우게 하는 대신 여기서 부른다. setup 은 이미 있는
+    #   .env 를 건드리지 않으므로 매번 불러도 안전하다.
+    if [ "$BEFORE" != "$AFTER" ] && [ -x "$ROOT/setup.sh" ]; then
+      echo "▸ 받은 것이 있어 setup.sh 를 돌립니다 (새 앱의 .env·토큰)"
+      "$ROOT/setup.sh" || { echo "  ✗ setup.sh 실패"; exit 1; }
+    fi
   else
     echo "  ✗ 당기지 못했습니다."
-    # 원인이 둘인데 화면에 나오는 말이 비슷해서 헷갈린다. 갈라서 알려준다.
-    if [ "$(id -un)" != "portal" ]; then
-      echo "      → 지금 '$(id -un)' 계정입니다. 깃 주소가 portal 의 ~/.ssh/config 에"
-      echo "        적힌 별명(github-chatportal)이라 다른 계정에서는 못 찾습니다."
-      echo "        exit 로 portal 로 돌아가서 다시 하세요. (sudo 는 nginx reload 에만 씁니다)"
+    # git 이 실제로 뭐라고 했는지를 보고 갈라 준다.
+    # (예전에는 계정 이름부터 봤는데, 원격이 HTTPS 로 바뀐 뒤로는
+    #  맞지도 않는 ssh 별명 얘기를 먼저 꺼내서 엉뚱한 곳을 뒤지게 했다.)
+    if [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
+      echo "      → 서버에서 직접 고친 파일이 있습니다:"
+      git -C "$ROOT" status --short | sed 's/^/          /'
+      echo "        버려도 되면  git -C $ROOT checkout -- <파일>"
     else
-      echo "      → 서버에서 직접 고친 파일이 있는지 보세요."
-      echo "        git -C $ROOT status --short"
-      echo "        (그 파일이 필요 없으면  git checkout -- <파일>  로 버립니다)"
+      echo "      → 네트워크나 접근 권한을 보세요."
+      echo "        git -C $ROOT remote -v"
     fi
     exit 1
   fi

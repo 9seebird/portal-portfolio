@@ -284,7 +284,7 @@ docker image prune -f        # 옛 이미지 정리
 | 증상 | 볼 곳 |
 |---|---|
 | 브라우저가 502 | 뒤 컨테이너가 죽었다. `docker ps` · `docker logs <이름>` |
-| 앱이 관리자 화면에 안 뜬다 | 토큰이 다르다. `./setup.sh` 다시 → `./deploy.sh` |
+| 앱이 관리자 화면에 안 뜬다 | 토큰이 다르다. `./deploy.sh` 를 다시 돌리면 setup 까지 알아서 합니다 |
 | 큰 파일에서 413 | nginx 두 곳(**호스트**와 `proxy/conf.d/portal.conf`)의 `client_max_body_size` |
 | 로그인이 자꾸 풀린다 | `COOKIE_SECURE` 가 실제 접속 방식(http/https)과 맞는지 |
 | 챗만 안 된다 | `portal/.env` 의 키 · `docker logs portal` 에 공급자 오류 |
