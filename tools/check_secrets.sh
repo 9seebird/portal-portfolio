@@ -20,6 +20,11 @@
 # =====================================================================
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# --strict : 낱말 목록이 없으면 「건너뜀」이 아니라 「실패」로 본다.
+#            pre-push 훅이 이 모드로 부른다 (.githooks/pre-push).
+STRICT=0
+for a in "$@"; do [ "$a" = "--strict" ] && STRICT=1; done
 cd "$ROOT" || exit 1
 BAD=0; WARN=0
 bad() { echo "  ✗ $1"; BAD=$((BAD+1)); }
@@ -77,6 +82,18 @@ if [ -s "$WORDS" ]; then
     else echo "  ✓ 없음 ($(wc -l < "$TMP")개 낱말로 검사)"; fi
   fi
   rm -f "$TMP"
+elif [ "$STRICT" = 1 ]; then
+  # ★ --strict 에서는 「건너뛰기」가 곧 구멍이다.
+  #
+  #   PC 가 두 대라 생기는 문제다. 회사 PC 에는 목록이 있고 집 PC 에는 없으면,
+  #   집에서 push 할 때 이 검사만 조용히 빠진다. 그런데 검사가 빠졌다는 사실은
+  #   화면을 눈여겨봐야 알 수 있고, push 는 그냥 성공한다.
+  #   그래서 pre-push 훅은 --strict 로 부른다 — **없으면 막는다.**
+  echo "  ✗ 낱말 목록이 없습니다 ($WORDS)"
+  echo "    이 PC 에서는 실명 검사를 할 수 없어 push 를 막습니다."
+  echo "    → 다른 PC 의 .secretwords 를 저장소 뿌리에 복사하세요."
+  echo "      (깃에 올라가지 않는 파일이라 PC 마다 한 번씩 두어야 합니다)"
+  BAD=$((BAD+1))
 else
   warn "낱말 목록이 없어 이 검사는 건너뜁니다 ($WORDS)"
 fi

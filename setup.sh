@@ -181,6 +181,24 @@ else
   ok "OPENAI_API_KEY 들어 있음"
 fi
 
+# ── 5. push 전 검사 훅 ───────────────────────────────────────
+#
+# .git/hooks 는 깃에 올라가지 않는다. 그래서 PC 를 바꿀 때마다 훅이 사라지고,
+# 사라진 줄 모른 채 push 하게 된다 — 회사 PC 와 집 PC 를 오가면 반드시 겪는다.
+# 저장소 안의 .githooks 를 가리키게 해 두면 setup 한 번으로 따라온다.
+say ""
+say "▸ push 전 검사"
+if [ -d ".githooks" ]; then
+  git config core.hooksPath .githooks 2>/dev/null && \
+    ok "git push 할 때 사내 정보 검사가 자동으로 돕니다" || \
+    warn "훅을 걸지 못했습니다 (git 저장소가 아닌 듯합니다)"
+  if [ ! -s ".secretwords" ]; then
+    warn ".secretwords 가 없습니다 — 이 PC 에서는 push 가 막힙니다."
+    say  "     다른 PC 의 저장소 뿌리에서 그 파일을 복사해 오세요."
+    say  "     (실명 목록이라 깃에 올리지 않습니다)"
+  fi
+fi
+
 say ""
 say "──────────────────────────────────────────────"
 say "다음:"

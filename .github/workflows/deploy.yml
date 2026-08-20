@@ -81,8 +81,18 @@ jobs:
 
       - name: 사내 정보 유출 검사
         env:
-          # 실명·실제 도메인·실제 IP 대역. 저장소 Settings > Secrets 에 넣는다.
-          # 여기 직접 적으면 그 목록 자체가 공개된다.
+          # ★ SECRET_WORDS 는 **넣지 않는 쪽을 골랐다.**
+          #
+          #   그 목록에는 실제 직원 이름이 들어 있다. 깃허브 Secrets 에 넣으면
+          #   CI 도 실명을 검사해 주지만, 목록이 있는 곳이 한 군데 늘어난다.
+          #
+          #   대신 push 앞에 세웠다 — .githooks/pre-push 가 내 PC 에서 먼저
+          #   검사하고, 걸리면 push 자체를 취소한다. 깃허브에 도달하지 않으므로
+          #   히스토리에 남을 일도 없다. 한 번 올라간 것을 지우는 쪽이 훨씬 번거롭다.
+          #
+          #   여기서는 값이 비어 있어 실명 검사만 「건너뜀」으로 찍히고,
+          #   나머지 세 검사(파일·열쇠·사설IP)는 그대로 돈다.
+          #   나중에 마음이 바뀌면 Secrets 에 SECRET_WORDS 를 넣기만 하면 된다.
           SECRET_WORDS: ${{ secrets.SECRET_WORDS }}
         run: |
           if [ -n "$SECRET_WORDS" ]; then

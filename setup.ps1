@@ -135,6 +135,26 @@ if (-not $key -or $key.StartsWith('발급받은')) {
 } else { Ok "OPENAI_API_KEY 들어 있음" }
 
 Write-Host ""
+
+# ── 5. push 전 검사 훅 ───────────────────────────────────────
+#
+# .git\hooks 는 깃에 올라가지 않는다. 그래서 PC 를 바꿀 때마다 훅이 사라지고,
+# 사라진 줄 모른 채 push 하게 된다 — 회사 PC 와 집 PC 를 오가면 반드시 겪는다.
+# 저장소 안의 .githooks 를 가리키게 해 두면 setup 한 번으로 따라온다.
+Write-Host ""
+Write-Host "> push 전 검사"
+if (Test-Path '.githooks') {
+    git config core.hooksPath .githooks 2>$null
+    if ($LASTEXITCODE -eq 0) { Ok 'git push 할 때 사내 정보 검사가 자동으로 돕니다' }
+    else { Warn '훅을 걸지 못했습니다 (git 저장소가 아닌 듯합니다)' }
+
+    if (-not (Test-Path '.secretwords')) {
+        Warn '.secretwords 가 없습니다 — 이 PC 에서는 push 가 막힙니다.'
+        Write-Host '     다른 PC 의 저장소 뿌리에서 그 파일을 복사해 오세요.'
+        Write-Host '     (실명 목록이라 깃에 올리지 않습니다)'
+    }
+}
+
 Write-Host "──────────────────────────────────────────────"
 Write-Host "다음:"
 Write-Host "  docker network create demo-net    # 처음 한 번만"
