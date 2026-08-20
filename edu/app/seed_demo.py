@@ -221,23 +221,13 @@ def _fill(force: bool) -> int:
     doc_lesson = db.get_lesson(doc_id)
     print(f"  과정 1 — 차시 {len(lessons1) + 1}개")
 
-    # ── 과정 2 — 마감이 가까운 의무 교육 ────────────────────
-    c2 = db.create_course(
-        "개인정보보호 교육 (연 1회 의무)",
-        "개인정보를 다루는 모든 직원이 연 1회 들어야 하는 교육입니다.",
-        (today + timedelta(days=12)).isoformat(), 1)
-    # ★ 과정 1 과 **다른 영상**을 쓴다.
-    #   전에는 과정 1 의 첫 차시(바이브코딩 입문)를 그대로 재활용했는데,
-    #   제목은 「개인정보보호 기본」인데 화면에는 코딩 강의가 떠서
-    #   체험판을 보는 사람이 먼저 그걸 보게 된다.
-    #   duration_sec 은 대충 넣어도 된다 — 재생기가 뜨면서 실제 길이로
-    #   set_lesson_duration 이 갱신한다. 첫 화면에 잠깐 보일 뿐이다.
-    l2 = db.get_lesson(db.create_lesson(c2, {
-        "title": "개인정보보호 기본 — 무엇이 개인정보인가",
-        "kind": "youtube", "url": "https://www.youtube.com/watch?v=OeMqczSw_fk",
-        "youtube_id": "OeMqczSw_fk", "note": "", "duration_sec": 600,
-        "min_ratio": 0.8, "required": 1}))
-    print("  과정 2 — 차시 1개")
+    # ── 과정은 하나만 둔다 ──────────────────────────────────
+    #
+    #   전에는 「개인정보보호 교육(연 1회 의무)」을 하나 더 만들어서
+    #   '마감 임박' 화면을 보여 줬다. 그런데 내용이 회사 것도 아니고
+    #   영상도 남의 것이라 포트폴리오에 둘 이유가 없어 뺐다.
+    #   다시 넣고 싶으면 위의 create_course 를 한 벌 더 쓰면 된다
+    #   (마감을 today + 12일쯤으로 두면 마감 임박 화면이 나온다).
 
     # ── 진도 ────────────────────────────────────────────────
     #
@@ -267,12 +257,6 @@ def _fill(force: bool) -> int:
     print(f"  과정 1 진도 — 이수 {len(done1)} · 듣는 중 {len(partial1)} · "
           f"미시작 {len(active) - len(done1) - len(partial1)}")
 
-    # 과정 2 는 마감이 가까워 대부분 끝냈다
-    done2 = active[:44]
-    for p in done2:
-        who = {"id": p["id"], "name": p["name"], "dept": p["dept"]}
-        _watch(who, l2, int(l2["duration_sec"]))
-    print(f"  과정 2 진도 — 이수 {len(done2)} · 남은 사람 {len(active) - len(done2)}")
 
     # 체험 계정은 「막 시작한 사람」으로 둔다. 들어가서 이어보기를 바로 볼 수 있게.
     demo_who = {"id": "demo", "name": "체험 계정", "dept": "인사총무팀"}
