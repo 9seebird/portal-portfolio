@@ -120,13 +120,36 @@ fi
 
 # ── 진짜로 살아 있나 ───────────────────────────────────────
 # 컨테이너가 떴다는 것과 사이트가 응답한다는 것은 다른 이야기다.
-PUB="$(sed -n 's/^PROXY_PUBLISH=//p' proxy/.env 2>/dev/null | head -1)"
-case "$PUB" in
-  "" )          URL="http://localhost/health" ;;
-  127.0.0.1:*)  URL="http://${PUB}/health" ;;
-  *:*)          URL="http://localhost:${PUB##*:}/health" ;;
-esac
+# ★ PROXY_PUBLISH 에서 **호스트 포트**를 뽑는다.
+#
+#   값의 모양이 두 가지다.
+#       127.0.0.1:8081:80   (앞에 nginx 를 두는 서버)
+#       8090:80             (혼자 쓰는 로컬)
+#   맨 뒤 토막은 **컨테이너 안쪽 포트(80)** 라서 밖에서 두드릴 수 없다.
+#   필요한 것은 뒤에서 두 번째다.
+#
+#   예전에는 ${PUB##*:} 로 맨 뒤를 집었다. 그래서 주소가
+#       http://127.0.0.1:8081:80/health   (포트가 두 개)
+#       http://localhost:80/health        (컨테이너 포트)
+#   처럼 나왔고, curl 이 늘 실패해 health=0 이 되었다. 배포는 멀쩡한데
+#   「상태가 나쁘다」며 되돌리고, 되돌린 뒤에도 같은 이유로 실패해서
+#   「사람이 봐야 합니다」로 끝났다 — 검사 자체가 틀렸던 것이다.
+PUB="$(sed -n 's/^PROXY_PUBLISH=//p' proxy/.env 2>/dev/null | head -1 | tr -d '\r' | tr -d '"')"
+if [ -z "$PUB" ]; then
+  HOSTPORT="127.0.0.1:80"
+else
+  HOSTPORT="${PUB%:*}"                  # 뒤의 컨테이너 포트를 뗀다
+  case "$HOSTPORT" in
+    0.0.0.0:*)  HOSTPORT="127.0.0.1:${HOSTPORT##*:}" ;;   # 0.0.0.0 으로는 두드리지 않는다
+    *:*)        ;;                                        # 이미 주소:포트
+    *)          HOSTPORT="127.0.0.1:$HOSTPORT" ;;         # 포트만 있던 경우
+  esac
+fi
+URL="http://$HOSTPORT/health"
 
+# 어디를 두드리는지 남긴다. 안 남기면 실패했을 때 「health=0」만 보이고
+# 주소가 틀린 것인지 앱이 죽은 것인지 구분할 수가 없다 — 실제로 그랬다.
+say "  살아있는지 확인 — $URL"
 HEALTHY=0
 for i in $(seq 1 "$HEALTH_TRIES"); do
   if curl -fsS --max-time 3 "$URL" 2>/dev/null | grep -q '"ok"'; then HEALTHY=1; break; fi
