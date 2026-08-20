@@ -23,15 +23,26 @@
 # 쓰지 않는 편이 좋다. 정말 오탐일 때만.
 # =====================================================================
 ROOT="$(git rev-parse --show-toplevel)"
+FAIL=0
 
+# ── 1. 워크플로 파일이 성한가 ────────────────────────────────
+# 깃허브 워크플로는 문법이 멀쩡해도 거부당하는 경우가 있고, 그건 올려 봐야
+# 안다. 두 번 겪었다 — 한글 job ID, 그리고 주석 안의 빈 이중 중괄호.
+# 둘 다 「실패 메일」로만 알게 되므로 여기서 먼저 본다.
+printf '\n▸ push 전 검사 — 워크플로 파일\n'
+if command -v python3 >/dev/null 2>&1 && [ -f "$ROOT/tools/check_workflow.py" ]; then
+  python3 "$ROOT/tools/check_workflow.py" || FAIL=1
+fi
+
+# ── 2. 사내 정보가 섞였나 ────────────────────────────────────
 printf '\n▸ push 전 검사 — 사내 정보가 섞였나\n'
 
 # --strict : 낱말 목록이 없으면 「건너뜀」이 아니라 「실패」다.
 #   PC 두 대를 오가면 한쪽에만 목록이 있기 쉽고, 조용히 건너뛰면
 #   그날 그 PC 에서 push 한 것만 검사를 안 받은 채로 나간다.
-if bash "$ROOT/tools/check_secrets.sh" --strict; then
-  exit 0
-fi
+bash "$ROOT/tools/check_secrets.sh" --strict || FAIL=1
+
+[ "$FAIL" = 0 ] && exit 0
 
 cat <<'MSG'
 
