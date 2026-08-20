@@ -30,7 +30,7 @@ from .auth import admin_user, current_user
 from .registry import User
 
 # 도구 등록 — import 하는 것만으로 @tool 데코레이터가 실행된다.
-from .tools import (basic, ai_report, biz_plan, file_read, guide,  # noqa: F401
+from .tools import (basic, ai_report, biz_plan, edu, file_read, guide,  # noqa: F401
                     it_asset, memory_tools, portal)  # noqa: F401
 
 logging.basicConfig(level=logging.INFO,

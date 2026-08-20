@@ -12,8 +12,8 @@
 # 파이썬이 이미 깔려 있고 위 세 개가 있으면 그쪽을 먼저 쓴다.
 # 그게 훨씬 빠르기 때문이다 (이미지 빌드 없이 바로 돈다).
 #
-#   docker build -t chat-portal-tools tools
-#   docker run --rm -v "$PWD:/w" -w /w chat-portal-tools python tools/make_demo_data.py
+#   docker build -t portfolio-tools tools
+#   docker run --rm -v "$PWD:/w" -w /w portfolio-tools python tools/make_demo_data.py
 FROM python:3.12-slim
 
 # 판을 고정한다. 안 그러면 몇 달 뒤에 받은 사람과 지금 만든 사람이

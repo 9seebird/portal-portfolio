@@ -29,7 +29,10 @@ sec() { echo ""; echo "── $1 ──"; }
 if [ "${1:-}" = "--staged" ]; then
   mapfile -t FILES < <(git diff --cached --name-only --diff-filter=ACM)
 else
-  mapfile -t FILES < <(git ls-files)
+  # --others --exclude-standard 를 붙여야 아직 git add 하지 않은 파일도 본다.
+  # 이게 없으면 새로 붙인 앱 폴더가 통째로 검사에서 빠진다 —
+  # 정작 처음 올리는 코드가 제일 위험한데 그걸 안 보는 셈이었다.
+  mapfile -t FILES < <(git ls-files --cached --others --exclude-standard)
 fi
 [ ${#FILES[@]} -eq 0 ] && { echo "볼 파일이 없습니다."; exit 0; }
 

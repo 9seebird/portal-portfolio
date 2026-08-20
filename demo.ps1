@@ -148,8 +148,8 @@ foreach ($py in @('python', 'python3', 'py')) {
 }
 if (-not $havePy) {
     Ok '이 PC 에 파이썬 꾸러미가 없어 컨테이너로 만듭니다 (처음 한 번만 좀 걸립니다)'
-    docker build -q -t chat-portal-tools tools | Out-Null
-    docker run --rm -v "$($ROOT):/w" -w /w chat-portal-tools python tools/make_demo_data.py
+    docker build -q -t portfolio-tools tools | Out-Null
+    docker run --rm -v "$($ROOT):/w" -w /w portfolio-tools python tools/make_demo_data.py
 }
 
 # ── 5. 띄우기 ────────────────────────────────────────────────
@@ -195,6 +195,7 @@ function Seed($container, $label, [string[]]$cmd) {
 Seed 'demo-asset-api'     '자산관리'      @('python','scripts/seed_demo.py')
 Seed 'demo-leave-anomaly' '연차 이상패턴' @('python','-m','app.seed_demo')
 Seed 'demo-manual-import' '매뉴얼'        @('python','-m','app.seed_demo')
+Seed 'demo-edu'           '온라인 교육'   @('python','-m','app.seed_demo')
 
 # ── 6-1. 안 띄운 앱은 목록에서도 뺀다 ────────────────────────
 #

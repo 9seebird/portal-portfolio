@@ -28,6 +28,7 @@ import http.cookiejar
 import json
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://localhost").rstrip("/")
@@ -43,7 +44,13 @@ WEB = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(JAR))
 
 def hit(method: str, path: str):
     """(상태코드, 본문) — 못 붙으면 (0, 사유)"""
-    req = urllib.request.Request(BASE + path, method=method,
+    # 주소에 한글이 섞일 수 있다 (예: /intake/api/check/회의실예약).
+    # urllib 는 주소를 아스키로만 받아서, 그냥 넘기면 요청을 보내기도 전에
+    # UnicodeEncodeError 가 나고 화면에는 「붙지 못함」으로 찍힌다 —
+    # 안전장치가 막은 것처럼 보여서 진짜 문제와 구분이 안 된다.
+    # 여기서 퍼센트 인코딩해 두면 서버가 받는 값은 똑같다.
+    url = BASE + urllib.parse.quote(path, safe="/?&=%")
+    req = urllib.request.Request(url, method=method,
                                  data=b"{}" if method != "GET" else None,
                                  headers={"Content-Type": "application/json"})
     try:
@@ -131,6 +138,10 @@ case("POST",   "/leave-anomaly/api/holidays", True)
 case("POST",   "/leave-anomaly/api/datasets/leave", True)
 case("POST",   "/ai-report/api/upload",       True)
 case("DELETE", "/ai-report/api/files/x.xlsx", True)
+case("POST",   "/edu/api/admin/courses",      True, "← 과정은 다음 사람에게 남는다")
+case("POST",   "/edu/api/admin/roster/upload", True)
+case("DELETE", "/edu/api/admin/courses/1",    True)
+case("POST",   "/edu/api/me/password",        True)
 
 print("\n■ 열려야 한다 — 계산하고 버리는 것")
 # 여기서는 401/422/400 이 나와도 좋다. 「막히지 않았다」만 보면 된다.
@@ -142,6 +153,8 @@ case("POST", "/biz-plan/api/recompute",       False)
 case("POST", "/biz-plan/api/export",          False)
 case("POST", "/intake/api/check/회의실예약",   False)
 case("POST", "/manual-import/api/preview",    False)
+case("POST", "/edu/api/progress",             False, "← 이게 막히면 진도 판정을 볼 수 없다")
+case("POST", "/edu/api/lessons/1/done",       False)
 case("GET",  "/it-asset/api/assets",          False, "← 읽기는 전부 열려 있다")
 # 배치도를 끌어 옮기는 것. 이 앱에서 제일 보여줄 만한 화면이라 열어 두었다.
 # 되돌리기 버튼이 있고, 틀어져도 배치 자료를 다시 넣으면 원래대로 돌아온다.

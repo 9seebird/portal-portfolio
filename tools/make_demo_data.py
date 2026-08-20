@@ -79,6 +79,7 @@ def main() -> int:
     import gen_asset_data
     asset_json = ROOT / "it-asset" / "data" / "demo_seed.json"
     portal_json = ROOT / "portal" / "data" / "demo_seed.json"
+    edu_json = ROOT / "edu" / "data" / "demo_seed.json"
 
     # ★ or 로 잇지 않는다. `need(a) or need(b)` 는 a 가 참이면 b 를
     #   **아예 부르지 않는다**(단축 평가). need() 가 폴더를 만드는 일도
@@ -86,8 +87,9 @@ def main() -> int:
     #   FileNotFoundError 로 죽는다. 둘 다 먼저 부르고 나서 판단한다.
     want_asset = need(asset_json)
     want_portal = need(portal_json)
+    want_edu = need(edu_json)
 
-    data = gen_asset_data.build() if (want_asset or want_portal) else None
+    data = gen_asset_data.build() if (want_asset or want_portal or want_edu) else None
 
     if want_asset:
         asset_json.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
@@ -100,6 +102,13 @@ def main() -> int:
         portal_json.write_text(json.dumps({"employees": data["employees"]},
                                           ensure_ascii=False), encoding="utf-8")
         say(f"✓ 포털 계정 — {len(data['employees'])}명")
+
+    if want_edu:
+        # 교육 앱도 사람만 있으면 된다. 같은 명부를 쓰므로 이수 현황에 뜨는
+        # 이름이 자산·연차 화면의 그 사람과 같다.
+        edu_json.write_text(json.dumps({"employees": data["employees"]},
+                                       ensure_ascii=False), encoding="utf-8")
+        say(f"✓ 교육 대상자 — {len(data['employees'])}명")
 
     # ── 연차 이상패턴 ───────────────────────────────────────
     import gen_leave_data
