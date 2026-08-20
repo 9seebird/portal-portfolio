@@ -10,6 +10,7 @@ pytest 는 conftest.py 를 자동으로 읽는다.
 import os
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
@@ -70,22 +71,44 @@ def fresh_db():
 
 @pytest.fixture
 def client():
-    """인증 없는 클라이언트."""
+    """아무 헤더도 없는 클라이언트. 앞단(포털)을 거치지 않고 들어온 요청이다."""
     return TestClient(fastapi_app)
+
+
+# ── 포털이 넣어 주는 헤더 ────────────────────────────────────
+#
+# 이 앱에는 로그인이 없다. 앞단 nginx 가 포털에 "이 사람이 이걸 써도 되나"를
+# 묻고, 통과한 요청에만 아래 헤더를 붙여 넘겨준다 (app/core/security.py).
+# 그래서 테스트도 **로그인하는 대신 헤더를 붙인다.**
+#
+# ★ 헤더에는 latin-1 만 담을 수 있어서 한글은 퍼센트 인코딩해서 넣는다.
+#   그냥 "홍길동" 을 넣으면 서버에 닿기도 전에 클라이언트가 터진다.
+#   실제 nginx 도 같은 이유로 인코딩해서 보낸다.
+def _portal_headers(uid: str, name: str, dept: str, role: str) -> dict:
+    return {
+        "X-User-Id": uid,
+        "X-User-Name": quote(name),
+        "X-User-Dept": quote(dept),
+        "X-User-Role": role,
+    }
 
 
 @pytest.fixture
 def admin(client):
-    """관리자로 로그인된 클라이언트.
+    """담당자로 들어온 클라이언트.
 
-    매번 로그인 코드를 쓰지 않도록 Authorization 헤더를 미리 붙여둔다.
+    예전에는 여기서 /auth/login 을 불러 토큰을 받았다. 로그인이 포털로
+    옮겨가면서 그 주소가 사라졌고, 픽스처가 404 를 받아 **거의 모든 테스트가
+    무너져 있었다** — 코드가 틀린 게 아니라 테스트가 옛 구조를 보고 있었다.
     """
-    res = client.post(
-        "/auth/login", json={"username": "admin", "password": "admin1234"}
-    )
-    assert res.status_code == 200, res.text
-    token = res.json()["access_token"]
-    client.headers.update({"Authorization": f"Bearer {token}"})
+    client.headers.update(_portal_headers("admin", "관리자", "IT팀", "admin"))
+    return client
+
+
+@pytest.fixture
+def member(client):
+    """담당자가 아닌 일반 직원. 담당자 전용 동작이 막히는지 볼 때 쓴다."""
+    client.headers.update(_portal_headers("hong", "홍길동", "인사총무팀", "user"))
     return client
 
 

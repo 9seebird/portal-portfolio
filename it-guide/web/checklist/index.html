@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>누리코스메틱 IT 운영 체크리스트</title>
+<title>온빛 IT 운영 체크리스트</title>
 <style>
   :root{
     --bg:#f5f7fa;
@@ -241,7 +241,7 @@
 <div class="wrap">
   <header class="top">
     <div class="head-main">
-      <h1>누리코스메틱 IT 운영 · 유지보수 체크리스트</h1>
+      <h1>온빛 IT 운영 · 유지보수 체크리스트</h1>
       <p>업로드된 문서를 기준으로 정리한 주기별 업무 체크리스트 &amp; 유지보수 업체 관리 페이지입니다.</p>
       <div class="save-bar">
         <button class="ghost small" id="uncheckBtn" title="이 브라우저의 체크 표시를 모두 지웁니다. 항목 내용은 그대로입니다">체크 전부 해제</button>
@@ -273,7 +273,7 @@
 
   <div id="panels"></div>
 
-  <div class="footer-note">누리코스메틱 IT 업무 정리 문서 기반 · 사내 참고용</div>
+  <div class="footer-note">온빛 IT 업무 정리 문서 기반 · 사내 참고용</div>
 </div>
 
 <script id="app-data" type="application/json">
@@ -574,7 +574,7 @@ let APP_DATA = JSON.parse(document.getElementById('app-data').textContent);
    순서를 바꿔도 체크가 따라간다. 다만 **항목 글자를 고치면 체크는
    풀린다.** 번호로 묶으면 순서만 바꿔도 엉뚱한 항목이 체크되므로
    이쪽이 낫다고 보았다. */
-const CHECK_KEY = 'nuricos.checklist.done.v1';
+const CHECK_KEY = 'onbit.checklist.done.v1';
 let CHECKS = {};
 try { CHECKS = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}'); } catch(e) { CHECKS = {}; }
 

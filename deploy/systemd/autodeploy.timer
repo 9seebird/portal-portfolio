@@ -1,0 +1,20 @@
+# 5분에 한 번 「새 커밋 있나요」 하고 물어본다.
+#
+# 깃허브 웹훅을 쓰지 않는 이유는 autodeploy.sh 머리말에 적어 두었다 —
+# 바깥에서 들어오는 문을 열지 않고, 서버 열쇠를 깃허브에 맡기지 않기 위해서다.
+# 대신 5분까지 늦어질 수 있는데, 포트폴리오에는 충분하다.
+
+[Unit]
+Description=포트폴리오 자동 배포 타이머
+
+[Timer]
+# 부팅하고 2분 뒤 첫 실행 (도커가 뜰 시간을 준다)
+OnBootSec=2min
+# 그 뒤로는 앞 실행이 끝나고 5분마다
+OnUnitActiveSec=5min
+# 서버가 꺼져 있던 사이에 지나간 실행은 켜지자마자 한 번 만회한다
+Persistent=true
+Unit=autodeploy.service
+
+[Install]
+WantedBy=timers.target

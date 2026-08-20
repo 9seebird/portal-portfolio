@@ -6,8 +6,8 @@
 #   /srv/portal/autodeploy.sh --force  새 커밋이 없어도 다시 띄운다
 #   /srv/portal/autodeploy.sh --dry    무엇을 할지 보기만 한다
 #
-# 반드시 portal 계정으로 돈다. 깃 주소가 portal 의 ~/.ssh/config 에 적힌
-# 별명이라 다른 계정에서는 받아오질 못한다.
+# 저장소를 받아 둔 그 계정으로 돈다 (지금 서버에서는 azureuser).
+# 다른 계정으로 돌리면 파일 주인이 뒤섞여 다음 git pull 이 막힌다.
 #
 # ── 왜 깃허브 웹훅이 아니라 「물어보기」인가 ─────────────────────
 # 웹훅은 깃허브가 서버를 부르는 방식이라, 바깥에서 들어오는 문을 하나 더
@@ -44,8 +44,17 @@ flock -n 9 || { echo "$(date '+%F %T')  (앞 배포가 아직 돕니다 — 건�
 
 cd "$ROOT" || exit 1
 
-if [ "$(id -un)" != "portal" ] && [ -z "${ALLOW_ANY_USER:-}" ]; then
-  say "✗ portal 계정이 아닙니다 (지금: $(id -un)). 깃 주소를 못 찾습니다."
+# ── 저장소 주인과 같은 계정인가 ─────────────────────────────
+# 예전에는 여기서 계정 이름을 "portal" 로 못 박아 두었다. 그런 계정은
+# 만들지 않았고, 서버는 azureuser 로 돈다 — 그래서 타이머를 걸어도
+# 매번 첫 줄에서 죽었다. 이름을 적는 대신 **폴더 주인과 같은지**를 본다.
+# 그러면 계정 이름이 무엇이든, 어느 서버로 옮기든 그대로 맞는다.
+OWNER="$(stat -c %U "$ROOT/.git" 2>/dev/null || echo "")"
+ME="$(id -un)"
+if [ -n "$OWNER" ] && [ "$OWNER" != "$ME" ] && [ -z "${ALLOW_ANY_USER:-}" ]; then
+  say "✗ 이 폴더의 주인은 $OWNER 인데 지금 $ME 로 돌고 있습니다."
+  say "  그대로 두면 파일 주인이 섞여 다음 git pull 이 막힙니다."
+  say "  → sudo -u $OWNER $ROOT/autodeploy.sh   (또는 ALLOW_ANY_USER=1)"
   exit 1
 fi
 

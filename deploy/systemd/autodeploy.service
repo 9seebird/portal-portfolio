@@ -1,0 +1,27 @@
+# 자동 배포를 한 번 돌린다. 타이머(autodeploy.timer)가 이것을 부른다.
+#
+# 설치는 아래 README.md 를 보세요. 요약하면 이 두 파일을
+# /etc/systemd/system/ 에 복사하고 타이머를 켜면 됩니다.
+#
+# ★ User 와 WorkingDirectory 는 서버에 맞게 고쳐야 합니다.
+#   저장소를 받아 둔 계정과 폴더여야 합니다 — 다른 계정으로 돌리면
+#   파일 주인이 섞여 다음 git pull 이 막힙니다.
+
+[Unit]
+Description=포트폴리오 자동 배포 (새 커밋이 있으면 받아서 띄운다)
+# 도커가 준비된 뒤에 돈다. 안 그러면 부팅 직후 한 번은 반드시 실패한다.
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=azureuser
+WorkingDirectory=/srv/portal
+ExecStart=/srv/portal/autodeploy.sh
+
+# 배포가 오래 걸려도 systemd 가 중간에 끊지 않게. 이미지 빌드가 느린 날이 있다.
+TimeoutStartSec=1800
+
+# 로그는 스크립트가 autodeploy.log 에도 남기지만, journalctl 로도 보이게 둔다.
+StandardOutput=journal
+StandardError=journal

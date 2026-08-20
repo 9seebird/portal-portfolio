@@ -26,3 +26,7 @@ tools/scrub.py
 
 # 유출 검사용 낱말 목록 — 이 목록 자체가 새면 안 된다
 .secretwords
+
+# 자동 배포가 서버에서 만드는 것. 기계마다 다르므로 올리지 않는다.
+autodeploy.log
+.autodeploy.lock

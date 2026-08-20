@@ -16,7 +16,7 @@
     # 리다이렉트를 "/login" 처럼 상대 주소로 내보낸다.
     #
     # 기본값(on)이면 nginx 가 스스로 절대 주소를 만들어 붙인다.
-    #   Location: http://portal.nuricos.example.com/login
+    #   Location: http://portal.onbit.example.com/login
     # 앞에 호스트 nginx 가 있고 브라우저가 https 로 들어온 경우,
     # 이 http 주소로 한 번 튕겼다가 다시 https 로 돌아오게 된다.
     # 컨테이너를 8081 같은 포트로 띄우면 그 포트까지 붙어서

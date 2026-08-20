@@ -227,7 +227,7 @@ def parse_blocks(path: Path) -> list[dict]:
                     head, tail = (p.strip() for p in text.split("\n", 1))
                     flat_tail = tail.replace(" ", "")
                     if any(w in flat_tail for w in ROOM_WORDS):
-                        # "누리코스메틱\n통신실" 처럼 두 줄이지만 사람이 아닌 것
+                        # "온빛\n통신실" 처럼 두 줄이지만 사람이 아닌 것
                         kind, label = "ROOM", tail
                     else:
                         marked = "●" in tail

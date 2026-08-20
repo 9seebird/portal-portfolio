@@ -194,6 +194,19 @@ if [ -d /etc/nginx ]; then
   fi
 fi
 
+line "회사 이름"
+# 체험판 회사 이름이 한 이름으로 맞는지. 예전 이름이 남아 있으면 화면마다
+# 다른 회사가 되고, 하필 그 이름이 실제 있는 회사라면 더 곤란하다.
+if command -v python3 >/dev/null 2>&1 && [ -f "$HERE/tools/company.py" ]; then
+  if OUT="$(python3 "$HERE/tools/company.py" --check 2>&1)"; then
+    ok "${OUT#*✓ }"
+  else
+    bad "예전 회사 이름이 남아 있습니다."
+    printf '%s\n' "$OUT" | sed -n '2,6p' | sed 's/^/      /'
+    echo "      → python3 tools/company.py --apply"
+  fi
+fi
+
 line "디스크"
 avail=$(df -Pm "$HERE" | awk 'NR==2{print $4}')
 [ "${avail:-0}" -gt 2000 ] && ok "여유 ${avail}MB" || warn "여유 ${avail}MB — 이미지 빌드에 2GB 쯤 듭니다."

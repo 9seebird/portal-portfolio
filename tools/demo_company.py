@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""가상 회사 「누리코스메틱」 — 체험판에 나오는 모든 이름과 숫자의 출처.
+"""가상 회사 「온빛」 — 체험판에 나오는 모든 이름과 숫자의 출처.
 
 체험판에는 앱이 아홉 개 있고, 앱마다 사람·부서·자산·매출이 나온다.
 그걸 앱마다 따로 지어내면 **같은 회사인데 이야기가 안 맞는다.**
@@ -25,9 +25,15 @@ import random
 from datetime import date, timedelta
 
 SEED = 20260814
-COMPANY = "누리코스메틱"
-COMPANY_EN = "NURI COSMETIC"
-DOMAIN = "nuricos.example.com"
+
+# ★ 회사 이름은 여기서 정하지 않는다. company.py 한 곳에만 있다.
+#   예전에는 이 파일에도 따로 적어 두었는데, 화면(HTML)·README·nginx 주석
+#   까지 같은 이름이 흩어져 있어서 한 번 바꾸려니 84군데를 손봐야 했다.
+#   이름을 바꿀 일이 생기면  tools/company.py  를 고치고 --apply 를 돌린다.
+try:
+    from company import COMPANY, COMPANY_EN, DOMAIN          # noqa: F401
+except ImportError:                                          # 컨테이너 안에서 부를 때
+    from tools.company import COMPANY, COMPANY_EN, DOMAIN    # noqa: F401
 
 # ── 조직 ────────────────────────────────────────────────────
 # (부서, 정원, 층)  — 층은 자리 배치도와 내선 구역에 쓴다.

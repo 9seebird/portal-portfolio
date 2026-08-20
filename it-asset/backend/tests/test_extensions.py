@@ -112,7 +112,12 @@ def test_번호와_이름_부서로_찾는다(admin, make_employee):
     admin.put(f"/extensions/{ext['id']}/employee", json={"employee_id": emp["id"]})
     admin.post("/extensions/", json={"number": "5678"})
 
-    assert [r["number"] for r in admin.get("/extensions/?q=구매").json()] == ["1234"]
+    # 부서 이름 일부로도 찾힌다. 위에서 만든 사람의 부서가 「생산관리팀」이다.
+    #
+    # ★ 여기가 한동안 깨져 있었다. 실명이 섞여 있던 것을 가짜 이름으로 바꾸면서
+    #   부서를 「구매팀」→「생산관리팀」으로 고쳤는데, **찾는 글자는 그대로**
+    #   두었다. 데이터와 기대값이 따로 놀아서 늘 빈 목록이 나왔다.
+    assert [r["number"] for r in admin.get("/extensions/?q=생산").json()] == ["1234"]
     assert [r["number"] for r in admin.get("/extensions/?q=567").json()] == ["5678"]
 
 
