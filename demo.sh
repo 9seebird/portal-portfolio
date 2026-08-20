@@ -109,6 +109,24 @@ fi
 # 「도커만 있으면 된다」를 지키려는 것이다 (윈도우에는 파이썬이 없는 쪽이 보통이다).
 say ""
 say "▸ 가짜 데이터"
+
+# ★ data/ 를 **내 소유로 먼저 만들어 둔다.**
+#
+#   앱 컨테이너는 대개 root 로 돈다. 그래서 deploy 를 먼저 하면 컨테이너가
+#   없는 data/ 를 root 소유로 만들어 버리고, 뒤이어 도는 이 단계(tools 는
+#   -u $(id -u) 로 나로 돈다)가 거기에 못 쓴다 — Permission denied 로 멈춘다.
+#
+#   새 앱을 붙일 때마다 반복되던 일이다. 폴더가 먼저 있으면 컨테이너는
+#   그것을 그대로 쓰므로, 여기서 미리 만들어 두면 생기지 않는다.
+#   이미 있으면 mkdir -p 가 아무 일도 하지 않는다.
+#   compose 가 ./data 를 실제로 붙이는 앱만 만든다. 전부 만들면 쓰지도 않는
+#   빈 폴더가 생겨서 「이건 뭐지」 하게 된다.
+for d in */; do
+  [ -f "${d}docker-compose.yml" ] || continue
+  grep -q '\./data' "${d}docker-compose.yml" || continue
+  mkdir -p "${d}data" 2>/dev/null || true
+done
+
 if python3 -c "import openpyxl, pptx, PIL" 2>/dev/null; then
   python3 tools/make_demo_data.py
 else
