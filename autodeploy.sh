@@ -39,8 +39,11 @@ say(){ printf '%s  %s\n' "$(date '+%F %T')" "$1" | tee -a "$LOG"; }
 
 # ── 겹쳐 돌지 않게 ──────────────────────────────────────────
 # 배포가 2분 넘게 걸리는 사이에 타이머가 또 불러도 조용히 물러난다.
-exec 9>"$LOCK"
-flock -n 9 || { echo "$(date '+%F %T')  (앞 배포가 아직 돕니다 — 건너뜀)" >>"$LOG"; exit 0; }
+# ★ 다시 시작(exec)한 경우에는 이미 9번을 쥐고 있다. 다시 잠그려 하면 안 된다.
+if [ -z "${AUTODEPLOY_REEXEC:-}" ]; then
+  exec 9>"$LOCK"
+  flock -n 9 || { echo "$(date '+%F %T')  (앞 배포가 아직 돕니다 — 건너뜀)" >>"$LOG"; exit 0; }
+fi
 
 cd "$ROOT" || exit 1
 
@@ -87,8 +90,13 @@ fi
 # ── 새 커밋이 있나 ─────────────────────────────────────────
 git fetch --quiet origin || { say "✗ git fetch 실패 (네트워크·열쇠 확인)"; exit 1; }
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-OLD="$(git rev-parse HEAD)"
+# 되돌릴 자리. 다시 시작한 경우에는 이미 받은 뒤라 HEAD 가 새 커밋이므로,
+# 처음 실행이 넘겨준 값을 그대로 쓴다.
+OLD="${AUTODEPLOY_OLD:-$(git rev-parse HEAD)}"
 NEW="$(git rev-parse "origin/$BRANCH")"
+
+# 자기 자신이 바뀌는지 보려고 미리 재 둔다.
+SELF_BEFORE="$(sha1sum "$0" 2>/dev/null | cut -d" " -f1)"
 
 if [ "$OLD" = "$NEW" ] && [ "$FORCE" = 0 ]; then
   exit 0                      # 조용히. 로그를 더럽히지 않는다.
@@ -102,6 +110,28 @@ if [ "$DRY" = 1 ]; then
 fi
 
 git pull --ff-only --quiet || { say "✗ git pull 실패"; exit 1; }
+
+# ★ 자기 자신이 바뀌었으면 **새 것으로 다시 시작한다.**
+#
+#   이 스크립트는 도는 도중에 git pull 로 자기 파일을 갈아 끼운다. 그런데
+#   bash 는 이미 읽은 부분을 그대로 이어서 실행하므로, 아래의 배포·헬스체크·
+#   되돌리기는 **옛 로직**이 돈다.
+#
+#   그게 한 번은 이렇게 나타났다. 헬스체크 주소 계산 오류를 고쳐 올렸는데,
+#     · 받기는 새 것을 받고
+#     · 돌기는 옛 로직으로 돌아 health=0 이 되고
+#     · 되돌리기(reset --hard)가 그 수정을 도로 지웠다
+#   그래서 몇 번을 올려도 같은 자리에서 실패했다 — 고칠 수가 없는 구조였다.
+#
+#   exec 로 갈아타면 그 지점부터는 온전히 새 스크립트다.
+#   AUTODEPLOY_REEXEC 는 다시 시작이 한 번만 일어나게 하는 표식이다.
+SELF_AFTER="$(sha1sum "$0" 2>/dev/null | cut -d" " -f1)"
+if [ -n "$SELF_BEFORE" ] && [ "$SELF_BEFORE" != "$SELF_AFTER" ] \
+   && [ -z "${AUTODEPLOY_REEXEC:-}" ]; then
+  say "  autodeploy.sh 자신이 바뀌었습니다 — 새 것으로 다시 시작합니다"
+  export AUTODEPLOY_REEXEC=1 AUTODEPLOY_OLD="$OLD"
+  exec bash "$0" "$@"
+fi
 
 # ── 띄우기 ────────────────────────────────────────────────
 # setup.sh 를 먼저 부른다. .env 는 깃에 없으므로, 앱을 새로 붙인 커밋이면
