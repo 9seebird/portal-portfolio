@@ -49,7 +49,9 @@ jobs:
     name: 검사
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # v4 는 Node 20 에서 돌게 만들어졌는데 깃허브가 그걸 접었다.
+      # 그대로 두면 「Node.js 20 is deprecated」 경고가 매번 붙는다.
+      - uses: actions/checkout@v6
 
       - name: 문법 — 셸
         run: |
@@ -58,7 +60,7 @@ jobs:
             | xargs -0 -r -n1 bash -n
           echo "✓ 셸 스크립트 문법 정상"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: '3.12' }
 
       - name: 문법 — 파이썬

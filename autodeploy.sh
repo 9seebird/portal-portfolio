@@ -59,12 +59,29 @@ if [ -n "$OWNER" ] && [ "$OWNER" != "$ME" ] && [ -z "${ALLOW_ANY_USER:-}" ]; the
 fi
 
 # ── 서버에서 직접 고친 파일이 있으면 멈춘다 ────────────────────
-# 여기서 --force 로 밀어 버리면 급하게 손본 것이 소리 없이 사라진다.
-if [ -n "$(git status --porcelain)" ]; then
-  say "✗ 서버에 커밋 안 된 변경이 있어 멈춥니다:"
-  git status --short | sed 's/^/          /' | tee -a "$LOG"
+#
+# 여기서 밀어 버리면 급하게 손본 것이 소리 없이 사라진다. 되돌릴 때
+# git reset --hard 를 쓰기 때문에 진짜로 사라진다.
+#
+# ★ 단, **추적되는 파일이 바뀐 경우만** 본다 (--untracked-files=no).
+#
+#   처음에는 추적 안 되는 파일(??)까지 중단 사유로 봤다. 그랬더니 서버에
+#   a.out 하나가 굴러다니는 것만으로 자동 배포가 영영 멈췄다. 그런 파일은
+#   git pull 로도 reset --hard 로도 사라지지 않으니 잃을 것이 없는데,
+#   고치려면 매번 SSH 로 들어가야 해서 자동화한 뜻이 없어진다.
+#   알려는 주되 막지는 않는다.
+DIRTY="$(git status --porcelain --untracked-files=no)"
+if [ -n "$DIRTY" ]; then
+  say "✗ 서버에서 고친 파일이 있어 멈춥니다 (덮어쓰면 사라집니다):"
+  printf '%s\n' "$DIRTY" | sed 's/^/          /' | tee -a "$LOG"
   say "  (버릴 것이면  git checkout -- <파일>  후 다시)"
   exit 1
+fi
+
+JUNK="$(git status --porcelain --untracked-files=normal | grep '^??' || true)"
+if [ -n "$JUNK" ]; then
+  say "  △ 저장소에 없는 파일이 있습니다 (배포는 그대로 진행):"
+  printf '%s\n' "$JUNK" | sed 's/^/          /' | tee -a "$LOG"
 fi
 
 # ── 새 커밋이 있나 ─────────────────────────────────────────
