@@ -161,6 +161,37 @@
   /* 앱이 스스로 등록했지만 아직 접근 범위가 정해지지 않은 서비스 */
   .card.needs-setup{border-color:var(--warn);background:linear-gradient(0deg,var(--warnbg),var(--warnbg))}
   .card.needs-setup .desc,.card.needs-setup .scope{opacity:.85}
+  /* 켜져 있는데 볼 수 있는 사람이 아무도 없는 상태.
+     '중지'와 달리 관리자 눈에는 멀쩡히 켜져 보인다. 관리자에게는 범위와
+     상관없이 다 보이기 때문에, 이 상태는 **화면으로는 절대 못 잡는다.**
+     그래서 이름표를 붙인다. */
+  .chip.nobody{background:#fde8e8;color:#a03030;border:1px solid #e6a5a5}
+  .card.nobody{border-color:#e0a0a0}
+  @media (prefers-color-scheme: dark){
+    .chip.nobody{background:#3a2020;color:#e0928c;border-color:#5a3030}
+  }
+
+  /* 카드 접기.
+     앱이 열 개를 넘으면 다 펴 둔 목록은 화면 몇 개 분량이 된다.
+     평소에는 제목 줄만 두고, 손볼 때만 편다. */
+  .card > .body{display:none}
+  .card.open > .body{display:block}
+  .card:not(.open) .shead{margin-bottom:0}
+  .shead .cav{border:0;background:transparent;cursor:pointer;color:var(--tx3);
+              font-size:11px;line-height:1;padding:4px 5px;border-radius:6px;
+              flex:0 0 auto;transition:transform .12s}
+  .shead .cav:hover{background:var(--line2);color:var(--tx2)}
+  .card.open .shead .cav{transform:rotate(90deg)}
+  .shead .tt{cursor:pointer}
+  /* 접혀 있어도 접근 범위는 한 줄로 보인다 — 그것 때문에 펴는 일이 제일 많다 */
+  .shead .scopesum{font-size:12px;color:var(--tx3);white-space:nowrap;overflow:hidden;
+              text-overflow:ellipsis;flex:1 1 120px;min-width:0}
+  .card.open .shead .scopesum{display:none}
+  /* 「접근 범위 정하고 켜기」— 설정 필요 카드에서 토글을 대신한다 */
+  .shead .go{border-color:var(--nav);background:var(--nav);color:#fff;font-weight:650;
+             margin-right:14px}
+  .shead .go:hover:not(:disabled){border-color:var(--nav);background:var(--nav);
+             color:#fff;opacity:.9}
   @media (prefers-color-scheme: dark){ .chip.new{color:#e8c46a} }
   @media (prefers-color-scheme: dark){
     .chip.all{background:#1d3324;color:#87c99a} .chip.res{background:#3a2020;color:#e0928c}
@@ -488,7 +519,8 @@
       <div><h2>등록된 서비스</h2>
         <div class="sub">여기에 등록한 서비스가 포탈 화면과 챗 도구에 함께 반영됩니다.
           앱이 뜨면서 스스로 등록한 것은 <b>설정 필요</b> 로 표시되며,
-          접근 범위를 정하고 켜야 직원에게 보입니다.</div></div>
+          접근 범위를 정하고 켜야 직원에게 보입니다.
+          <b>카드는 접혀 있습니다 — 이름을 누르면 펴집니다.</b></div></div>
       <button class="primary" id="svcAdd">＋ 서비스 추가</button>
     </div>
     <div id="svcList"></div>
@@ -717,7 +749,7 @@
       <div class="fs"><label class="fld" for="uId">아이디</label>
         <input class="in" id="uId" placeholder="hong" autocomplete="off"></div>
       <div class="fs"><label class="fld" for="uNm">이름</label>
-        <input class="in" id="uNm" placeholder="구본승" autocomplete="off"></div>
+        <input class="in" id="uNm" placeholder="홍길동" autocomplete="off"></div>
     </div>
     <div class="fs"><label class="fld" for="uDept">부서</label>
       <!-- 직접 입력이 아니라 선택. 오타 하나가 곧 권한 사고가 된다. -->
@@ -993,47 +1025,67 @@ async function loadServices(){
 
   SVC.forEach((s,i)=>{
     const c = el("div","card"), row = el("div","shead");
+
+    const cav = el("button","cav","\u25B8"); cav.title = "펴기 / 접기";
+    row.appendChild(cav);
+
     const dot = el("div","dotc"); dot.style.background = s.color; row.appendChild(dot);
 
     const tt = el("div","tt");
     tt.appendChild(el("b","",s.name));
     tt.appendChild(el("span","chip "+(s.access==="all"?"all":"res"),
       s.access==="all" ? "전 직원" : "부서/개인 지정"));
-    // 앱이 스스로 등록했지만 관리자가 아직 손대지 않은 상태.
-    // "중지"로만 표시하면 일부러 꺼둔 것과 구분이 안 된다.
-    const untouched = !s.enabled && s.access === "restricted" &&
+
+    /* 범위가 하나도 없는 상태는 켜기 전과 켠 뒤가 전혀 다른 뜻이다.
+         켜기 전  → 앱이 스스로 등록만 해 둔 것. '설정 필요'.
+         켠 뒤    → **켜져 있는데 직원 화면에는 없다.** 훨씬 위험하다.
+       관리자에게는 범위와 상관없이 다 보이므로 눈으로는 못 잡는다. */
+    const noScope = s.access === "restricted" &&
       !(s.allowed_depts||[]).length && !(s.allowed_users||[]).length;
+    const untouched = !s.enabled && noScope;
+    const nobody = s.enabled && noScope;
     if(untouched) tt.appendChild(el("span","chip new","설정 필요"));
+    else if(nobody) tt.appendChild(el("span","chip nobody","아무도 못 봄"));
     else if(!s.enabled) tt.appendChild(el("span","chip off","중지"));
+
+    tt.appendChild(el("span","scopesum", s.access_desc || ""));
     row.appendChild(tt);
     if(untouched) c.classList.add("needs-setup");
+    if(nobody) c.classList.add("nobody");
 
     const ctr = el("div","ctr");
-    const sw = el("label","sw"); const chk=document.createElement("input");
-    chk.type="checkbox"; chk.checked=s.enabled;
-    chk.onchange = async ()=>{
-      try{
-        // 범위가 하나도 없는 서비스를 켜면 아무에게도 안 보인다.
-        // 켰는데 안 보이면 "고장났나?" 가 된다. 켤 때 전 직원으로 연다.
-        // (좁히려면 접근 범위 설정에서 바꾸면 된다 — 되돌리기 쉬운 쪽으로 둔다)
-        const empty = s.access === "restricted" &&
-          !(s.allowed_depts||[]).length && !(s.allowed_users||[]).length;
-        if(chk.checked && empty){
-          await api(`/api/admin/services/${s.id}/access`, { method:"PATCH",
-            body: JSON.stringify({ access:"all", allowed_depts:[], allowed_users:[],
-                                   excluded_users:[], allowed_ips:s.allowed_ips||[],
-                                   managers:s.managers||[] }) });
+
+    if(untouched){
+      /* ★ 순서를 뒤집었다.
+         예전에는 토글을 먼저 켜고, 그 다음 스크롤을 내려 접근 범위를 정했다.
+         게다가 범위가 비어 있으면 켜는 김에 **전 직원으로 자동 개방**했다.
+         급여·인사 자료처럼 아무나 보면 안 되는 앱에서는 그 한 번이 그대로 사고다.
+         이제는 범위를 먼저 정하고, 저장하면서 켜진다. 조작이 하나로 준다. */
+      const go = el("button","sm go","접근 범위 정하고 켜기");
+      go.onclick = ()=> openAccess(s, true);
+      ctr.appendChild(go);
+    } else {
+      const sw = el("label","sw"); const chk=document.createElement("input");
+      chk.type="checkbox"; chk.checked=s.enabled;
+      chk.onchange = async ()=>{
+        // 범위가 빈 채로 켜면 아무에게도 안 보인다.
+        // 전 직원으로 열어 주던 예전 동작은 지웠다 — 되돌리기 전까지 모두가 본다.
+        if(chk.checked && noScope){
+          chk.checked = false;
+          toast("볼 수 있는 사람이 없습니다. 접근 범위를 먼저 정하세요.", true);
+          openAccess(s, true);
+          return;
         }
-        await api(`/api/admin/services/${s.id}/enabled`, { method:"PATCH",
-          body: JSON.stringify({ active: chk.checked }) });
-        toast(!chk.checked ? "중지했습니다."
-              : empty ? "켰습니다. 전 직원이 볼 수 있습니다 — 좁히려면 접근 범위 설정에서 바꾸세요."
-                      : "사용으로 변경했습니다.");
-        loadServices();
-      }catch(e){ toast(e.message,true); chk.checked=!chk.checked; }
-    };
-    sw.appendChild(chk); sw.appendChild(document.createElement("i"));
-    ctr.appendChild(sw);
+        try{
+          await api(`/api/admin/services/${s.id}/enabled`, { method:"PATCH",
+            body: JSON.stringify({ active: chk.checked }) });
+          toast(chk.checked ? "사용으로 변경했습니다." : "중지했습니다.");
+          loadServices();
+        }catch(e){ toast(e.message,true); chk.checked=!chk.checked; }
+      };
+      sw.appendChild(chk); sw.appendChild(document.createElement("i"));
+      ctr.appendChild(sw);
+    }
 
     // 순서 이동은 하나의 조작이므로 붙이고, 편집 버튼 묶음과는 띄운다
     const ord = el("div","btns");
@@ -1053,14 +1105,27 @@ async function loadServices(){
     row.appendChild(ctr);
     c.appendChild(row);
 
-    if(s.url) c.appendChild(el("div","path",s.url));
-    if(s.description) c.appendChild(el("div","desc",s.description));
+    // 카드 속은 접어 둔다. 제목 줄이나 화살표를 누르면 펴진다.
+    const body = el("div","body");
+    if(s.url) body.appendChild(el("div","path",s.url));
+    if(s.description) body.appendChild(el("div","desc",s.description));
     const sc = el("div","scope");
     sc.appendChild(el("b","","접근 범위"));
     sc.appendChild(el("div","",s.access_desc));
     sc.appendChild(el("b","","담당자"));
     sc.appendChild(el("div","",s.manager_desc));
-    c.appendChild(sc);
+    body.appendChild(sc);
+    c.appendChild(body);
+
+    /* 펴 둔 카드는 다시 그려도 그대로 펴져 있어야 한다.
+       토글 하나 누를 때마다 loadServices() 가 목록을 통째로 다시 그리는데,
+       그때 도로 접히면 방금 보던 자리를 잃는다. */
+    if(OPEN_SVC.has(s.id)) c.classList.add("open");
+    const toggle = ()=>{
+      if(c.classList.toggle("open")) OPEN_SVC.add(s.id); else OPEN_SVC.delete(s.id);
+    };
+    cav.onclick = toggle;
+    tt.onclick = toggle;
 
     (untouched ? fresh : done).push(c);
   });
@@ -1070,7 +1135,7 @@ async function loadServices(){
     const h = el("div","sechead");
     h.appendChild(el("b","", "새로 등록된 서비스 " + fresh.length + "개"));
     h.appendChild(el("span","",
-      "앱이 스스로 등록했습니다. 접근 범위를 정하고 켜야 직원에게 보입니다."));
+      "앱이 스스로 등록했습니다. 「접근 범위 정하고 켜기」 한 번이면 끝납니다."));
     box.appendChild(h);
     fresh.forEach(c => box.appendChild(c));
   }
@@ -1083,6 +1148,9 @@ async function loadServices(){
     done.forEach(c => box.appendChild(c));
   }
 }
+
+/* 어떤 카드를 펴 두었는지. 목록을 다시 그려도 유지한다. */
+const OPEN_SVC = new Set();
 
 async function move(id,d){ await api(`/api/admin/services/${id}/move?direction=${d}`,{method:"PATCH"}); loadServices(); }
 
@@ -1122,11 +1190,19 @@ function askDeleteSvc(s){
 $("cOk").onclick = ()=>{ const f=confirmFn; closeAll(); if(f) f(); };
 
 /* ── 접근 범위 ── */
-function openAccess(s){
+/* thenEnable=true 면 저장하면서 서비스를 켠다.
+   「설정 필요」 카드에서 들어온 경우다. 범위를 정하는 것과 켜는 것은
+   결국 한 번에 끝나야 하는 일인데, 예전에는 위에서 켜고 → 스크롤 내려
+   범위 정하기 두 번이었다. */
+let accThenEnable = false;
+
+function openAccess(s, thenEnable){
   accSvc = s;
+  accThenEnable = !!thenEnable;
   accSel = { depts:new Set(s.allowed_depts), users:new Set(s.allowed_users),
              excluded:new Set(s.excluded_users), ips:[...s.allowed_ips],
              mgrs:new Set(s.managers || []) };
+  $("accOk").textContent = accThenEnable ? "저장하고 켜기" : "저장";
   $("accWho").textContent = s.name;
   document.querySelectorAll('#accMode input').forEach(r=>{
     r.checked = r.value === s.access;
@@ -1377,12 +1453,28 @@ $("accIpAdd").onclick = ()=>{
 };
 $("accOk").onclick = async ()=>{
   const mode = document.querySelector('#accMode input:checked').value;
+
+  /* 켜져 있거나 지금 켜려는 서비스인데 아무도 안 고르면, 켜 봐야 안 보인다.
+     관리자에게만 보이니 잘못된 줄도 모른다. 여기서 막는다.
+     (꺼 둔 서비스는 비워 둬도 상관없으니 막지 않는다.) */
+  const willBeOn = accThenEnable || !!(accSvc && accSvc.enabled);
+  if(willBeOn && mode==="restricted" && !accSel.depts.size && !accSel.users.size){
+    merr("aMsg","볼 수 있는 사람이 한 명도 없습니다. 부서나 개인을 고르거나 「전 직원」을 선택하세요.");
+    return;
+  }
+
   try{
     await api(`/api/admin/services/${accSvc.id}/access`, { method:"PATCH",
       body: JSON.stringify({ access:mode, allowed_depts:[...accSel.depts],
         allowed_users:[...accSel.users], excluded_users:[...accSel.excluded],
         allowed_ips:accSel.ips, managers:[...accSel.mgrs] }) });
-    closeAll(); toast("접근 범위를 저장했습니다."); loadServices();
+    if(accThenEnable){
+      await api(`/api/admin/services/${accSvc.id}/enabled`, { method:"PATCH",
+        body: JSON.stringify({ active:true }) });
+    }
+    closeAll();
+    toast(accThenEnable ? "접근 범위를 정하고 켰습니다." : "접근 범위를 저장했습니다.");
+    loadServices();
   }catch(e){ merr("aMsg", e.message); }
 };
 

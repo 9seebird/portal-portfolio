@@ -89,6 +89,17 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ── 대상 정하기 ──────────────────────────────────────────────
+# ★ 탭 자동완성이 넣어 주는 '.\it-asset\' 을 'it-asset' 으로 되돌린다.
+#
+#   PowerShell 에서 it-a 까지 치고 Tab 을 누르면 '.\it-asset\' 이 들어간다.
+#   그대로 두면 $dir 이 'C:\...\.\it-asset\' 가 되는데, 컨테이너가 적어 둔
+#   폴더는 'C:\...\it-asset' 이다. 글자가 달라서 **내가 띄운 것을 남의 것으로
+#   착각하고** "이름을 다른 곳에서 쓰고 있습니다" 로 멈춘다. 폴더는 같은데.
+#   자동완성을 쓰지 말라고 할 수는 없으니 여기서 받아 준다.
+$Targets = @($Targets | ForEach-Object {
+    ($_ -replace '^[.][\\/]', '') -replace '[\\/]+$', ''
+} | Where-Object { $_ })
+
 if ($Targets.Count -gt 0) {
     $list = $Targets
 } else {

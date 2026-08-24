@@ -1,5 +1,5 @@
 # 버전을 고정한다. 안 그러면 다시 빌드하는 날마다 다른 것이 깔린다 (규칙 15).
-# 다른 앱(leave-anomaly · journal-check)과 같은 판으로 맞췄다.
+# 다른 앱(leave-anomaly · biz-plan)과 같은 판으로 맞췄다.
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20

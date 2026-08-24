@@ -27,6 +27,15 @@
   display: none !important;
 }
 
+/* ★ 세로 스크롤막대 자리를 늘 비워 둔다.
+   이게 없으면 목록이 짧아져 스크롤막대가 사라지는 순간 본문이 15px쯤
+   넓어진다. 그 15px 때문에 form-grid(auto-fit) 의 칸 수가 5→6 으로
+   바뀌면서 **검색 결과가 없을 때만 입력칸 배치가 통째로 틀어졌다.**
+   검색어를 한 글자 지웠다 넣을 때마다 화면이 덜컹거린 것도 같은 이유다. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -2075,3 +2084,95 @@ body.seat-dragging { -webkit-user-select: none; user-select: none; }
 }
 .seat:hover .seat-pen { opacity: 1; }
 .seat .seat-pen:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ------------------------------------------------------------ 입사 처리 창
+   「퇴사 처리」의 짝. 등록 → 자산 → IP → 내선 → 라이선스 → 소프트웨어를
+   한 창에서 끝낸다. 단계마다 창을 넘기지 않는 이유는, 신규 입사자가
+   자산 하나만 받고 끝나는 경우가 제일 흔해서 그때 「다음」을 네 번
+   누르게 하는 것이 오히려 손이 더 가기 때문이다. 전부 펼쳐 두고
+   필요한 칸만 채우게 한다. */
+
+.ob-sec {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.ob-sec:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ob-sec > h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 순서를 눈으로 세게 해 준다. 위에서 아래로 한 번만 훑으면 끝나야 한다. */
+.ob-sec > h4 > i {
+  font-style: normal;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.ob-sec > h4 > small {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ob-sec > select {
+  width: 100%;
+  min-height: 34px;
+}
+
+.ob-sec .hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ob-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 6px 12px;
+}
+
+.ob-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+/* 결과 알림. 일부만 실패했을 때 창을 닫지 않고 여기에 남긴다 —
+   직원은 이미 등록됐으므로 무엇이 빠졌는지 보여 주지 않으면 알 길이 없다. */
+.ob-msg {
+  margin: 0 20px 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--warn-weak, #fff6e5);
+  border: 1px solid var(--warn, #e0a33a);
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.ob-msg.ok {
+  background: var(--accent-weak);
+  border-color: var(--accent);
+}

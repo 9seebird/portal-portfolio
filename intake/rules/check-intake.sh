@@ -57,7 +57,7 @@ DOCKERFILE="$DIR/Dockerfile"
 # 앱 모양을 먼저 본다. 셋 중 하나다.
 #
 #   python   .py 가 있다                     (대부분)
-#   node     package.json 에 start 가 있다   (Hireflow 처럼 받은 앱)
+#   node     package.json 에 start 가 있다   (Node 서버로 받은 앱)
 #   static   둘 다 없다 — nginx 하나가 파일만 준다 (it-guide)
 #
 # ★ 전에는 「.py 가 없으면 정적 앱」이었다. 그래서 Node 로 만든 앱을
@@ -105,7 +105,7 @@ NEED="docker-compose.yml .env.example .gitignore README.md"
 [ "$KIND" = "python" ]        && NEED="requirements.txt $NEED"
 [ "$KIND" = "node" ]          && NEED="package.json $NEED"
 [ "$NEEDS_DOCKERFILE" -eq 1 ] && NEED="Dockerfile $NEED"
-[ "$KIND" = "node" ]          && echo "  · package.json 에 start 가 있습니다 — Node 서버 앱으로 봅니다 (Hireflow 같은 모양)"
+[ "$KIND" = "node" ]          && echo "  · package.json 에 start 가 있습니다 — Node 서버 앱으로 봅니다 (Node 서버로 받은 앱 모양)"
 [ "$KIND" = "static" ]        && echo "  · 서버 소스가 없습니다 — 정적 파일만 주는 앱으로 봅니다 (it-guide 같은 모양)"
 [ "$NEEDS_DOCKERFILE" -eq 0 ] && echo "  · compose 에 build 가 없습니다 — 이미지를 그대로 쓰는 앱으로 봅니다"
 for f in $NEED; do

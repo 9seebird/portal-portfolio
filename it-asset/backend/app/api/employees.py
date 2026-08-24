@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
@@ -99,10 +100,35 @@ def create_employee(
     db: Session = Depends(get_db),
     _admin=Depends(require_view("employees")),
 ):
-    db_employee = Employee(**employee.model_dump())
+    # ★ 사번은 유일해야 한다(employees.emp_no UNIQUE).
+    #   이 확인이 없으면 이미 있는 사번을 넣었을 때 DB 가 UNIQUE 위반을 던지고,
+    #   그게 그대로 새어 나가 화면에는 "Internal Server Error" 만 뜬다.
+    #   자산 등록도 같은 이유로 500 이 났었다. 유일한 칸을 받는 곳은
+    #   **전부** 여기서 먼저 걸러야 한다.
+    emp_no = (employee.emp_no or "").strip()
+    if not emp_no:
+        raise HTTPException(status_code=400, detail="사번을 입력해 주세요.")
+
+    exists = db.query(Employee).filter(Employee.emp_no == emp_no).first()
+    if exists:
+        raise HTTPException(
+            status_code=409,
+            detail=f"사번 {emp_no} 는 이미 등록돼 있습니다 ({exists.name}).",
+        )
+
+    data = employee.model_dump()
+    data["emp_no"] = emp_no
+    db_employee = Employee(**data)
 
     db.add(db_employee)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"사번 {emp_no} 는 이미 등록돼 있습니다.",
+        )
     db.refresh(db_employee)
 
     return db_employee

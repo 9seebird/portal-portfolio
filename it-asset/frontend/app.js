@@ -712,7 +712,9 @@ function renderAssets() {
     <table>
       <thead><tr>${sortableHead("assets", ASSET_COLUMNS)}</tr></thead>
       <tbody>
-        ${sorted.map(assetViewRow).join("")}
+        ${sorted.map(assetViewRow).join("") ||
+          `<tr><td class="muted empty" colspan="${ASSET_COLUMNS.length}">${
+            query || status ? "찾는 자산이 없습니다." : "등록된 자산이 없습니다."}</td></tr>`}
       </tbody>
     </table>
   `;
@@ -792,7 +794,9 @@ function renderEmployees() {
     <table>
       <thead><tr>${sortableHead("employees", EMPLOYEE_COLUMNS)}</tr></thead>
       <tbody>
-        ${rows.map(viewRow).join("")}
+        ${rows.map(viewRow).join("") ||
+          `<tr><td class="muted empty" colspan="${EMPLOYEE_COLUMNS.length}">${
+            query ? "찾는 직원이 없습니다." : "등록된 직원이 없습니다."}</td></tr>`}
       </tbody>
     </table>
   `;
@@ -1953,6 +1957,300 @@ $("#editModal").addEventListener("click", async (event) => {
       toast(error.message);
     }
   }
+});
+
+// ---------------------------------------------------------------- 입사 처리
+//
+// 「퇴사 처리」는 버튼 하나로 자산·IP·라이선스를 한 번에 회수한다.
+// 그런데 **입사는 짝이 없었다.** 새 사람이 올 때마다 이렇게 돌아다녀야 했다 —
+//
+//   직원 명단에서 등록 → 직원별 현황으로 이동 → 그 사람 찾기 → 서랍 열기
+//   → 자산 지급 → IP → 내선 → 라이선스
+//
+// 화면 두 개에 클릭 열댓 번. 게다가 등록한 직원은 목록 어딘가에 섞여 들어가서
+// 매번 다시 찾아야 했다. 여기서 한 창에 모은다.
+//
+// 직원 정보만 필수고 나머지는 비워 두면 건너뛴다. 나중에 주기로 한 것은
+// 지금까지처럼 직원별 현황 서랍에서 하면 된다 — 그 길을 없애지 않는다.
+
+function obMsg(text, ok) {
+  const box = $("#obMsg");
+  if (!box) return;
+  box.textContent = text || "";
+  box.hidden = !text;
+  box.classList.toggle("ok", !!ok);
+}
+
+function obPickList(items, attr, labelFn, valueKey, emptyText) {
+  if (!items.length) return `<div class="d-empty">${escapeHtml(emptyText)}</div>`;
+  return `<div class="ob-checks">${items.map((item) => `
+    <label class="ob-check">
+      <input type="checkbox" ${attr} value="${escapeHtml(String(item[valueKey]))}"
+             data-ob-name="${escapeHtml(labelFn(item))}" />
+      <span>${escapeHtml(labelFn(item))}</span>
+    </label>`).join("")}</div>`;
+}
+
+async function openOnboard() {
+  if (!guard("employees")) return;
+
+  // 고를 것들을 한 번에 받아 온다. 창을 연 뒤에 하나씩 채우면
+  // 이미 고른 값이 다시 그려지면서 튕긴다.
+  const [assets, freeIps, extensions, licenseUsage, software, workspace] = await Promise.all([
+    api("/assets/").catch(() => []),
+    api("/ip-addresses/free?kind=NETWORK").catch(() => []),
+    api("/extensions/").catch(() => []),
+    api("/license-assignments/usage").catch(() => []),
+    api("/software-products").catch(() => []),
+    api("/employees/workspace").catch(() => []),
+  ]);
+
+  const spares = assets.filter((a) => a.status === "STORAGE");
+  const freeExt = extensions.filter((row) => !row.employee_id)
+    .sort((a, b) => (/^\d+$/.test(a.number) && /^\d+$/.test(b.number)
+      ? Number(a.number) - Number(b.number)
+      : String(a.number).localeCompare(String(b.number))));
+
+  const uniq = (key) => [...new Set(workspace.map((e) => e[key]).filter(Boolean))]
+    .sort((a, b) => String(a).localeCompare(String(b), "ko"));
+
+  const combo = (name, label, key) => `
+    <label class="field">
+      <span>${label}</span>
+      <input data-ob="${name}" list="ob-dl-${name}" type="text" />
+      <datalist id="ob-dl-${name}">
+        ${uniq(key).map((v) => `<option value="${escapeHtml(v)}"></option>`).join("")}
+      </datalist>
+    </label>`;
+
+  const canAsset = canEdit("assets");
+  const canIp = canEdit("ips");
+  const canExt = canEdit("extensions");
+  const canSw = canEdit("software");
+
+  $("#editModal").innerHTML = `
+    <div class="drawer-head">
+      <div>
+        <h3>입사 처리</h3>
+        <p>직원 정보만 채우면 됩니다. 아래 칸은 비워 두면 건너뜁니다.</p>
+      </div>
+      <span class="spacer"></span>
+      <button class="icon-btn" data-edit-close title="닫기">×</button>
+    </div>
+
+    <div class="drawer-scroll">
+      <section class="ob-sec">
+        <h4><i>1</i> 직원 정보</h4>
+        <div class="edit-grid">
+          <label class="field"><span>사번 *</span><input data-ob="emp_no" type="text" /></label>
+          <label class="field"><span>이름 *</span><input data-ob="name" type="text" /></label>
+          ${combo("department", "부서", "department")}
+          ${combo("position", "직책", "position")}
+          ${combo("rank", "직급", "rank")}
+          <label class="field"><span>이메일</span><input data-ob="email" type="text" /></label>
+          <label class="field"><span>연락처</span><input data-ob="phone" type="text" /></label>
+          <label class="field"><span>입사일</span><input data-ob="hire_date" type="date" /></label>
+        </div>
+      </section>
+
+      ${canAsset ? `
+      <section class="ob-sec">
+        <h4><i>2</i> 자산 지급 <small>보관 중 ${spares.length}대</small></h4>
+        <select data-ob="asset_id">
+          ${options(spares, assetLabel, "id",
+            spares.length ? "지급하지 않음" : "보관 중인 자산이 없습니다")}
+        </select>
+        <small class="hint">IP 와 소프트웨어는 <b>이 자산에</b> 붙습니다.
+          자산을 안 고르면 그 둘은 건너뜁니다.</small>
+      </section>` : ""}
+
+      ${canAsset && canIp ? `
+      <section class="ob-sec">
+        <h4><i>3</i> IP</h4>
+        <select data-ob="ip">
+          ${options(freeIps, (row) => `${row.ip_address}${row.range ? ` (${row.range})` : ""}`, "ip_address",
+            freeIps.length ? "배정하지 않음" : "빈 IP 가 없습니다 — IP 관리에서 등록하세요")}
+        </select>
+      </section>` : ""}
+
+      ${canExt ? `
+      <section class="ob-sec">
+        <h4><i>4</i> 내선번호</h4>
+        <select data-ob="ext_id">
+          ${options(freeExt,
+            (row) => `${row.number}${row.zone ? ` (${row.zone})` : ""}${row.ip_address ? ` · ${row.ip_address}` : ""}`,
+            "id",
+            freeExt.length ? "부여하지 않음" : "빈 번호가 없습니다 — 내선 관리에서 등록하세요")}
+        </select>
+      </section>` : ""}
+
+      ${canSw ? `
+      <section class="ob-sec">
+        <h4><i>5</i> 라이선스</h4>
+        ${obPickList(licenseUsage, "data-ob-lic",
+          (row) => `${row.software_name}${row.available_count != null ? ` (여유 ${row.available_count})` : ""}`,
+          "license_pool_id", "부여할 라이선스가 없습니다.")}
+      </section>` : ""}
+
+      ${canAsset && canSw ? `
+      <section class="ob-sec">
+        <h4><i>6</i> 소프트웨어 <small>고른 자산에 설치 기록</small></h4>
+        ${obPickList(software, "data-ob-sw", (row) => row.name, "id",
+          "등록된 소프트웨어가 없습니다.")}
+      </section>` : ""}
+    </div>
+
+    <div class="ob-msg" id="obMsg" hidden></div>
+
+    <div class="drawer-foot">
+      <span class="spacer"></span>
+      <button class="secondary" data-edit-close>닫기</button>
+      <button class="admin-only" data-need="employees" data-onboard-run>입사 처리</button>
+    </div>
+  `;
+
+  // 이 창은 openEdit 의 저장 버튼을 쓰지 않는다. 아래 data-onboard-run 이 대신한다.
+  // 다만 editState 가 비어 있으면 닫기 버튼이 안 먹으므로 채워 둔다.
+  editState = { onSave: null, onDelete: null, need: "employees" };
+  $("#editModal").classList.add("wide");
+  $("#editModal").hidden = false;
+  $("#editBackdrop").hidden = false;
+  updateAuthUI();
+  $("#editModal").querySelector('[data-ob="emp_no"]')?.focus();
+}
+
+async function runOnboard(button) {
+  if (!guard("employees")) return;
+
+  const v = (name) => {
+    const el = $(`#editModal [data-ob="${name}"]`);
+    const raw = (el?.value || "").trim();
+    return raw === "" ? null : raw;
+  };
+
+  const payload = {
+    emp_no: v("emp_no"), name: v("name"), department: v("department"),
+    position: v("position"), rank: v("rank"), email: v("email"),
+    phone: v("phone"), hire_date: v("hire_date"),
+  };
+  if (!payload.emp_no || !payload.name) {
+    return obMsg("사번과 이름은 반드시 있어야 합니다.");
+  }
+
+  button.disabled = true;
+  obMsg("처리 중입니다…");
+
+  const done = [], failed = [];
+
+  /* 직원 등록은 여기서 끊어 낸다.
+     사람이 안 만들어지면 뒤의 지급은 붙일 곳이 없어서 전부 무의미하다. */
+  let created;
+  try {
+    created = await api("/employees/", { method: "POST", body: JSON.stringify(payload) });
+  } catch (error) {
+    button.disabled = false;
+    return obMsg("직원 등록에 실패했습니다 — " + error.message);
+  }
+  done.push(`직원 등록 (${created.name})`);
+
+  /* ★ 순서가 중요하다. IP 와 소프트웨어는 **자산에** 붙는다.
+     자산 지급이 실패하면 붙일 곳이 없으니 아예 건너뛰고, 그 사실을 말해 준다.
+     조용히 넘어가면 "IP 넣었는데 왜 없지?" 가 된다. */
+  const assetId = v("asset_id");
+  let assetOk = false;
+  if (assetId) {
+    try {
+      await api(`/assets/${assetId}/assign`, {
+        method: "POST", body: JSON.stringify({ employee_id: created.id }),
+      });
+      assetOk = true;
+      done.push("자산 지급");
+    } catch (error) { failed.push("자산 지급 — " + error.message); }
+  }
+
+  const ip = v("ip");
+  if (ip && assetOk) {
+    try {
+      await api("/ip-assignments", {
+        method: "POST", body: JSON.stringify({ asset_id: assetId, ip_address: ip }),
+      });
+      done.push(`IP ${ip}`);
+    } catch (error) { failed.push("IP — " + error.message); }
+  } else if (ip && assetId) {
+    failed.push("IP — 자산 지급이 안 돼서 건너뜀");
+  }
+
+  const extId = v("ext_id");
+  if (extId) {
+    try {
+      await api(`/extensions/${extId}/employee`, {
+        method: "PUT", body: JSON.stringify({ employee_id: created.id }),
+      });
+      done.push("내선번호");
+    } catch (error) { failed.push("내선 — " + error.message); }
+  }
+
+  for (const box of $("#editModal").querySelectorAll("[data-ob-lic]:checked")) {
+    try {
+      await api("/license-assignments/", {
+        method: "POST",
+        body: JSON.stringify({ license_pool_id: box.value, employee_id: created.id }),
+      });
+      done.push(`라이선스 ${box.dataset.obName}`);
+    } catch (error) { failed.push(`라이선스 ${box.dataset.obName} — ` + error.message); }
+  }
+
+  if (assetOk) {
+    for (const box of $("#editModal").querySelectorAll("[data-ob-sw]:checked")) {
+      try {
+        await api("/software-installations", {
+          method: "POST",
+          body: JSON.stringify({ asset_id: assetId, software_id: box.value }),
+        });
+        done.push(`소프트웨어 ${box.dataset.obName}`);
+      } catch (error) { failed.push(`소프트웨어 ${box.dataset.obName} — ` + error.message); }
+    }
+  }
+
+  button.disabled = false;
+  await refresh();
+
+  if (!failed.length) {
+    closeEdit();
+    toast(`${created.name} 입사 처리 완료 — ${done.map((d) => d.split(" ")[0]).join(" · ")}`);
+    return;
+  }
+
+  /* 일부만 실패했으면 **창을 닫지 않는다.**
+     직원은 이미 들어갔으므로, 닫아 버리면 무엇이 빠졌는지 알 길이 없다. */
+  obMsg(`직원은 등록됐습니다 (${created.name}).\n`
+    + `안 된 것: ${failed.join(" / ")}\n`
+    + `남은 것은 직원별 현황에서 그 직원을 눌러 이어서 하시면 됩니다.`);
+}
+
+/* 칸을 고치기 시작하면 지난 알림은 지운다.
+   "사번과 이름은 반드시" 가 다 채운 뒤에도 남아 있으면,
+   방금 누른 것이 또 막힌 줄 알고 다시 누르게 된다. */
+$("#editModal").addEventListener("input", (event) => {
+  if (event.target.closest("[data-ob], [data-ob-lic], [data-ob-sw]")) obMsg("");
+});
+$("#editModal").addEventListener("change", (event) => {
+  if (event.target.closest("[data-ob], [data-ob-lic], [data-ob-sw]")) obMsg("");
+});
+
+$("#editModal").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-onboard-run]");
+  if (!button) return;
+  runOnboard(button).catch((error) => {
+    button.disabled = false;
+    obMsg(error.message);
+  });
+});
+
+document.querySelectorAll("[data-onboard-open]").forEach((button) => {
+  button.addEventListener("click", () => {
+    openOnboard().catch((error) => toast(error.message));
+  });
 });
 
 // ---------------------------------------------------------------- 값 정리
@@ -3407,6 +3705,14 @@ $("#drawer").addEventListener("click", async (event) => {
 // 자산 등록: 자산번호 수정 · 삭제
 $("#assetSearch").addEventListener("input", renderAssets);
 $("#assetStatusFilter").addEventListener("change", renderAssets);
+
+/* 직원 명단 검색.
+   ★ 이 한 줄이 없었다. renderEmployees() 는 처음부터 검색어를 읽고 있었지만,
+     **아무도 renderEmployees() 를 다시 부르지 않아서** 글자를 쳐도 표가 그대로였다.
+     걸러 내는 코드가 멀쩡히 있으면 눈으로 훑을 때 다 됐다고 착각한다.
+     검색칸을 새로 만들 때는 「거르는 코드」와 「다시 그리라는 신호」가
+     짝으로 있는지 반드시 같이 본다. (자산·내선·좌석은 짝이 있었다) */
+$("#employeeSearch").addEventListener("input", renderEmployees);
 
 // 자산 등록: 행을 누르면 편집 모달
 $("#assetsTable").addEventListener("click", (event) => {

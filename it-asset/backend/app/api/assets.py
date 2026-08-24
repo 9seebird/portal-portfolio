@@ -4,6 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
@@ -204,10 +205,36 @@ def create_asset(
     if not data.get("status"):
         data["status"] = "STORAGE"
 
+    # ★ 자산번호는 유일해야 한다(assets.asset_no UNIQUE).
+    #   이 확인이 없으면 이미 있는 번호를 넣었을 때 DB 가 UNIQUE 위반을 던지고,
+    #   그게 그대로 새어 나가 화면에는 "Internal Server Error" 만 뜬다.
+    #   **무엇이 잘못됐는지 못 알려주는 500 은 고장이나 마찬가지다.**
+    #   수정(PUT)에는 이미 같은 확인이 있었는데 등록(POST)에만 빠져 있었다.
+    asset_no = (data.get("asset_no") or "").strip()
+    if not asset_no:
+        raise HTTPException(status_code=400, detail="자산번호를 입력해 주세요.")
+    data["asset_no"] = asset_no
+
+    exists = db.query(Asset).filter(Asset.asset_no == asset_no).first()
+    if exists:
+        raise HTTPException(
+            status_code=409,
+            detail=f"자산번호 {asset_no} 는 이미 등록돼 있습니다. 목록에서 검색해 확인해 주세요.",
+        )
+
     asset = Asset(**data)
 
     db.add(asset)
-    db.commit()
+    # 위에서 걸렀어도 두 사람이 동시에 같은 번호를 넣으면 여기서 부딪힐 수 있다.
+    # 그때도 500 이 아니라 읽을 수 있는 말로 돌려준다.
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"자산번호 {asset_no} 는 이미 등록돼 있습니다.",
+        )
     db.refresh(asset)
 
     return asset

@@ -110,6 +110,8 @@
             <option value="100">100개씩</option>
             <option value="200">200개씩</option>
           </select>
+          <button type="button" class="admin-only" data-need="employees"
+                  data-onboard-open>＋ 입사 처리</button>
           <span class="spacer"></span>
           <span id="storageCount" class="chip"></span>
           <span class="csv-slot"></span>
@@ -206,6 +208,9 @@
 
         <div class="toolbar">
           <input id="employeeSearch" placeholder="이름, 사번, 부서 검색" />
+          <!-- 「퇴사 처리」의 짝. 등록 → 자산 → IP → 내선 → 라이선스를 한 창에서. -->
+          <button type="button" class="admin-only" data-need="employees"
+                  data-onboard-open>＋ 입사 처리</button>
           <span class="spacer"></span>
           <!-- 받기와 넣기는 붙여 둔다. 양식을 받으러 딴 데 갔다 오지 않게. -->
           <span class="csv-slot"></span>
