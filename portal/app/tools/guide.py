@@ -73,6 +73,96 @@ _cache: dict[str, tuple[float, object]] = {}
 _lock = threading.Lock()
 
 
+# ── 찾을 낱말 고르기 ─────────────────────────────────────────
+#
+# 예전에는 물어본 문장을 띄어쓰기로만 잘라서 그대로 다 찾았다. 그래서
+# "사내앱 규칙 중 내가 신경써야 하는 부분" 을 물으면 조사 '중', 어미 '하는',
+# 의존명사 '부분' 이 매뉴얼 아무 데나 스쳤고, 정작 '사내앱'·'신경써야' 는
+# 0건인데도 SAP 매뉴얼이 1등으로 올라왔다. "점심 메뉴 추천해줘" 로는
+# '메뉴' 한 글자가 걸려 SAP 매뉴얼 12곳이 나왔다.
+#
+# 한 글자는 버리고, 뜻이 없는 말도 버린다. portal.py 의 find_app 이
+# 이미 `len(w) >= 2` 로 같은 일을 하고 있다. 여기만 빠져 있었다.
+_STOP = {
+    "하는", "되는", "있는", "없는", "같은", "그런", "이런", "저런", "관한",
+    "알려줘", "알려", "보여줘", "보여", "찾아줘", "찾아", "해줘", "하고", "해서",
+    "어떻게", "무엇", "뭐가", "뭔가", "뭐야", "어디", "언제", "누가", "얼마나",
+    "부분", "내용", "방법", "경우", "때문", "관련", "대해", "대한", "위해", "위한",
+    "전체", "그리고", "그거", "저거", "이거", "우리", "제가", "내가", "나는",
+    "합니다", "입니다", "인가요", "인가", "일까", "일까요", "건가요", "인지",
+    "좀더", "다시", "지금", "혹시", "정말", "진짜",
+    "나와", "있어", "없어", "있나", "없나", "되나", "하나", "무슨", "어떤",
+    "어디에", "그럼", "해도", "되죠", "하죠", "인데", "라면",
+    "알려줄래", "알려주라", "궁금해", "뭐뭐", "있을까", "좋을까", "할까",
+}
+
+# 동사·형용사가 이어지는 어미로 끝나면 찾을 낱말이 아니다.
+# "열어도", "신경써야", "확인하면" 같은 것들. 이런 말이 하나 섞였다고
+# "물어본 낱말 중 절반밖에 못 찾았다" 로 세면 멀쩡한 검색이 막힌다.
+_ENDING = re.compile(r"(어도|아도|으면|하면|되면|는데|지만|니까|려고|하게|되게)$")
+# 이런 소리로 끝나면 대개 동사다 — "나눠", "보여줘", "확인해봐".
+# 이름씨(명사)가 이렇게 끝나는 일은 드물어서 두 글자부터 적용한다.
+_VERB2 = re.compile(r"(눠|줘|둬|봐|켜|져|쳐|워)$")
+# '야'·'와' 는 "분야"·"조와" 처럼 이름씨에도 나온다. 세 글자부터만 본다.
+_VERB3 = re.compile(r"(야|와)$")
+
+
+def _words(q: str) -> list[str]:
+    """물어본 문장에서 실제로 찾을 낱말만 남긴다."""
+    raw = [w.strip(" .,?!\"'`~()[]{}<>:;·/").lower()
+           for w in re.split(r"[\s,·/]+", q or "")]
+    keep = [w for w in raw
+            if len(w) >= 2 and w not in _STOP
+            and not _ENDING.search(w)
+            and not _VERB2.search(w)
+            and not (len(w) >= 3 and _VERB3.search(w))]
+    if keep:
+        return keep
+    # 전부 걸러졌으면 한 글자라도 남긴다 (예: "IP")
+    return [w for w in raw if w] or [(q or "").strip()]
+
+
+def _need(words: list[str]) -> int:
+    """몇 개는 걸려야 '찾았다' 고 할 수 있나.
+
+    낱말이 둘이면 둘 다 걸려야 한다. "점심 메뉴" 에서 '메뉴' 하나만
+    스친 것을 찾았다고 하면 안 된다. 셋 이상이면 과반.
+    """
+    n = len(words)
+    if n <= 1:
+        return 1
+    return max(2, (n + 1) // 2)
+
+
+# 우리말은 낱말 뒤에 조사·어미가 붙는다. "MCP가", "제출할", "포트를" 은
+# 매뉴얼 글자와 그대로는 안 맞는다. 뒤를 조금씩 떼어 보고 맞춰 본다.
+_TAILS = ("으로", "에서", "에게", "까지", "부터", "이라고", "라고", "이나",
+          "에는", "에도", "이란", "합니다", "해야", "하는", "한다", "했다",
+          "은", "는", "이", "가", "을", "를", "의", "에", "도", "만",
+          "과", "와", "로", "야", "랑", "할", "해", "함", "된", "됨")
+
+
+def _variants(w: str) -> list[str]:
+    """낱말 하나에서 찾아볼 꼴들. 원래 낱말과 조사를 뗀 꼴."""
+    out = [w]
+    for t in _TAILS:
+        if w.endswith(t) and len(w) - len(t) >= 2:
+            stem = w[: -len(t)]
+            if stem not in out:
+                out.append(stem)
+    return out
+
+
+def _hit(w: str, text: str) -> bool:
+    """낱말이 글 안에 있나. 대소문자와 띄어쓰기 차이는 무시한다."""
+    low = text.lower()
+    flat = low.replace(" ", "")
+    for v in _variants(w):
+        if v in low or v.replace(" ", "") in flat:
+            return True
+    return False
+
+
 def _fetch(path: str) -> str:
     """앱에서 파일을 받아온다. 잠깐 담아 둔다."""
     now = time.time()
@@ -142,7 +232,11 @@ def _manual_link(m: dict, sec_idx: int | None = None) -> str:
         "**업무 절차나 사용법**을 물을 때 쓴다. "
         "SAP GUI·SAP 분기보고서·NAS·상해 ITO·Unipost·한비로 그룹웨어·"
         "웍스AI·Grafana·카스퍼스키·M365 매뉴얼이 들어 있다. "
-        "찾은 절차의 글자를 그대로 돌려주며, 화면 캡처는 매뉴얼 화면에서 봐야 한다."
+        "찾은 절차의 글자를 그대로 돌려주며, 화면 캡처는 매뉴얼 화면에서 봐야 한다. "
+        "※ 위에 적힌 매뉴얼 안에서만 찾는다. 그 밖의 주제는 여기에 없다. "
+        "사내앱을 만들 때 지키는 표준 규칙(포트·권한·저장·제출물)이면 "
+        "search_app_rules, AI 용어나 프롬프트 예시면 search_ai_ref, "
+        "주기별 운영 업무면 get_checklist, 어느 앱에서 하는 일인지면 find_app 을 쓴다."
     ),
     input_schema={
         "type": "object",
@@ -164,14 +258,12 @@ def search_manual(user: User, query: str) -> ToolResult:
     if not q:
         return fail("무엇을 찾을지 알려주세요.")
     # 띄어쓰기가 달라도 걸리게 한다 ("신규 엔트리" / "신규엔트리")
-    words = [w for w in q.split() if w] or [q]
+    words = _words(q)
+    need = _need(words)
 
     # 어디에서 걸렸는지에 따라 무게를 다르게 준다.
     # "SAP 신규 엔트리" 를 찾을 때 'SAP' 하나만 걸린 항목이 28개나 나오면
     # 맞는 답이 그 속에 묻힌다. 항목 이름에서 걸린 것이 가장 정확하다.
-    def has(w: str, text: str) -> bool:
-        return w in text or w.replace(" ", "") in text.replace(" ", "")
-
     hits = []
     for m in manuals:
         for idx, sec in enumerate(m.get("sections", [])):
@@ -182,24 +274,36 @@ def search_manual(user: User, query: str) -> ToolResult:
             score = 0
             matched = 0
             for w in words:
-                if has(w, sec_title):
+                if _hit(w, sec_title):
                     score += 3; matched += 1
-                elif has(w, body):
+                elif _hit(w, body):
                     score += 2; matched += 1
-                elif has(w, man_title):
+                elif _hit(w, man_title):
                     score += 1; matched += 1
-            if not matched:
+            # 물어본 낱말의 과반은 걸려야 한다.
+            # 하나만 스친 것을 "찾았다" 고 하면 엉뚱한 답이 나간다.
+            if matched < need:
                 continue
             # 여러 낱말로 물었으면 다 걸린 쪽을 크게 앞세운다
             score += matched * 2
             hits.append((score, m, sec, steps, idx))
 
+    # 아래 상대 컷(best * 0.6)만으로는 막지 못한다. 1등 자체가 형편없으면
+    # 그 0.6 도 같이 내려가기 때문이다. 절대 바닥을 따로 둔다.
+    #   본문에 한 낱말만 걸린 경우가 2 + 2 = 4 점이다. 그 아래는 우연이다.
+    if hits and max(h[0] for h in hits) < 4:
+        hits = []
+
     if not hits:
         titles = ", ".join(m.get("title", "") for m in manuals)
         return ToolResult(
-            summary=f"'{q}' 로 찾은 대목이 없습니다. 다른 말로 찾아보시거나 "
-                    f"매뉴얼 화면에서 직접 살펴보세요.",
-            data={"결과": "없음", "있는 매뉴얼": titles},
+            summary=f"IT 매뉴얼에는 '{q}' 에 해당하는 대목이 없습니다.",
+            data={"결과": "없음", "있는 매뉴얼": titles,
+                  "작성지침": "**없다고 그대로 말하십시오.** 비슷해 보이는 다른 매뉴얼을 "
+                          "끌어다 답하지 마십시오. 물어본 것이 사내앱을 만들 때 "
+                          "지키는 규칙이면 search_app_rules, AI 용어나 프롬프트면 "
+                          "search_ai_ref, 어느 앱에서 하는 일인지면 find_app 을 "
+                          "대신 부르십시오."},
             detail_url=MANUAL_URL)
 
     hits.sort(key=lambda x: -x[0])
@@ -263,6 +367,187 @@ def list_manuals(user: User) -> ToolResult:
     )
 
 
+# ── 사내앱 규칙 · AI 참고자료 ────────────────────────────────
+#
+# 둘 다 백엔드가 없는 정적 화면이다. 매뉴얼과 같은 방식으로 HTTP 로
+# 자료를 가져온다. 다만 화면(HTML)을 긁지 않고 **옆에 둔 data.json 을
+# 읽는다.** 화면 모양을 바꿔도 챗이 깨지지 않게 하려는 것이다.
+RULES_URL = os.environ.get("RULES_URL", "/rules/")
+AIREF_URL = os.environ.get("AIREF_URL", "/ai-ref/")
+
+
+def _rules() -> dict:
+    return json.loads(_fetch("/rules/data.json"))
+
+
+def _airef() -> dict:
+    return json.loads(_fetch("/ai-ref/data.json"))
+
+
+def _pick(rows: list[dict], fields: tuple[str, ...], words: list[str],
+          need: int, weights: tuple[int, ...]) -> list[tuple[int, dict]]:
+    """낱말이 어디에서 걸렸는지에 따라 점수를 주고, 과반을 못 채우면 버린다."""
+    out = []
+    for r in rows:
+        score = 0
+        matched = 0
+        for w in words:
+            for f, wt in zip(fields, weights):
+                if _hit(w, str(r.get(f, ""))):
+                    score += wt
+                    matched += 1
+                    break
+        if matched < need:
+            continue
+        out.append((score + matched * 2, r))
+    out.sort(key=lambda x: -x[0])
+    return out
+
+
+@tool(
+    name="search_app_rules",
+    label="사내앱 규칙 검색",
+    description=(
+        "사내에서 쓸 웹 프로그램(사내앱)을 만들 때 지켜야 하는 회사 표준 규칙을 찾아 준다. "
+        "'사내앱 규칙 알려줘', '내가 신경 써야 할 게 뭐야', '포트 열어도 돼?', "
+        "'권한은 어떻게 나눠?', '어떤 파일을 제출해?', '데이터는 어디에 저장해?', "
+        "'왜 반려됐어?', '표준규칙이 뭐야', '바이브코딩으로 만들 때 뭐 지켜야 해' 처럼 "
+        "**앱을 만들고 제출하는 규칙**을 물을 때 쓴다. "
+        "규칙은 열 묶음으로 나뉘어 있고, 대부분은 프롬프트 생성기가 자동으로 넣어 주는 것이며 "
+        "사람이 직접 챙겨야 하는 것은 아홉 가지뿐이다. "
+        "낱말을 비우고 부르면 그 아홉 가지를 돌려준다. "
+        "※ 시스템 사용법(SAP·NAS·그룹웨어)은 search_manual, "
+        "IT 담당자의 주기별 운영 업무는 get_checklist, "
+        "AI 용어나 프롬프트 예시는 search_ai_ref 를 쓴다."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string",
+                      "description": "찾을 말. '포트', '권한', '제출', '저장' 처럼. "
+                                     "비우면 사람이 챙겨야 하는 규칙만 돌려준다"},
+        },
+    },
+    service="rules",
+)
+def search_app_rules(user: User, query: str | None = None) -> ToolResult:
+    try:
+        d = _rules()
+    except Exception as e:  # noqa: BLE001
+        return _down(e, "사내앱 규칙")
+
+    rules = d.get("rules", [])
+    ver = d.get("version", "")
+    q = (query or "").strip()
+
+    # 무엇을 찾을지 안 밝혔으면 "사람이 챙길 것" 만 준다.
+    # 규칙 전체를 늘어놓으면 읽지 않는다.
+    if not q:
+        mine = [r for r in rules if r.get("who") == "내가 챙길 것"]
+        return ToolResult(
+            summary=f"규칙은 모두 {len(rules)}가지인데, 사람이 직접 챙길 것은 "
+                    f"{len(mine)}가지입니다. 나머지는 프롬프트 생성기가 넣어 줍니다.",
+            data={"규칙 버전": ver,
+                  "내가 챙길 것": [{"묶음": r["group"], "규칙": r["title"],
+                                "왜": r["why"]} for r in mine],
+                  "작성지침": "이 아홉 가지를 그대로 알려 주십시오. 나머지 규칙은 "
+                          "생성기가 자동으로 넣어 주므로 외울 필요가 없다는 점을 "
+                          "꼭 덧붙이십시오."},
+            detail_url=RULES_URL)
+
+    words = _words(q)
+    hits = _pick(rules, ("title", "why", "group"), words, _need(words), (3, 2, 2))
+    if not hits or hits[0][0] < 4:
+        # 이 도구를 불렀다는 것은 규칙을 알고 싶다는 뜻이다. 딱 맞는 것을
+        # 못 찾았다고 빈손으로 돌려보내면, 정작 이 사람이 알아야 할
+        # 아홉 가지도 못 보고 끝난다. 그것만 대신 보여 준다.
+        mine = [r for r in rules if r.get("who") == "내가 챙길 것"]
+        return ToolResult(
+            summary=f"사내앱 규칙에는 '{q}' 에 해당하는 것이 없습니다. "
+                    f"(사람이 직접 챙길 것은 모두 {len(mine)}가지입니다)",
+            data={"규칙 버전": ver,
+                  "찾은 결과": "없음",
+                  "대신 보여드리는 것 — 내가 챙길 것":
+                      [{"묶음": r["group"], "규칙": r["title"], "왜": r["why"]}
+                       for r in mine],
+                  "작성지침": "물어보신 말로는 딱 맞는 규칙을 못 찾았다고 먼저 밝히고, "
+                          "대신 사람이 챙겨야 하는 것들을 알려 주십시오. "
+                          "없는 규칙을 지어내지 마십시오."},
+            detail_url=RULES_URL)
+
+    top = hits[:6]
+    return ToolResult(
+        summary=(f"{top[0][1]['title']}"
+                 + (f" 외 {len(hits) - 1}가지" if len(hits) > 1 else "")),
+        data={"규칙 버전": ver,
+              "찾은 규칙": [{"묶음": r["group"], "규칙": r["title"], "왜": r["why"],
+                         "누가": r["who"]} for _, r in top],
+              "작성지침": "규칙 문장을 그대로 알려 주십시오. '누가' 가 "
+                      "'생성기가 넣어줌' 이면 사람이 신경 쓸 필요가 없다는 뜻이므로 "
+                      "그 점을 덧붙이십시오."},
+        detail_url=RULES_URL,
+        truncated=len(hits) > len(top),
+    )
+
+
+@tool(
+    name="search_ai_ref",
+    label="AI 용어 · 프롬프트 찾기",
+    description=(
+        "AI 용어 풀이와 바로 복사해 쓰는 프롬프트 예시를 찾아 준다. "
+        "'MCP 가 뭐야', '할루시네이션이 무슨 뜻이야', '토큰이 뭐야', "
+        "'회의록 정리하는 프롬프트 있어?', '엑셀 정리 프롬프트 알려줘', "
+        "'프롬프트 잘 쓰는 법', '바이브코딩이 뭐야' 처럼 "
+        "**모르는 AI 용어를 묻거나, 쓸 만한 프롬프트를 찾을 때** 쓴다. "
+        "용어 192개, 그대로 복사해 쓰는 프롬프트 216개, 바이브코딩 입문 70항목이 들어 있다. "
+        "※ 사내앱을 만드는 표준 규칙은 search_app_rules, "
+        "시스템 사용법은 search_manual 을 쓴다."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string",
+                      "description": "찾을 말. 'MCP', '회의록', '할루시네이션' 처럼"},
+        },
+        "required": ["query"],
+    },
+    service="ai-ref",
+)
+def search_ai_ref(user: User, query: str) -> ToolResult:
+    try:
+        d = _airef()
+    except Exception as e:  # noqa: BLE001
+        return _down(e, "AI 참고자료")
+
+    q = (query or "").strip()
+    if not q:
+        return fail("무엇을 찾을지 알려주세요.")
+
+    items = d.get("items", [])
+    words = _words(q)
+    hits = _pick(items, ("title", "short", "text"), words, _need(words), (3, 2, 1))
+    if not hits or hits[0][0] < 4:
+        return ToolResult(
+            summary=f"참고자료에는 '{q}' 에 해당하는 것이 없습니다.",
+            data={"결과": "없음",
+                  "들어 있는 것": "AI 용어집 · AI 프롬프트집 · 바이브코딩 입문",
+                  "작성지침": "**없다고 그대로 말하십시오.** 비슷해 보이는 다른 항목을 "
+                          "끌어다 답하지 마십시오."},
+            detail_url=AIREF_URL)
+
+    top = hits[:5]
+    return ToolResult(
+        summary=(f"{top[0][1]['title']} ({top[0][1]['tab']})"
+                 + (f" 외 {len(hits) - 1}건" if len(hits) > 1 else "")),
+        data={"찾은 것": [{"어디": r["tab"], "제목": r["title"],
+                       "한 줄": r["short"], "설명": r["text"]} for _, r in top],
+              "작성지침": "설명을 쉬운 말로 풀어 주십시오. 프롬프트집에서 나온 것이면 "
+                      "그 문장을 그대로 복사해 쓸 수 있다고 알려 주십시오."},
+        detail_url=AIREF_URL,
+        truncated=len(hits) > len(top),
+    )
+
+
 # ── 운영 체크리스트 ──────────────────────────────────────────
 PERIODS = {"adhoc": "수시", "daily": "매일", "monthly": "월간",
            "quarterly": "분기", "yearly": "연간"}
@@ -301,7 +586,9 @@ def _checklist() -> dict:
         "'연간 업무 뭐 있어', '인수인계 받았는데 뭐부터 해야 해' 처럼 "
         "**주기별로 할 일**을 물을 때 쓴다. "
         "수시·매일·월간·분기·연간으로 나뉘어 있다. "
-        "유지보수 업체 연락처도 함께 들어 있다."
+        "유지보수 업체 연락처도 함께 들어 있다. "
+        "※ 이것은 IT 담당자의 운영 업무 목록이다. 사내앱을 만들 때 지키는 "
+        "개발 규칙이면 search_app_rules, 시스템 사용법이면 search_manual 을 쓴다."
     ),
     input_schema={
         "type": "object",

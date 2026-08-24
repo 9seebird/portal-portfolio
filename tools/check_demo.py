@@ -159,6 +159,10 @@ case("GET",  "/it-asset/api/assets",          False, "← 읽기는 전부 열�
 # 배치도를 끌어 옮기는 것. 이 앱에서 제일 보여줄 만한 화면이라 열어 두었다.
 # 되돌리기 버튼이 있고, 틀어져도 배치 자료를 다시 넣으면 원래대로 돌아온다.
 case("PATCH", "/it-asset/api/seats/1",        False, "← 자리 옮기기는 열어 두었다")
+case("GET",  "/rules/",                       False, "← 규칙표는 읽기만 하는 정적 화면")
+case("GET",  "/rules/data.json",              False, "← 챗 도구가 읽는 자료")
+case("GET",  "/ai-ref/",                      False)
+case("GET",  "/ai-ref/data.json",             False)
 case("GET",  "/",                             False)
 
 print(f"\n{ok}개 통과 · {fail}개 실패")
