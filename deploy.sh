@@ -13,6 +13,35 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NET="demo-net"
 
+# ── 컨테이너가 옛 폴더를 붙들고 있나 ─────────────────────────
+#
+# 바인드 마운트는 경로가 아니라 **그때의 디렉터리 inode** 에 걸린다.
+# 폴더가 통째로 새로 생기면(재클론 · 폴더 이동 · 지웠다 복구) 호스트에는
+# 새 파일이 있는데 컨테이너는 옛 폴더를 계속 본다.
+#
+# 이게 고약한 이유는 어느 것도 이상을 알려주지 않기 때문이다.
+#   · docker inspect 의 마운트 경로는 **맞게** 보인다
+#   · git status 는 깨끗하고, git pull 도 정상이다
+#   · 컨테이너는 healthy 다
+#   · nginx -s reload 로도 안 풀린다 — 읽는 위치 자체가 옛 폴더다
+# 실제로 이 상태로 오래 있었다. 화면에는 옛 회사 이름이 남아 있었고,
+# 나중에 추가한 앱 두 개는 통째로 404 였다.
+#
+# 그래서 호스트와 컨테이너가 **같은 것을 보고 있는지** 직접 맞춰 본다.
+# 다르면 아래에서 컨테이너를 다시 만든다.
+mount_drift() {              # $1 = 컨테이너 이름. 어긋난 경로를 찍는다.
+  local ct="$1" src dst a b
+  docker inspect "$ct" --format \
+    '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}|{{.Destination}}{{println}}{{end}}{{end}}' \
+    2>/dev/null | while IFS='|' read -r src dst; do
+      [ -n "$src" ] && [ -d "$src" ] || continue      # 파일 마운트는 건너뛴다
+      a=$(ls -A -- "$src" 2>/dev/null | sort | md5sum)
+      b=$(docker exec "$ct" sh -c "ls -A -- '$dst' 2>/dev/null" | sort | md5sum)
+      [ "$a" != "$b" ] && echo "$src"
+    done
+  return 0
+}
+
 # ── 레포 전체를 한 번 당긴다 ─────────────────────────────────
 # 서비스 폴더마다 .git 이 있던 시절의 잔재가 아래에 남아 있는데,
 # 지금은 레포가 **하나**다. 그러니 여기서 한 번만 당기면 된다.
@@ -175,6 +204,20 @@ for name in "${ORDERED[@]}"; do
     [ "$name" = "proxy" ]    && NGINX_CT="demo-proxy"
     [ "$name" = "it-guide" ] && NGINX_CT="demo-guide-web"
     if [ -n "$NGINX_CT" ]; then
+      # 설정을 다시 읽히기 **전에** 본다. 옛 폴더를 보고 있으면
+      # reload 를 아무리 해도 옛 파일을 다시 읽을 뿐이다.
+      DRIFT="$(mount_drift "$NGINX_CT" || true)"
+      if [ -n "$DRIFT" ]; then
+        echo "  △ 컨테이너가 옛 폴더를 붙들고 있습니다 — 다시 만듭니다"
+        echo "$DRIFT" | sed 's/^/      /'
+        docker compose up -d --force-recreate
+        if [ -n "$(mount_drift "$NGINX_CT" || true)" ]; then
+          echo "  ✗ 다시 만들었는데도 그대로입니다. 마운트 경로를 확인하세요."
+          FAILED+=("$name (마운트 어긋남)")
+        else
+          echo "  ✓ 마운트를 다시 걸었습니다"
+        fi
+      fi
       if docker exec "$NGINX_CT" nginx -t; then
         docker exec "$NGINX_CT" nginx -s reload >/dev/null 2>&1
         echo "  ✓ nginx 설정 다시 읽음 ($NGINX_CT)"
