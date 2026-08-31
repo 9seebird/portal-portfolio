@@ -32,12 +32,12 @@ import sys
 from pathlib import Path
 
 # ── 여기가 전부다 ────────────────────────────────────────────
-COMPANY = "온빛"
-COMPANY_EN = "ONBIT"
-DOMAIN = "onbit.example.com"
+COMPANY = "미르"
+COMPANY_EN = "MIR"
+DOMAIN = "mir.example.com"
 
 # 로고에 쓰는 두 낱말. 앞은 진한 색, 뒤는 강조 색으로 그린다.
-WORDMARK = ("ONBIT", "PORTAL")
+WORDMARK = ("MIR", "PORTAL")
 
 # ── 예전에 쓰던 이름 ────────────────────────────────────────
 # 이름을 바꿀 때마다 옛 값을 여기에 **덧붙인다.** 지우지 않는다.
@@ -47,6 +47,8 @@ WORDMARK = ("ONBIT", "PORTAL")
 RETIRED = [
     # (한글, 영문, 도메인 앞부분)
     ("누리코스메틱", "NURI COSMETIC", "nuricos"),
+    # 실제로 있는 회사와 겹쳐서 바꿨다. 다음에도 겹치면 여기에 한 줄 더 쌓는다.
+    ("온빛", "ONBIT", "onbit"),
 ]
 
 # ── 로고 색 ─────────────────────────────────────────────────

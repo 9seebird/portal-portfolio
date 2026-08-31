@@ -181,16 +181,24 @@ foreach ($name in $ordered) {
         # nginx 는 뜰 때 한 번만 읽는다. 컨테이너가 이미 떠 있으면 compose 는
         # "Running" 이라고만 하고 아무것도 하지 않는다. 그래서 앱 conf 를
         # 새로 넣어도 그 경로가 404 로 남는다.
-        if ($name -eq 'proxy') {
-            docker exec demo-proxy nginx -t 2>&1 | Out-Null
+        #
+        # ★ proxy 만 그런 것이 아니다. it-guide 도 nginx 를 쓴다.
+        #   compose 는 depends_on 같은 것만 바뀌면 "바뀐 것 없음" 으로 보고
+        #   컨테이너를 그대로 두는데, nginx 는 뜰 때 설정을 한 번만 읽는다.
+        #   그러면 **컨테이너는 healthy 인데 새 경로만 404** 가 된다.
+        $nginxCt = $null
+        if ($name -eq 'proxy')    { $nginxCt = 'demo-proxy' }
+        if ($name -eq 'it-guide') { $nginxCt = 'demo-guide-web' }
+        if ($nginxCt) {
+            docker exec $nginxCt nginx -t 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) {
-                docker exec demo-proxy nginx -s reload 2>&1 | Out-Null
-                Ok 'nginx 설정 다시 읽음'
+                docker exec $nginxCt nginx -s reload 2>&1 | Out-Null
+                Ok "nginx 설정 다시 읽음 ($nginxCt)"
             } else {
-                Bad 'nginx 설정에 문제가 있어 그대로 둡니다.'
+                Bad "nginx 설정에 문제가 있어 그대로 둡니다. ($nginxCt)"
                 Note '고친 뒤 다시 실행하세요. 지금은 옛 설정으로 돌고 있습니다.'
-                Note 'docker exec demo-proxy nginx -t'
-                $failed += 'proxy (설정 오류)'
+                Note "docker exec $nginxCt nginx -t"
+                $failed += "$name (설정 오류)"
             }
         }
     } finally { Pop-Location }

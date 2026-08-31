@@ -94,6 +94,14 @@
     .wrap{padding:20px 12px 60px}
     th:nth-child(3),td:nth-child(3){display:none}
   }
+
+  /* 저장 상태 — 눌러야 저장되는 화면이 아니므로 저장됐다는 것이 보여야 한다 */
+  .save-state{font-size:12px;color:var(--sub);white-space:nowrap;margin-right:8px;}
+  .save-state.saving{color:var(--accent,#2f6fed);}
+  .save-state.saved{color:#1baf7a;}
+  .save-state.failed{color:#c0392b;font-weight:600;}
+  /* 담당자가 아니면 고치는 길을 아예 감춘다 */
+  body.readonly .only-editor{display:none !important;}
 </style>
 </head>
 <body>
@@ -105,9 +113,10 @@
       <p class="sub" id="sub"></p>
     </div>
     <div class="spacer"></div>
+    <span id="saveState" class="save-state">불러오는 중…</span>
     <a class="btn" href="/" data-backportal>← 포탈로</a>
-    <button class="btn" id="btnEdit">항목 편집</button>
-    <button class="btn" id="btnMore">설정</button>
+    <button class="btn only-editor" id="btnEdit">항목 편집</button>
+    <button class="btn only-editor" id="btnMore">설정</button>
   </div>
 
   <div class="bar" id="editBar" style="display:none">
@@ -131,7 +140,7 @@
   <div class="tab-bar" id="tabBar"></div>
   <div class="panel" id="panel"></div>
 
-  <footer>온빛 인사총무팀 IT · 체크 상태는 이 브라우저에만 저장됩니다</footer>
+  <footer>미르 인사총무팀 IT · 체크 상태는 이 브라우저에만 저장됩니다</footer>
 </div>
 
 <script>
@@ -178,22 +187,90 @@ var S = load();
 var editing = false;
 var tab = null;          /* 'm7' | 'special' */
 
-function load(){
-  try{
-    var raw = localStorage.getItem(KEY);
-    if (!raw) return freshState();
-    var o = JSON.parse(raw);
-    if (!o || !o.items) return freshState();
-    o.cfg = assign(clone(DEFAULT_CFG), o.cfg || {});
-    o.special = o.special || [];
-    o.checks = o.checks || {};
-    o.items.concat(o.special).forEach(function(it){ if(!it.id) it.id = newId(); });
-    return o;
-  }catch(e){ return freshState(); }
+/* ═══════════════════════════════════════════════════════════
+   무엇을 어디에 두나
+
+     항목·업체·표시 연월(cfg, items, special)  →  사내 서버
+     체크 표시(checks)                        →  이 브라우저
+
+   예전에는 넷 다 브라우저에만 있었다. 그래서 항목을 고쳐도 나만 보이고,
+   PC 를 바꾸면 사라졌다. 항목은 모두가 함께 보는 것이 맞고, 체크는
+   각자의 것이다. 그래서 나눠 둔다.
+
+   고치는 것은 담당자만 할 수 있다(포털 관리자 화면에서 지정).
+   그래야 담당자가 바뀌어도 이어서 고칠 수 있다.
+   ═══════════════════════════════════════════════════════════ */
+var API = new URL('api/', location.href).pathname;
+var ME = {can_edit:false};
+var DOC_VERSION = 0;
+var lastSaved = null;
+var saveTimer = null;
+
+function setState(kind, text){
+  var el = document.getElementById('saveState');
+  if(!el) return;
+  el.className = 'save-state ' + (kind || '');
+  el.textContent = text;
 }
+function timeText(sec){
+  var d = new Date(sec*1000), p = function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+/* 체크만 브라우저에 남긴다 */
+function loadChecks(){
+  try{ return JSON.parse(localStorage.getItem(KEY+'.checks') || '{}') || {}; }
+  catch(e){ return {}; }
+}
+function saveChecks(){
+  try{ localStorage.setItem(KEY+'.checks', JSON.stringify(S.checks||{})); }catch(e){}
+}
+
+/* 서버에 보낼 몫만 뽑는다. 체크는 뺀다 — 넣으면 내 체크가 남의 화면에 번진다. */
+function contentOf(){
+  return { cfg: S.cfg, items: S.items, special: S.special };
+}
+
+function load(){
+  // 처음에는 화면 안의 기본값으로 시작한다. 곧 boot() 가 서버 내용으로 갈아끼운다.
+  var st = freshState();
+  st.checks = loadChecks();
+  return st;
+}
+
+/* 예전 save() 는 브라우저에만 썼다. 이제 체크는 브라우저, 내용은 서버다.
+   부르는 자리(열 몇 군데)는 그대로 두고 이 함수 안에서만 갈린다. */
 function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify(S)); }
-  catch(e){ alert("저장하지 못했어요. 브라우저 저장공간을 확인해주세요."); }
+  saveChecks();
+  if(!ME.can_edit) return;
+  var now = JSON.stringify(contentOf());
+  if(now === lastSaved) return;       // 체크만 눌렀다 — 서버에 보낼 것이 없다
+  setState('saving', '저장 중…');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(pushDoc, 700);
+}
+
+function pushDoc(){
+  var sent = JSON.stringify(contentOf());
+  fetch(API + 'doc', {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data: contentOf(), base_version: DOC_VERSION || null})
+  }).then(function(r){
+    if(r.status === 409){
+      setState('failed', '저장 못 함 — 새로고침 필요');
+      alert('다른 사람이 먼저 저장했습니다.\n새로고침해서 바뀐 내용을 확인한 뒤 다시 고쳐 주세요.');
+      return null;
+    }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(doc){
+    if(!doc) return;
+    DOC_VERSION = doc.version;
+    lastSaved = sent;
+    setState('saved', '저장됨 · ' + timeText(doc.updated_at));
+  }).catch(function(err){
+    setState('failed', '저장 못 함 — ' + (err.message || '연결 오류'));
+  });
 }
 
 /* =========================================================
@@ -461,8 +538,38 @@ $("#btnReset").addEventListener("click", function(){
   S = freshState(); save(); bindCfg(); renderAll();
 });
 
-bindCfg();
-renderAll();
+/* ── 처음 열 때 ──────────────────────────────────────────────
+   내가 고칠 수 있는 사람인지 묻고, 서버에 있는 내용을 받아 온다. */
+function boot(){
+  fetch(API + 'me').then(function(r){ return r.ok ? r.json() : null; })
+   .then(function(me){ if(me) ME = me; })
+   .catch(function(){})
+   .then(function(){
+     document.body.classList.toggle('readonly', !ME.can_edit);
+     return fetch(API + 'doc').then(function(r){ return r.ok ? r.json() : null; })
+              .catch(function(){ return null; });
+   })
+   .then(function(doc){
+     if(doc && !doc.empty && doc.data && doc.data.items){
+       S.cfg     = assign(clone(DEFAULT_CFG), doc.data.cfg || {});
+       S.items   = doc.data.items || [];
+       S.special = doc.data.special || [];
+       S.items.concat(S.special).forEach(function(it){ if(!it.id) it.id = newId(); });
+       DOC_VERSION = doc.version;
+       lastSaved = JSON.stringify(contentOf());
+       setState('saved', '저장됨 · ' + timeText(doc.updated_at));
+     } else {
+       // 서버에 아직 없다. 화면 안의 기본값을 쓰고, 담당자면 그대로 한 번 심는다.
+       if(ME.can_edit){ setState('', '아직 저장된 내용이 없습니다 — 첫 저장을 준비합니다'); }
+       else { setState('', ME.id ? '보기 전용' : '저장소에 연결하지 못했습니다 (보기 전용)'); }
+     }
+     bindCfg();
+     renderAll();
+     if(ME.can_edit && lastSaved === null) save();   // 첫 저장
+   });
+}
+
+boot();
 })();
 </script>
 <!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고

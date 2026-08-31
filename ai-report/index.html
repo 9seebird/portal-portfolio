@@ -487,37 +487,37 @@ const SYSTEM_RE = /^__system__/i;
    이 표가 없으면 사용자별 순위가 전부 이메일로 나온다. 화면의 「이름 매핑」
    에서 고치면 그 값이 이것보다 우선한다.
 
-   ★ 여기 있는 것은 전부 가상 회사 「온빛」의 지어낸 사람들이다.
+   ★ 여기 있는 것은 전부 가상 회사 「미르」의 지어낸 사람들이다.
      원래는 실제 사내 명부가 코드 안에 그대로 박혀 있었다. 공개 저장소로
      옮기면서 통째로 갈아 끼웠다 — 이런 것은 지운 뒤에도 커밋 기록에
      남으므로, 애초에 코드에 넣지 않는 편이 낫다. */
 const DEFAULT_NAME_MAP = {
-  "user001@onbit.example.com":"한윤현", "user002@onbit.example.com":"오채성",
-  "user003@onbit.example.com":"안서연", "user004@onbit.example.com":"정은우",
-  "user005@onbit.example.com":"서시성", "user006@onbit.example.com":"오도현",
-  "user007@onbit.example.com":"신윤연", "user008@onbit.example.com":"최서우",
-  "user009@onbit.example.com":"한도우", "user010@onbit.example.com":"박채영",
-  "user011@onbit.example.com":"신윤성", "user012@onbit.example.com":"강수아",
-  "user013@onbit.example.com":"윤채아", "user014@onbit.example.com":"강주진",
-  "user015@onbit.example.com":"윤예원", "user016@onbit.example.com":"임하율",
-  "user017@onbit.example.com":"서채희", "user018@onbit.example.com":"정은진",
-  "user019@onbit.example.com":"김도연", "user020@onbit.example.com":"오하호",
-  "user021@onbit.example.com":"정서연", "user022@onbit.example.com":"정민우",
-  "user023@onbit.example.com":"정준원", "user024@onbit.example.com":"강주영",
-  "user025@onbit.example.com":"장준원", "user026@onbit.example.com":"오준원",
-  "user027@onbit.example.com":"한지현", "user028@onbit.example.com":"최도성",
-  "user029@onbit.example.com":"이준진", "user030@onbit.example.com":"권채율",
-  "user031@onbit.example.com":"임서성", "user032@onbit.example.com":"조서연",
-  "user033@onbit.example.com":"한주우", "user034@onbit.example.com":"한민진",
-  "user035@onbit.example.com":"정은아", "user036@onbit.example.com":"장민영",
-  "user037@onbit.example.com":"김민호", "user038@onbit.example.com":"이하호",
-  "user039@onbit.example.com":"안시영", "user040@onbit.example.com":"최준아",
-  "user041@onbit.example.com":"신채현", "user042@onbit.example.com":"이시영",
-  "user043@onbit.example.com":"장민아", "user044@onbit.example.com":"신현호",
-  "user045@onbit.example.com":"오시성", "user046@onbit.example.com":"오서아",
-  "user047@onbit.example.com":"한하아", "user048@onbit.example.com":"장윤희",
-  "user049@onbit.example.com":"정예호", "user050@onbit.example.com":"권현율",
-  "user051@onbit.example.com":"윤수연", "user052@onbit.example.com":"황준현"
+  "user001@mir.example.com":"한윤현", "user002@mir.example.com":"오채성",
+  "user003@mir.example.com":"안서연", "user004@mir.example.com":"정은우",
+  "user005@mir.example.com":"서시성", "user006@mir.example.com":"오도현",
+  "user007@mir.example.com":"신윤연", "user008@mir.example.com":"최서우",
+  "user009@mir.example.com":"한도우", "user010@mir.example.com":"박채영",
+  "user011@mir.example.com":"신윤성", "user012@mir.example.com":"강수아",
+  "user013@mir.example.com":"윤채아", "user014@mir.example.com":"강주진",
+  "user015@mir.example.com":"윤예원", "user016@mir.example.com":"임하율",
+  "user017@mir.example.com":"서채희", "user018@mir.example.com":"정은진",
+  "user019@mir.example.com":"김도연", "user020@mir.example.com":"오하호",
+  "user021@mir.example.com":"정서연", "user022@mir.example.com":"정민우",
+  "user023@mir.example.com":"정준원", "user024@mir.example.com":"강주영",
+  "user025@mir.example.com":"장준원", "user026@mir.example.com":"오준원",
+  "user027@mir.example.com":"한지현", "user028@mir.example.com":"최도성",
+  "user029@mir.example.com":"이준진", "user030@mir.example.com":"권채율",
+  "user031@mir.example.com":"임서성", "user032@mir.example.com":"조서연",
+  "user033@mir.example.com":"한주우", "user034@mir.example.com":"한민진",
+  "user035@mir.example.com":"정은아", "user036@mir.example.com":"장민영",
+  "user037@mir.example.com":"김민호", "user038@mir.example.com":"이하호",
+  "user039@mir.example.com":"안시영", "user040@mir.example.com":"최준아",
+  "user041@mir.example.com":"신채현", "user042@mir.example.com":"이시영",
+  "user043@mir.example.com":"장민아", "user044@mir.example.com":"신현호",
+  "user045@mir.example.com":"오시성", "user046@mir.example.com":"오서아",
+  "user047@mir.example.com":"한하아", "user048@mir.example.com":"장윤희",
+  "user049@mir.example.com":"정예호", "user050@mir.example.com":"권현율",
+  "user051@mir.example.com":"윤수연", "user052@mir.example.com":"황준현"
 };
 
 const $  = (s,r)=> (r||document).querySelector(s);

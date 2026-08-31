@@ -24,13 +24,13 @@ IMAGES = ROOT / "images"
 BACKUP = ROOT / "data" / "backup"
 SOURCES = ROOT / "sources"          # 올린 PPT 원본을 그대로 둔다
 
-HEADER = """// 온빛 IT 매뉴얼 포털 - 내용 파일
+HEADER = """// 미르 IT 매뉴얼 포털 - 내용 파일
 // 포털의 "편집 모드"에서 수정 후 저장하면 이 파일이 새로 만들어집니다.
 // 직접 편집해도 됩니다. (이미지 경로는 images/ 폴더 기준)
 window.MANUAL_DATA = """
 
 DEFAULT_SITE = {
-    "title": "온빛 IT 매뉴얼 포털",
+    "title": "미르 IT 매뉴얼 포털",
     "subtitle": "업무 시스템 사용법을 한 곳에서 확인하세요",
     "imageSize": "m",
 }

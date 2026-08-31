@@ -30,3 +30,6 @@ tools/scrub.py
 # 자동 배포가 서버에서 만드는 것. 기계마다 다르므로 올리지 않는다.
 autodeploy.log
 .autodeploy.lock
+
+# 체크리스트·ITO 비용처리의 내용과 지난 판 (guide-api 가 쓴다)
+it-guide/data/

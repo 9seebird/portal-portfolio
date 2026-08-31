@@ -1194,7 +1194,7 @@ payload 에서는 빠지고 `has_detail_page: true` 만 남는다 (`ToolResult.f
 
 ```
 IT 매뉴얼 — SAP/M365 등 사용법 확인 (/manual/)
-2026년 7월 AI 사용비용은 … https://portal.onbit.example.com/ai-report?month=2026-07
+2026년 7월 AI 사용비용은 … https://portal.mir.example.com/ai-report?month=2026-07
 ```
 
 직원 대부분은 그 경로로 무엇을 해야 하는지 모르고, 오히려 **답이 잘못

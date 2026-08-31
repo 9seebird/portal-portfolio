@@ -165,14 +165,23 @@ for name in "${ORDERED[@]}"; do
     # nginx 는 뜰 때 한 번만 읽는다. 컨테이너가 이미 떠 있으면 compose 는
     # "Running" 이라고만 하고 아무것도 하지 않는다. 그래서 앱 conf 를
     # 새로 넣어도 그 경로가 404 로 남는다.
-    if [ "$name" = "proxy" ]; then
-      if docker exec demo-proxy nginx -t; then
-        docker exec demo-proxy nginx -s reload >/dev/null 2>&1
-        echo "  ✓ nginx 설정 다시 읽음"
+    #
+    # ★ proxy 만 그런 것이 아니다. it-guide 도 nginx 를 쓴다.
+    #   그리고 compose 는 depends_on 같은 것만 바뀌면 "바뀐 것 없음" 으로
+    #   보고 컨테이너를 그대로 둔다. 그러면 설정 파일은 새것인데 nginx 는
+    #   옛 설정으로 계속 돈다. **컨테이너는 healthy 인데 새 경로만 404** 인,
+    #   원인을 짐작하기 어려운 상태가 된다.
+    NGINX_CT=""
+    [ "$name" = "proxy" ]    && NGINX_CT="demo-proxy"
+    [ "$name" = "it-guide" ] && NGINX_CT="demo-guide-web"
+    if [ -n "$NGINX_CT" ]; then
+      if docker exec "$NGINX_CT" nginx -t; then
+        docker exec "$NGINX_CT" nginx -s reload >/dev/null 2>&1
+        echo "  ✓ nginx 설정 다시 읽음 ($NGINX_CT)"
       else
-        echo "  ✗ nginx 설정에 문제가 있어 그대로 둡니다."
+        echo "  ✗ nginx 설정에 문제가 있어 그대로 둡니다. ($NGINX_CT)"
         echo "      고친 뒤 다시 실행하세요. 지금은 옛 설정으로 돌고 있습니다."
-        FAILED+=("proxy (설정 오류)")
+        FAILED+=("$name (설정 오류)")
       fi
     fi
   else
