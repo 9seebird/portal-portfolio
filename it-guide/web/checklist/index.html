@@ -43,6 +43,10 @@
   .save-bar{
     display:flex;gap:8px;flex-wrap:wrap;align-items:center;
     margin-top:12px;
+    /* 「저장 중…」 과 「저장됨 · 2026-08-26 23:59」 은 글자 길이가 두 배 넘게
+       차이 난다. 자리를 미리 잡아 두지 않으면 상태가 바뀔 때마다 옆 버튼이
+       아랫줄로 밀렸다 올라왔다 하면서 화면 전체가 들썩인다. */
+    min-height:26px;
   }
   button{
     font-family:inherit;
@@ -90,6 +94,12 @@
   }
   .period-header h2{font-size:18px;margin:0;}
   .progress-wrap{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);min-width:200px;}
+  /* 「0/8 완료 0%」 와 「12/59 완료 100%」 는 글자 폭이 다르다. 체크할 때마다
+     이 글자가 바뀌므로, 자리를 미리 잡아 두지 않으면 옆의 막대와 묶음 제목이
+     조금씩 밀리면서 화면이 들썩인다. 숫자는 폭이 같은 글꼴로 뽑는다. */
+  .progress-wrap > span{font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .progress-wrap > span:first-child{min-width:84px;}
+  .progress-wrap > span:last-child{min-width:42px;text-align:right;}
   .progress-track{flex:1;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;min-width:100px;}
   .progress-fill{height:100%;background:var(--green);border-radius:999px;transition:width .2s;}
 
@@ -145,7 +155,8 @@
   .add-item-row input:focus{outline:none;border-color:var(--accent);border-style:solid;}
 
   /* 저장 상태 — 눌러야 저장되는 화면이 아니므로, 저장됐다는 것이 보여야 한다 */
-  .save-state{font-size:12px;color:var(--sub);white-space:nowrap;}
+  .save-state{font-size:12px;color:var(--sub);white-space:nowrap;
+              display:inline-block;min-width:190px;}
   .save-state.saving{color:var(--accent);}
   .save-state.saved{color:#1baf7a;}
   .save-state.failed{color:var(--red);font-weight:600;}
@@ -780,20 +791,33 @@ function buildSectionCard(period, section, sIdx){
     allBtn.type = 'button';
     allBtn.textContent = '전체 체크';
     allBtn.title = '이 묶음을 모두 체크합니다 (내 화면에만)';
-    allBtn.onclick = () => {
-      section.items.forEach(it => setDone(period, section, it, true));
-      render();
+
+    /* ★ 다시 그리지 않는다.
+       예전에는 render() 로 목록을 통째로 새로 만들었다. 그러면 두 가지가 같이 났다.
+         · DOM 이 전부 교체되면서 보고 있던 자리가 사라져 화면이 위아래로 튄다
+         · 항목 글자칸(contentEditable)에 커서가 있었으면 blur 가 터지고,
+           그 핸들러가 saveSoon() 을 불러 「저장 중…」 → 「저장됨 · 날짜」 로 바뀐다.
+           이 글자가 길어지면 save-bar 가 한 줄 더 늘어 화면이 또 밀린다.
+       체크는 이 브라우저에만 남는 값이라 서버에 보낼 것도 없다.
+       체크박스 하나를 눌렀을 때와 똑같이, 있는 것만 고쳐 준다. */
+    const applyAll = (on) => {
+      section.items.forEach(it => setDone(period, section, it, on));
+      card.querySelectorAll('.item-row').forEach(row => {
+        const box = row.querySelector('input[type="checkbox"]');
+        if(box) box.checked = on;
+        row.classList.toggle('done', on);
+      });
+      cnt.textContent = (on ? total : 0) + '/' + total;
+      updateProgressBar(period);
     };
+    allBtn.onclick = () => applyAll(true);
     const sep = document.createElement('span');
     sep.className = 'sep'; sep.textContent = '/';
     const noneBtn = document.createElement('button');
     noneBtn.type = 'button';
     noneBtn.textContent = '전체 해제';
     noneBtn.title = '이 묶음의 체크를 모두 지웁니다 (내 화면에만)';
-    noneBtn.onclick = () => {
-      section.items.forEach(it => setDone(period, section, it, false));
-      render();
-    };
+    noneBtn.onclick = () => applyAll(false);
     box.appendChild(allBtn); box.appendChild(sep); box.appendChild(noneBtn);
     actions.appendChild(box);
   }

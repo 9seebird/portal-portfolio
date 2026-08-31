@@ -13,30 +13,44 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NET="demo-net"
 
-# ── 컨테이너가 옛 폴더를 붙들고 있나 ─────────────────────────
+# ── 컨테이너가 옛 것을 붙들고 있나 ───────────────────────────
 #
-# 바인드 마운트는 경로가 아니라 **그때의 디렉터리 inode** 에 걸린다.
-# 폴더가 통째로 새로 생기면(재클론 · 폴더 이동 · 지웠다 복구) 호스트에는
-# 새 파일이 있는데 컨테이너는 옛 폴더를 계속 본다.
+# 바인드 마운트는 **경로가 아니라 그때의 inode** 에 걸린다.
+#
+#   · 파일 하나를 붙인 경우 (./nginx.conf:/etc/nginx/conf.d/default.conf)
+#     git pull 은 파일을 고쳐 쓰지 않는다. **새로 쓰고 이름을 바꿔 단다.**
+#     그러면 inode 가 바뀌고, 컨테이너는 이미 사라진 옛 파일을 계속 본다.
+#   · 폴더를 붙인 경우도 폴더가 통째로 새로 생기면(재클론·이동) 같다.
 #
 # 이게 고약한 이유는 어느 것도 이상을 알려주지 않기 때문이다.
 #   · docker inspect 의 마운트 경로는 **맞게** 보인다
 #   · git status 는 깨끗하고, git pull 도 정상이다
 #   · 컨테이너는 healthy 다
-#   · nginx -s reload 로도 안 풀린다 — 읽는 위치 자체가 옛 폴더다
-# 실제로 이 상태로 오래 있었다. 화면에는 옛 회사 이름이 남아 있었고,
-# 나중에 추가한 앱 두 개는 통째로 404 였다.
+#   · nginx -s reload 로도 안 풀린다 — 읽는 파일 자체가 옛것이다
+#   · docker compose up -d 도 소용없다. compose 는 **서비스 정의**가
+#     바뀌었는지만 본다. 붙인 파일의 내용이 바뀐 것은 보지 않는다.
+# 실제로 이것 때문에 화면은 새것인데 API 만 404 인 채로 오래 있었다.
 #
 # 그래서 호스트와 컨테이너가 **같은 것을 보고 있는지** 직접 맞춰 본다.
-# 다르면 아래에서 컨테이너를 다시 만든다.
-mount_drift() {              # $1 = 컨테이너 이름. 어긋난 경로를 찍는다.
+# 다르면 아래에서 컨테이너를 다시 만든다. 그것 말고는 푸는 방법이 없다.
+mount_drift() {              # $1 = 컨테이너 이름. 어긋난 것을 찍는다.
   local ct="$1" src dst a b
   docker inspect "$ct" --format \
     '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}|{{.Destination}}{{println}}{{end}}{{end}}' \
     2>/dev/null | while IFS='|' read -r src dst; do
-      [ -n "$src" ] && [ -d "$src" ] || continue      # 파일 마운트는 건너뛴다
-      a=$(ls -A -- "$src" 2>/dev/null | sort | md5sum)
-      b=$(docker exec "$ct" sh -c "ls -A -- '$dst' 2>/dev/null" | sort | md5sum)
+      [ -n "$src" ] || continue
+      if [ -d "$src" ]; then
+        # 폴더는 안에 든 이름만 맞춘다. 내용까지 다 읽으면 느리다
+        # (매뉴얼 이미지가 17MB 다).
+        a=$(ls -A -- "$src" 2>/dev/null | sort | md5sum)
+        b=$(docker exec "$ct" sh -c "ls -A -- '$dst' 2>/dev/null" | sort | md5sum)
+      elif [ -f "$src" ]; then
+        # 파일은 내용을 맞춘다. **설정 파일이 여기 걸린다.**
+        a=$(md5sum < "$src" 2>/dev/null)
+        b=$(docker exec "$ct" sh -c "cat -- '$dst' 2>/dev/null" | md5sum)
+      else
+        continue
+      fi
       [ "$a" != "$b" ] && echo "$src"
     done
   return 0
@@ -204,18 +218,18 @@ for name in "${ORDERED[@]}"; do
     [ "$name" = "proxy" ]    && NGINX_CT="demo-proxy"
     [ "$name" = "it-guide" ] && NGINX_CT="demo-guide-web"
     if [ -n "$NGINX_CT" ]; then
-      # 설정을 다시 읽히기 **전에** 본다. 옛 폴더를 보고 있으면
-      # reload 를 아무리 해도 옛 파일을 다시 읽을 뿐이다.
+      # 설정을 다시 읽히기 **전에** 본다. 옛 파일을 보고 있으면
+      # reload 를 아무리 해도 옛것을 다시 읽을 뿐이다.
       DRIFT="$(mount_drift "$NGINX_CT" || true)"
       if [ -n "$DRIFT" ]; then
-        echo "  △ 컨테이너가 옛 폴더를 붙들고 있습니다 — 다시 만듭니다"
+        echo "  △ 컨테이너가 옛 것을 붙들고 있습니다 — 다시 만듭니다"
         echo "$DRIFT" | sed 's/^/      /'
         docker compose up -d --force-recreate
         if [ -n "$(mount_drift "$NGINX_CT" || true)" ]; then
           echo "  ✗ 다시 만들었는데도 그대로입니다. 마운트 경로를 확인하세요."
           FAILED+=("$name (마운트 어긋남)")
         else
-          echo "  ✓ 마운트를 다시 걸었습니다"
+          echo "  ✓ 컨테이너를 다시 만들어 지금 파일을 보게 했습니다"
         fi
       fi
       if docker exec "$NGINX_CT" nginx -t; then
