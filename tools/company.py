@@ -62,6 +62,20 @@ WORDMARK_DIR = Path(__file__).resolve().parents[1] / "portal" / "static"
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# ── 깃이 모르는데 화면에는 나오는 것 ────────────────────────
+# data/ 는 .gitignore 에 있다. 그래서 --check 는 오랫동안 이곳을 안 봤다.
+# 그런데 매뉴얼 제목·부제는 **바로 이 파일**이 정한다 — 화면(HTML)에 박힌
+# 기본값보다 저장된 값이 이긴다(manuals/index.html 의 siteTitle 대입).
+#
+# 실제로 그 일이 났다. 저장소는 전부 새 이름인데 서버 화면만 옛 이름이었다.
+# 배포는 코드를 덮어쓰지만 볼륨에 쌓인 자료는 그대로 두기 때문이다.
+# 그래서 「있으면 본다」로 바꿨다. 갓 받은 저장소에는 없으니 그냥 지나간다.
+RUNTIME_DATA = [
+    "it-guide/web/manuals/data",   # 매뉴얼 본문 (manual-import 가 쓴다)
+    "it-guide/data",               # 체크리스트·ITO 본문 (guide-api 가 쓴다)
+]
+RUNTIME_SUFFIX = {".js", ".json", ".txt", ".md", ".html", ".csv"}
+
 # 글자를 바꾸면 안 되는 것들. 그림·압축파일에 문자열 치환을 들이대면 깨진다.
 SKIP_SUFFIX = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip",
                ".xlsx", ".xls", ".pptx", ".docx", ".db", ".sqlite",
@@ -90,6 +104,25 @@ def _tracked() -> list[Path]:
     return files
 
 
+def _runtime() -> list[Path]:
+    """깃이 안 보는 자료 파일. 없으면 조용히 넘어간다.
+
+    같은 폴더 안이라도 이미 추적 중인 파일은 뺀다 — 안 그러면 한 줄이
+    「저장소」와 「자료」 양쪽에 두 번 찍혀서 몇 군데인지 알 수 없다.
+    """
+    known = {p.resolve() for p in _tracked()}
+    files = []
+    for rel in RUNTIME_DATA:
+        base = ROOT / rel
+        if not base.is_dir():
+            continue
+        for p in sorted(base.rglob("*")):
+            if (p.is_file() and p.suffix.lower() in RUNTIME_SUFFIX
+                    and p.resolve() not in known):
+                files.append(p)
+    return files
+
+
 def _pairs() -> list[tuple[str, str]]:
     """옛 낱말 → 지금 낱말. 긴 것부터 바꿔야 겹치는 경우에 안 깨진다."""
     out = []
@@ -98,11 +131,9 @@ def _pairs() -> list[tuple[str, str]]:
     return sorted(out, key=lambda x: -len(x[0]))
 
 
-def check() -> int:
-    bad = []
-    words = [w for tri in RETIRED for w in tri]
-    pat = re.compile("|".join(re.escape(w) for w in words))
-    for p in _tracked():
+def _hits(files: list[Path], pat: "re.Pattern[str]") -> list[str]:
+    out = []
+    for p in files:
         try:
             text = p.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
@@ -110,12 +141,32 @@ def check() -> int:
         for i, line in enumerate(text.splitlines(), 1):
             m = pat.search(line)
             if m:
-                bad.append(f"  {p.relative_to(ROOT)}:{i}: {m.group(0)}")
-    if bad:
-        print(f"✗ 예전 회사 이름이 {len(bad)}군데 남아 있습니다:")
-        print("\n".join(bad[:30]))
-        if len(bad) > 30:
-            print(f"  … 그리고 {len(bad) - 30}군데 더")
+                out.append(f"  {p.relative_to(ROOT)}:{i}: {m.group(0)}")
+    return out
+
+
+def check() -> int:
+    words = [w for tri in RETIRED for w in tri]
+    pat = re.compile("|".join(re.escape(w) for w in words))
+    bad = _hits(_tracked(), pat)
+    data_bad = _hits(_runtime(), pat)
+
+    if bad or data_bad:
+        if bad:
+            print(f"✗ 저장소에 예전 회사 이름이 {len(bad)}군데 남아 있습니다:")
+            print("\n".join(bad[:30]))
+            if len(bad) > 30:
+                print(f"  … 그리고 {len(bad) - 30}군데 더")
+        if data_bad:
+            print(f"✗ 앱이 만든 자료에 예전 이름이 {len(data_bad)}군데 있습니다:")
+            print("\n".join(data_bad[:15]))
+            if len(data_bad) > 15:
+                print(f"  … 그리고 {len(data_bad) - 15}군데 더")
+            # ★ 여기가 핵심이다. 이 파일들은 깃에 없다.
+            #   내 PC 를 고쳐도 **서버의 같은 파일은 그대로 남는다.**
+            #   화면 제목은 이 자료가 정하므로, 서버에서도 한 번 돌려야 한다.
+            print("    ↑ 깃에 올라가지 않는 파일입니다. 고쳐도 배포로 안 넘어갑니다.")
+            print("      서버에서도 같은 명령을 한 번 돌리세요.")
         print("\n  → python tools/company.py --apply 로 한 번에 고칩니다.")
         return 1
     print(f"✓ 회사 이름이 「{COMPANY} / {COMPANY_EN} / {DOMAIN}」 하나로 맞습니다.")
@@ -125,7 +176,7 @@ def check() -> int:
 def apply() -> int:
     pairs = _pairs()
     changed = 0
-    for p in _tracked():
+    for p in _tracked() + _runtime():
         try:
             text = p.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):

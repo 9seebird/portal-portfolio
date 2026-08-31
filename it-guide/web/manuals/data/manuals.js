@@ -1,10 +1,10 @@
-// 미르 IT 매뉴얼 포털 - 내용 파일
+// IT 매뉴얼 - 내용 파일
 // 포털의 "편집 모드"에서 수정 후 저장하면 이 파일이 새로 만들어집니다.
 // 직접 편집해도 됩니다. (이미지 경로는 images/ 폴더 기준)
 window.MANUAL_DATA = {
   "site": {
-    "title": "미르 IT 매뉴얼",
-    "subtitle": "사내 프로그램 설치·사용 안내. 궁금한 건 인사총무팀 IT 담당자에게 문의하세요.",
+    "title": "IT 매뉴얼",
+    "subtitle": "사내 프로그램 설치·사용 안내. 궁금한 건 IT팀 담당자에게 문의하세요.",
     "imageSize": "m"
   },
   "manuals": [
@@ -13,7 +13,7 @@ window.MANUAL_DATA = {
       "icon": "한",
       "title": "한컴오피스 2024 설치",
       "subtitle": "기존 사용자는 구 버전 한글을 삭제한 뒤 설치하세요.",
-      "contactNote": "문의: 인사총무팀 IT 담당자",
+      "contactNote": "문의: IT팀 담당자",
       "sections": [
         {
           "title": "1. 기존에 설치된 한글 삭제하기",
@@ -84,7 +84,7 @@ window.MANUAL_DATA = {
       "icon": "K",
       "title": "카스퍼스키 중앙 관리 툴",
       "subtitle": "중앙 관리 콘솔(KSC) 설치와 사용. IT 매니저 전용입니다.",
-      "contactNote": "문의: 인사총무팀 IT 담당자",
+      "contactNote": "문의: IT팀 담당자",
       "sections": [
         {
           "title": "1. Kaspersky Security Center 다운로드",
