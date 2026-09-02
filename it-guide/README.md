@@ -21,6 +21,7 @@
 | `checklist` | IT 운영 체크리스트 | `/checklist/` |
 | `ito-cost` | ITO 비용처리 | `/ito-cost/` |
 | `prompt` | 바이브코딩 프롬프트 생성기 | `/prompt/` |
+| `selfcheck` | IT 자가진단 | `/selfcheck/` |
 
 ## 실행
 

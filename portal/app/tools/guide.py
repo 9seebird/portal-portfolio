@@ -659,3 +659,133 @@ def get_checklist(user: User, period: str | None = None,
         # 주기를 안 밝혔으면 화면이 원래 열던 탭 그대로 둔다.
         detail_url=CHECKLIST_URL + (f"#{key}" if key else ""),
     )
+
+
+# ── IT 자가진단 ──────────────────────────────────────────────
+#
+# 직원이 "안 돼요" 하고 부르기 전에 스스로 확인할 것을 알려 주는 화면이다.
+# 챗에서 물어도 같은 순서를 그대로 준다. 확인 순서가 두 벌이 되면
+# 화면과 챗이 다른 말을 하게 되므로, 화면이 쓰는 그 파일을 그대로 읽는다.
+#
+#   /selfcheck/data/selfcheck.js   window.SELFCHECK_DATA = { ... }
+#
+# ★ window.SELFCHECK_DATA 라는 이름이 앱과의 약속이다. 바꾸면 못 읽는다.
+
+
+def _selfcheck() -> dict:
+    raw = _fetch("/selfcheck/data/selfcheck.js")
+    i = raw.index("{")
+    return json.loads(raw[i:].rstrip().rstrip(";"))
+
+
+def _plain(s: str) -> str:
+    """화면용 태그(<b>·<kbd>·<code>)를 떼고 글자만 남긴다."""
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", s or "")).strip()
+
+
+def _sc_steps(topic: dict) -> list[str]:
+    out = []
+    for i, st in enumerate(topic.get("steps", []), 1):
+        t, d = _plain(st.get("t", "")), _plain(st.get("d", ""))
+        out.append(f"{i}. {t} — {d}" if d else f"{i}. {t}")
+    return out
+
+
+@tool(
+    name="search_selfcheck",
+    label="IT 자가진단",
+    description=(
+        "전산 문제가 생겼을 때 전산팀에 연락하기 전에 **본인이 먼저 확인할 순서**를 알려준다. "
+        "'모니터가 안 나와요', '인터넷이 안 돼요', '인쇄가 안 나와요', '소리가 안 나요', "
+        "'PC가 느려요', '비밀번호를 잊었어요', 'USB가 인식이 안 돼요', "
+        "'화상회의에서 마이크가 안 잡혀요' 처럼 **지금 뭔가 고장났다고 말할 때** 쓴다. "
+        "모니터·화면, 네트워크·인터넷, 프린터·복합기, PC·주변기기, 계정·프로그램·파일 "
+        "다섯 분야에 증상 27개가 들어 있다. 확인 순서를 차례대로 돌려준다. "
+        "낱말을 비우고 부르면 어떤 증상이 있는지 목록을 돌려준다. "
+        "※ 시스템 사용법(SAP·NAS·그룹웨어 절차)이면 search_manual, "
+        "IT 담당자의 주기별 운영 업무면 get_checklist 를 쓴다."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {"type": "string",
+                      "description": "증상을 그대로. '모니터가 안 나와요', '인쇄', "
+                                     "'소리' 처럼. 비우면 증상 목록"},
+        },
+    },
+    service="selfcheck",
+)
+def search_selfcheck(user: User, query: str = "") -> ToolResult:
+    try:
+        data = _selfcheck()
+    except Exception as e:  # noqa: BLE001
+        return _down(e, "IT 자가진단")
+
+    topics = data.get("topics", [])
+    cats = {c["id"]: c["name"] for c in data.get("cats", [])}
+    q = (query or "").strip()
+
+    # 비우고 부르면 무엇이 있는지 알려준다
+    if not q:
+        by_cat = {}
+        for t in topics:
+            by_cat.setdefault(cats.get(t.get("cat"), "기타"), []).append(t.get("title"))
+        return ToolResult(
+            summary=f"자가진단 증상 {len(topics)}개",
+            data={"분야별 증상": by_cat,
+                  "작성지침": "목록만 보여 주고, 어느 것인지 고르면 그 확인 순서를 "
+                          "알려주겠다고 하십시오."},
+            detail_url=SELFCHECK_URL)
+
+    # 화면이 쓰는 것과 같은 방식으로 고른다 — 구체적인 말일수록 높은 점수.
+    # 화면과 챗이 다른 증상을 집으면 그것이 곧 서로 다른 답이 된다.
+    low = " ".join(q.lower().split())
+    best, best_score = None, 0
+    for t in topics:
+        s = sum(len(k.lower().replace(" ", ""))
+                for k in t.get("kw", []) if k.lower() in low)
+        if s > best_score:
+            best, best_score = t, s
+
+    # 등록된 말로 못 잡으면 제목·본문에서 한 번 더 본다
+    if best_score < 2:
+        words = _words(q)
+        need = _need(words)
+        cand = []
+        for t in topics:
+            body = " ".join(_sc_steps(t))
+            title = t.get("title", "")
+            score = matched = 0
+            for w in words:
+                if _hit(w, title):
+                    score += 3; matched += 1
+                elif _hit(w, body):
+                    score += 1; matched += 1
+            if matched >= need and score >= 3:
+                cand.append((score, t))
+        if cand:
+            cand.sort(key=lambda x: -x[0])
+            best, best_score = cand[0][1], cand[0][0]
+
+    if not best:
+        return ToolResult(
+            summary=f"자가진단에 '{q}' 에 해당하는 증상이 없습니다.",
+            data={"결과": "없음",
+                  "있는 분야": list(cats.values()),
+                  "작성지침": "**없다고 그대로 말하십시오.** 비슷해 보이는 다른 증상을 "
+                          "끌어다 답하지 마십시오. 분야를 알려주고 자가진단 화면에서 "
+                          "찾아보도록 안내하십시오."},
+            detail_url=SELFCHECK_URL)
+
+    return ToolResult(
+        summary=f"{cats.get(best.get('cat'), '')} — {best.get('title')}",
+        data={"증상": best.get("title"),
+              "확인 순서": _sc_steps(best),
+              "다 해봤는데 안 될 때": "자가진단 화면에서 '다 해봤는데 안 돼요' 를 "
+                                "누르면 확인한 항목이 들어간 접수 문구를 만들어 줍니다.",
+              "작성지침": "확인 순서를 **번호 그대로, 위에서부터** 알려주십시오. "
+                      "순서를 바꾸거나 요약하지 마십시오 — 위에서부터 하나씩 "
+                      "확인하도록 만들어진 순서입니다. 다 해봐도 안 되면 "
+                      "화면에서 접수 문구를 만들 수 있다고 덧붙이십시오."},
+        detail_url=SELFCHECK_URL + "#" + str(best.get("id") or ""),
+    )

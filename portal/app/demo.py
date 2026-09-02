@@ -77,6 +77,7 @@ ENABLED = _on("DEMO_MODE")
 
 DEMO_ID = os.environ.get("DEMO_USER_ID", "demo").strip()
 DEMO_PW = os.environ.get("DEMO_PASSWORD", "demo1234")
+DEMO_DEPT = "IT팀"      # 데모 담당자는 IT팀 소속이다 (조직표와 맞춘다)
 
 # 챗 한도.
 #   하루 · IP 당      한 사람이 눌러 볼 만큼. 20번이면 도구도 몇 개 써 본다.
@@ -397,9 +398,16 @@ def seed() -> None:
     try:
         if users.get(DEMO_ID):
             users.set_password(DEMO_ID, DEMO_PW, must_change=False)
+            # ★ 관리자 표시도 매번 되돌린다.
+            #   전에는 비밀번호만 되돌렸다. 그런데 is_admin 은 **처음 만들 때
+            #   한 번만** 붙으므로, 계정이 어쩌다 관리자가 아닌 채로 생겼거나
+            #   나중에 권한이 내려가면 그대로 굳는다. 다시 띄워도 안 풀리고,
+            #   화면에는 「관리자 권한이 필요합니다」만 떠서 원인을 짐작하기
+            #   어렵다. 비밀번호와 같은 이유로 여기서 함께 맞춰 둔다.
+            users.update_profile(DEMO_ID, dept=DEMO_DEPT, is_admin=True)
         else:
             users.create(DEMO_ID, "체험 계정", DEMO_PW,
-                         dept="인사총무팀", is_admin=True, must_change=False)
+                         dept=DEMO_DEPT, is_admin=True, must_change=False)
         log.info("데모 계정 준비됨 — %s", DEMO_ID)
     except Exception:  # noqa: BLE001
         log.exception("데모 계정을 만들지 못했습니다")

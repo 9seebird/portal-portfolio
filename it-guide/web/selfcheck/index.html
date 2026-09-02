@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IT QA 자가진단</title>
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<script src="data/selfcheck.js"></script>
+</head>
+<body>
+<style>
+:root{
+  --ground:#FAFAFB; --surface:#FFFFFF; --surface2:#F6F7F8; --bubble:#F1F2F4;
+  --ink:#17181B; --ink2:#5D626B; --ink3:#8E939C;
+  --line:#E5E6E9; --line2:#D3D5DA;
+  --accent:#22314F; --accent-ink:#FFFFFF; --accent-soft:#EEF1F6;
+  --warn:#A9701A; --warn-soft:#FBF4E7;
+  --ok:#2F6B45;
+  --shadow:0 1px 2px rgba(20,22,28,.04);
+  --radius:8px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#15171B; --surface:#1B1E23; --surface2:#22262C; --bubble:#272B32;
+    --ink:#E7E9ED; --ink2:#A3A9B4; --ink3:#787E89;
+    --line:#2B2F36; --line2:#3A3F48;
+    --accent:#A8BEE4; --accent-ink:#141A26; --accent-soft:#1F2531;
+    --warn:#DDA85C; --warn-soft:#2A2318;
+    --ok:#7FBE95;
+    --shadow:0 1px 2px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#15171B; --surface:#1B1E23; --surface2:#22262C; --bubble:#272B32;
+  --ink:#E7E9ED; --ink2:#A3A9B4; --ink3:#787E89;
+  --line:#2B2F36; --line2:#3A3F48;
+  --accent:#A8BEE4; --accent-ink:#141A26; --accent-soft:#1F2531;
+  --warn:#DDA85C; --warn-soft:#2A2318;
+  --ok:#7FBE95;
+  --shadow:0 1px 2px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  font-size:15px; line-height:1.65; -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 18px;height:100dvh;display:flex;flex-direction:column}
+header.top{
+  flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px;
+  padding:22px 0 16px;border-bottom:1px solid var(--line);
+}
+.brand{font-weight:700;font-size:25px;letter-spacing:-.02em;margin:0}
+.brand em{font-style:normal;color:var(--accent)}
+.tagline{color:var(--ink2);font-size:13.5px;margin:0}
+.tabs{margin-left:auto;display:flex;gap:2px;background:var(--surface2);padding:2px;border:1px solid var(--line);border-radius:8px}
+.tabs button{
+  border:1px solid transparent;background:transparent;color:var(--ink2);padding:5px 15px;border-radius:6px;
+  font-size:13.5px;font-weight:500;cursor:pointer;
+}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);border:1px solid var(--line2)}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:22px;margin-top:18px;align-items:stretch;flex:1 1 auto;min-height:0}
+@media (max-width:880px){.layout{grid-template-columns:1fr}}
+
+/* ---------- chat ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.chat{display:flex;flex-direction:column;height:100%;min-height:0}
+.log{position:relative;padding:20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex:1 1 auto;min-height:0}
+.msg{display:flex;gap:10px;max-width:100%}
+.msg .who{
+  flex:0 0 auto;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+  font-size:11px;font-weight:600;font-family:"D2Coding","Consolas",monospace;margin-top:2px;
+}
+.bot .who{background:var(--accent);color:var(--accent-ink)}
+.me{flex-direction:row-reverse}
+.me .who{background:var(--surface2);color:var(--ink2)}
+.body{min-width:0}
+.me .body{
+  background:var(--bubble);border-radius:12px 12px 3px 12px;padding:8px 14px;max-width:min(460px,80%);
+}
+.bot .body{max-width:min(560px,92%)}
+.bot .body>p{margin:0 0 6px}
+.bot .body>p:last-child{margin-bottom:0}
+
+/* checklist card */
+.card{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-top:10px;background:var(--surface)}
+.card h3{
+  margin:0;padding:11px 14px;background:var(--surface2);border-bottom:1px solid var(--line);
+  font-size:14px;font-weight:600;letter-spacing:-.01em;display:flex;gap:8px;align-items:center;
+}
+.card h3 .cat{border:1px solid var(--line2);
+  font-family:"D2Coding","Consolas",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:4px;font-weight:500;
+}
+ol.steps{list-style:none;margin:0;padding:4px 0;counter-reset:s}
+ol.steps li{display:flex;gap:11px;padding:9px 14px;align-items:flex-start;border-top:1px solid transparent}
+ol.steps li+li{border-top-color:var(--line)}
+.tick{
+  flex:0 0 auto;width:21px;height:21px;margin-top:2px;border:1.5px solid var(--line2);border-radius:6px;
+  background:transparent;cursor:pointer;display:grid;place-items:center;padding:0;
+  transition:background .12s ease,border-color .12s ease;
+}
+.tick svg{width:12px;height:12px;opacity:0;stroke:var(--accent-ink);stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent)}
+.tick[aria-pressed="true"] svg{opacity:1}
+.stxt{min-width:0}
+.stxt>b{display:block;font-weight:600;font-size:14.5px;letter-spacing:-.01em}
+.stxt>span{display:block;color:var(--ink2);font-size:13.5px;line-height:1.55}
+.stxt>b b{font-weight:600}
+.stxt kbd{vertical-align:baseline}
+li.done .stxt>b, li.done .stxt>span{color:var(--ink3)}
+li.done .stxt>b{text-decoration:line-through;text-decoration-color:var(--line2)}
+kbd{
+  font-family:"D2Coding","Consolas",monospace;font-size:11.5px;background:var(--surface2);
+  border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--ink);
+  white-space:nowrap;
+}
+code{font-family:"D2Coding","Consolas",monospace;font-size:12.5px;background:var(--surface2);padding:1px 5px;border-radius:4px}
+figure.shot{margin:8px 0 2px}
+figure.shot img{display:block;max-width:210px;width:100%;border:1px solid var(--line);border-radius:8px}
+figure.shot.wide img{max-width:100%;width:100%}
+figure.shot.wide img[src$="winp.png"]{max-width:230px;width:auto}
+figure.shot.fig svg{display:block;width:100%;max-width:330px;height:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px}
+figure.shot figcaption{font-size:12px;color:var(--ink3);margin-top:4px}
+.card .foot{display:flex;flex-wrap:wrap;gap:8px;padding:11px 14px;border-top:1px solid var(--line);background:var(--surface2)}
+
+/* buttons */
+.btn{
+  border:1px solid var(--line2);background:var(--surface);color:var(--ink);padding:6px 13px;
+  border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;transition:border-color .12s,background .12s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.solid{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.solid:hover{color:var(--accent-ink);opacity:.9}
+.btn.warnish{border-color:var(--warn);color:var(--warn)}
+.btn.warnish:hover{background:var(--warn-soft)}
+
+/* input row */
+.compose{border-top:1px solid var(--line);padding:12px 14px;background:var(--surface);border-radius:0 0 var(--radius) var(--radius);margin-top:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{
+  border:1px solid var(--line);background:transparent;color:var(--ink2);border-radius:999px;
+  padding:4px 11px;font-size:12.5px;cursor:pointer;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.row{display:flex;gap:8px}
+.row input[type=text]{
+  flex:1;min-width:0;background:var(--ground);border:1px solid var(--line2);border-radius:8px;
+  padding:10px 13px;font-size:14.5px;
+}
+.row input::placeholder{color:var(--ink3)}
+.send{border:0;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:0 18px;font-weight:600;cursor:pointer}
+
+/* ticket form */
+.ticket{margin-top:10px;border:1px solid var(--warn);border-radius:var(--radius);overflow:hidden}
+.ticket h3{background:var(--warn-soft);border-bottom-color:var(--warn)}
+.ticket h3 .cat{color:var(--warn);background:transparent;border:1px solid var(--warn)}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+@media (max-width:560px){.fields{grid-template-columns:1fr}}
+.fields label{display:block;font-size:12px;color:var(--ink2);margin-bottom:3px;letter-spacing:.01em}
+.fields input,.fields select{
+  width:100%;background:var(--ground);border:1px solid var(--line2);border-radius:7px;padding:7px 10px;font-size:14px;
+}
+.fields .full{grid-column:1/-1}
+textarea.out{
+  width:100%;min-height:190px;background:var(--ground);border:1px solid var(--line2);border-radius:8px;
+  padding:12px;font-family:"IBM Plex Mono","IBM Plex Sans KR",monospace;font-size:12.5px;line-height:1.7;resize:vertical;
+}
+.note{font-size:12.5px;color:var(--warn);padding:0 14px 10px;margin:0}
+
+/* ---------- aside ---------- */
+aside{display:flex;flex-direction:column;gap:14px;overflow-y:auto;min-height:0;padding-bottom:2px}
+@media (max-width:880px){
+  .wrap{height:auto;padding-bottom:40px}
+  .layout{display:block}
+  .chat{height:auto;min-height:72dvh;margin-bottom:16px}
+  aside{overflow:visible;display:flex}
+  .manual{overflow:visible}
+}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.box h4{
+  margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink3);font-family:"D2Coding","Consolas",monospace;
+}
+.catlist{display:flex;flex-direction:column;gap:2px}
+.catlist button{
+  text-align:left;border:0;background:transparent;padding:5px 8px;border-radius:6px;cursor:pointer;
+  font-size:13.5px;color:var(--ink2);display:flex;justify-content:space-between;gap:8px;
+}
+.catlist button:hover{background:var(--surface2);color:var(--ink)}
+.catlist button .n{font-family:"D2Coding","Consolas",monospace;font-size:11px;color:var(--ink3)}
+.rule{font-size:13px;color:var(--ink2);margin:0 0 8px;padding-left:14px;position:relative}
+.rule:last-child{margin-bottom:0}
+.rule::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+/* ---------- manual ---------- */
+.manual{max-width:780px;margin:18px auto 0;width:100%;flex:1 1 auto;min-height:0;overflow-y:auto;padding-bottom:40px}
+.manual .lead{color:var(--ink2);font-size:14px;border-left:2px solid var(--accent);padding-left:14px;margin:0 0 26px}
+.mcat{margin-bottom:34px}
+.mcat>h2{
+  font-size:20px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em;
+  display:flex;align-items:baseline;gap:10px;
+}
+.mcat>h2 .num{font-family:"D2Coding","Consolas",monospace;font-size:12px;color:var(--accent);font-weight:500}
+.mcat>.sub{color:var(--ink3);font-size:13px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.mitem{margin-bottom:18px}
+.mitem h3{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
+.mitem .kw{font-size:12px;color:var(--ink3);margin:0 0 8px;font-family:"D2Coding","Consolas",monospace}
+.mitem ol{margin:0;padding-left:20px}
+.mitem ol li{margin-bottom:5px;font-size:14px}
+.mitem ol li b{font-weight:600}
+.mitem ol li>span{color:var(--ink2);display:block;font-size:13.5px}
+.hidden{display:none}
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);opacity:0;pointer-events:none;
+  background:var(--ink);color:var(--ground);padding:9px 18px;border-radius:999px;font-size:13.5px;
+  transition:opacity .18s ease,transform .18s ease;z-index:9;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{
+  .wrap{height:auto;display:block}
+  .manual{overflow:visible;max-height:none;margin:0}
+  .tabs,.chat,aside,.toast,header.top .tagline{display:none!important}
+  body{background:#fff;color:#000}
+  .manual{max-width:none}
+  .mcat{break-inside:avoid}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1 class="brand">IT QA <em>자가진단</em></h1>
+    <p class="tagline">자가 진단으로 증상을 확인해보세요.</p>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-view="chat">자가진단</button>
+      <button role="tab" aria-selected="false" data-view="manual">매뉴얼 전체</button>
+    </div>
+  </header>
+
+  <div class="layout" id="view-chat">
+    <section class="panel chat">
+      <div class="log" id="log" aria-live="polite"></div>
+      <div class="compose">
+        <div class="chips" id="chips"></div>
+        <div class="row">
+          <input type="text" id="q" placeholder="증상을 그대로 적어주세요. 예) 모니터가 안 나와요" autocomplete="off">
+          <button class="send" id="sendBtn">보내기</button>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="box">
+        <h4>분야별 찾기</h4>
+        <div class="catlist" id="catlist"></div>
+      </div>
+      <div class="box">
+        <h4>접수 전 확인해주세요</h4>
+        
+        <p class="rule"><b>언제부터, 무엇이, 어떻게</b> 안 되는지 <br>상세하게 알려주시면 도움이 돼요</p>
+        <p class="rule">옆자리 PC도 같은 증상인지 확인하면 <br> 원인이 절반으로 좁혀집니다.</p>
+      </div>
+      <div class="box">
+        <h4>그래도 안 될 때</h4>
+        <p class="rule" style="color:var(--ink)">전산팀 내선 <b>0230</b> · 메신저 <b>IT 담당</b></p>
+        <p class="rule">접수 양식을 만들어 붙여넣어 주시면 <br>문의가 더 쉽습니다.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div id="view-manual" class="manual hidden"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+
+const DATA  = window.SELFCHECK_DATA || {cats:[], topics:[]};
+const CATS  = DATA.cats;
+const KB    = DATA.topics;
+const IMGDIR = "images/";
+
+const FIGS = {
+net:`<svg viewBox="0 0 360 130" role="img" aria-label="네트워크 아이콘 세 가지 상태: 정상, 느낌표, 지구본">
+<g fill="none" stroke="var(--ink2)" stroke-width="1.6" stroke-linejoin="round">
+<rect x="36" y="26" width="48" height="32" rx="3"/><path d="M50 58v6h20v-6M44 70h32"/>
+<rect x="156" y="26" width="48" height="32" rx="3"/><path d="M170 58v6h20v-6M164 70h32"/>
+</g>
+<circle cx="204" cy="62" r="11" fill="var(--warn)"/><text x="204" y="67" text-anchor="middle" font-size="14" font-weight="700" fill="var(--surface)">!</text>
+<g fill="none" stroke="var(--ink2)" stroke-width="1.6"><circle cx="300" cy="46" r="22"/><ellipse cx="300" cy="46" rx="9" ry="22"/><path d="M279 39h42M279 53h42"/></g>
+<g font-size="11" fill="var(--ink)" text-anchor="middle" font-weight="600"><text x="60" y="94">정상</text><text x="180" y="94">느낌표</text><text x="300" y="94">지구본</text></g>
+<g font-size="10" fill="var(--ink3)" text-anchor="middle"><text x="60" y="110">인터넷 사용 가능</text><text x="180" y="110">연결은 됐지만</text><text x="180" y="122">인터넷이 안 나감</text><text x="300" y="110">연결 자체가</text><text x="300" y="122">안 된 상태</text></g>
+</svg>`,
+sound:`<svg viewBox="0 0 320 128" role="img" aria-label="출력 장치 목록에서 모니터가 아니라 실제 스피커를 고르는 모습">
+<rect x="8" y="8" width="304" height="112" rx="10" fill="var(--surface2)" stroke="var(--line)"/>
+<text x="24" y="30" font-size="11" fill="var(--ink3)">출력 장치 선택</text>
+<rect x="20" y="40" width="280" height="32" rx="7" fill="var(--warn-soft)" stroke="var(--warn)"/>
+<path d="M33 56l5 5 9-10" fill="none" stroke="var(--warn)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="58" y="61" font-size="12" fill="var(--ink)">모니터 (HDMI Output)</text>
+<rect x="20" y="80" width="280" height="32" rx="7" fill="var(--surface)" stroke="var(--line2)"/>
+<text x="58" y="101" font-size="12" fill="var(--ink)">스피커 (Realtek Audio)</text>
+<text x="286" y="101" font-size="11" fill="var(--accent)" text-anchor="end">← 선택</text>
+</svg>`,
+queue:`<svg viewBox="0 0 320 140" role="img" aria-label="인쇄 대기열의 프린터 메뉴에서 오프라인 상태로 사용 항목이 체크돼 있는 모습">
+<rect x="8" y="8" width="304" height="124" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+<rect x="8" y="8" width="304" height="24" rx="8" fill="var(--surface2)"/>
+<g font-size="11" fill="var(--ink2)"><text x="22" y="24">프린터</text><text x="66" y="24">문서</text><text x="104" y="24">보기</text></g>
+<rect x="18" y="32" width="196" height="94" rx="6" fill="var(--surface2)" stroke="var(--line2)"/>
+<g font-size="11" fill="var(--ink)"><text x="42" y="52">연결</text><text x="42" y="74">기본 프린터로 설정</text><text x="42" y="96">프린터를 오프라인 상태로 사용</text><text x="42" y="118">모든 문서 취소</text></g>
+<path d="M26 90l4 4 7-8" fill="none" stroke="var(--warn)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="228" y="96" font-size="10.5" fill="var(--warn)">체크 해제</text>
+</svg>`
+};
+
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const log = $("#log");
+let seq = 0;
+const state = {};   // cardId -> {topic, checked:Set}
+
+function toast(t){
+  const el = $("#toast"); el.textContent = t; el.classList.add("show");
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove("show"), 1900);
+}
+let anchor = null;                       // 이 지점이 화면 맨 위로 오도록 맞춘다
+function place(){
+  if (anchor && log.contains(anchor)) log.scrollTop = Math.max(0, anchor.offsetTop - 8);
+  else log.scrollTop = log.scrollHeight;
+}
+function scroll(){ place(); }
+
+function bubble(role, htmlInner){
+  const d = document.createElement("div");
+  d.className = "msg " + (role==="me" ? "me" : "bot");
+  d.innerHTML = '<div class="who">'+(role==="me"?"나":"IT")+'</div><div class="body">'+htmlInner+'</div>';
+  const prev = log.lastElementChild;
+  log.appendChild(d);
+  // 내가 보낸 말은 그 줄부터, 버튼으로 생긴 답변은 그 답변부터 보이게
+  if (role === "me") anchor = d;
+  else if (!(prev && prev.classList.contains("me"))) anchor = d;
+  place();
+  requestAnimationFrame(place);
+  d.querySelectorAll("img").forEach(im => { if (!im.complete) im.addEventListener("load", place, {once:true}); });
+  return d.querySelector(".body");
+}
+
+function catName(id){ return (CATS.find(c=>c.id===id)||{}).name || ""; }
+
+/* ---------- matching ---------- */
+function match(text){
+  const t = text.toLowerCase().replace(/\s+/g," ").trim();
+  let best = null, bestScore = 0;
+  for (const topic of KB){
+    let s = 0;
+    for (const k of topic.kw){
+      const key = k.toLowerCase();
+      if (t.includes(key)) s += key.replace(/\s/g,"").length;   // 구체적인 말일수록 높은 점수
+    }
+    if (s > bestScore){ bestScore = s; best = topic; }
+  }
+  return bestScore >= 2 ? best : null;
+}
+
+/* ---------- rendering a checklist ---------- */
+function showTopic(topic){
+  const id = "c" + (++seq);
+  state[id] = {topic, checked:new Set()};
+  const steps = topic.steps.map((s,i)=>`
+    <li data-i="${i}">
+      <button class="tick" aria-pressed="false" aria-label="${i+1}번 항목 확인함" data-card="${id}" data-i="${i}">
+        <svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+      </button>
+      <div class="stxt">
+        <b>${s.t}</b>
+        <span>${s.d}</span>
+        ${s.img ? `<figure class="shot wide"><img src="${IMGDIR}${s.img}" alt="${s.cap||""}" loading="lazy"><figcaption>${s.cap||""}</figcaption></figure>` : ""}
+        ${s.fig ? `<figure class="shot fig">${FIGS[s.fig]}<figcaption>${s.cap||""}</figcaption></figure>` : ""}
+      </div>
+    </li>`).join("");
+
+  const html = `
+    <p>아래 항목을 <b>위에서부터 하나씩</b> 확인하면서 눌러주세요. 대부분 여기서 해결됩니다.</p>
+    <div class="card" id="${id}">
+      <h3><span class="cat">${catName(topic.cat)}</span> ${topic.title}</h3>
+      <ol class="steps">${steps}</ol>
+      <div class="foot">
+        <button class="btn solid" data-act="solved" data-card="${id}">해결됐어요</button>
+        <button class="btn warnish" data-act="fail" data-card="${id}">다 해봤는데 안 돼요</button>
+        <button class="btn" data-act="other">다른 증상 찾기</button>
+      </div>
+    </div>`;
+  bubble("bot", html);
+}
+
+/* ---------- ticket ---------- */
+function showTicket(cardId){
+  const st = state[cardId];
+  const topic = st.topic;
+  const unchecked = topic.steps.map((s,i)=>({s,i})).filter(o=>!st.checked.has(o.i));
+  const warn = unchecked.length
+    ? `<p class="note">아직 확인하지 않은 항목이 ${unchecked.length}개 있어요: ${unchecked.map(o=>"<b>"+o.s.t.replace(/<[^>]+>/g,"")+"</b>").join(", ")}. 접수 전에 한 번만 더 봐주세요.</p>`
+    : "";
+  const tid = "t" + (++seq);
+  const html = `
+    <p>확인하신 내용을 그대로 담아 접수 문구를 만들어 드릴게요. 아래를 채우고 <b>문구 만들기</b>를 누르세요.</p>
+    <div class="card ticket" id="${tid}">
+      <h3><span class="cat">접수</span> 전산 지원 요청서</h3>
+      ${warn}
+      <div class="fields">
+        <div><label for="${tid}-n">이름</label><input id="${tid}-n" type="text" placeholder="홍길동"></div>
+        <div><label for="${tid}-d">부서 · 자리</label><input id="${tid}-d" type="text" placeholder="영업1팀 3층 창가"></div>
+        <div><label for="${tid}-e">내선 · 연락처</label><input id="${tid}-e" type="text" placeholder="1234"></div>
+        <div><label for="${tid}-a">PC 이름 · 자산번호</label><input id="${tid}-a" type="text" placeholder="PC-0431"></div>
+        <div><label for="${tid}-w">언제부터</label>
+          <select id="${tid}-w">
+            <option>오늘 아침부터</option><option>어제부터</option><option>이번 주 들어</option>
+            <option>몇 주 전부터 가끔</option><option>방금 갑자기</option>
+          </select></div>
+        <div><label for="${tid}-o">옆자리 · 다른 PC는</label>
+          <select id="${tid}-o">
+            <option>확인 못 했음</option><option>다른 PC는 정상</option><option>다른 PC도 같은 증상</option>
+          </select></div>
+        <div class="full"><label for="${tid}-m">화면에 뜬 메시지 (있으면 그대로)</label><input id="${tid}-m" type="text" placeholder="예) 연결되어 있지 않음 / No Signal"></div>
+      </div>
+      <div class="foot">
+        <button class="btn solid" data-act="make" data-card="${cardId}" data-t="${tid}">문구 만들기</button>
+      </div>
+    </div>`;
+  bubble("bot", html);
+}
+
+function buildText(cardId, tid){
+  const st = state[cardId], topic = st.topic;
+  const v = id => (document.getElementById(tid+"-"+id).value || "").trim();
+  const strip = s => s.replace(/<[^>]+>/g,"");
+  const done = topic.steps.filter((s,i)=>st.checked.has(i)).map(s=>"  - "+strip(s.t));
+  const left = topic.steps.filter((s,i)=>!st.checked.has(i)).map(s=>"  - "+strip(s.t));
+  const lines = [
+    "[전산 지원 요청]",
+    "증상 : " + topic.title,
+    "분야 : " + catName(topic.cat),
+    "요청자 : " + (v("n")||"(이름)") + " / " + (v("d")||"(부서·자리)") + " / 내선 " + (v("e")||"(내선)"),
+    "장비 : " + (v("a")||"(PC 이름·자산번호)"),
+    "발생 시점 : " + v("w"),
+    "다른 PC : " + v("o"),
+    "화면 메시지 : " + (v("m") || "없음"),
+    "",
+    "확인해 본 것",
+    done.length ? done.join("\n") : "  - (없음)",
+  ];
+  if (left.length){ lines.push("", "아직 못 해본 것", left.join("\n")); }
+  return lines.join("\n");
+}
+
+/* ---------- events ---------- */
+log.addEventListener("click", e => {
+  const tick = e.target.closest(".tick");
+  if (tick){
+    const on = tick.getAttribute("aria-pressed") === "true";
+    tick.setAttribute("aria-pressed", on ? "false" : "true");
+    tick.closest("li").classList.toggle("done", !on);
+    const st = state[tick.dataset.card], i = +tick.dataset.i;
+    if (on) st.checked.delete(i); else st.checked.add(i);
+    return;
+  }
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+
+  if (act === "solved"){
+    bubble("bot", "<p>잘됐네요. 같은 증상이 또 생기면 이 페이지를 먼저 열어보시고, 반복되면 접수해 주세요.</p>");
+  } else if (act === "fail"){
+    showTicket(btn.dataset.card);
+  } else if (act === "other"){
+    askCategory();
+  } else if (act === "topic"){
+    const topic = KB.find(t => t.id === btn.dataset.id);
+    bubble("me", topic.title);
+    showTopic(topic);
+  } else if (act === "cat"){
+    pickCat(btn.dataset.id);
+  } else if (act === "make"){
+    const text = buildText(btn.dataset.card, btn.dataset.t);
+    const b = bubble("bot", `<p>아래 문구를 복사해 메신저 <b>IT 담당</b> 또는 내선 <b>0230</b>으로 보내주세요.</p>
+      <textarea class="out" readonly>${text.replace(/</g,"&lt;")}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="btn solid" data-act="copy">복사하기</button></div>`);
+    } else if (act === "copy"){
+    const ta = btn.closest(".body").querySelector("textarea");
+    ta.select();
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ta.value).then(()=>toast("복사했습니다"), ()=>toast("직접 선택해 복사해 주세요"));
+    } else { try{ document.execCommand("copy"); toast("복사했습니다"); }catch(_){ toast("직접 선택해 복사해 주세요"); } }
+  }
+});
+
+function askCategory(){
+  const btns = CATS.map(c=>`<button class="btn" data-act="cat" data-id="${c.id}">${c.name}</button>`).join(" ");
+  bubble("bot", `<p>어느 쪽 문제인가요?</p><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">${btns}</div>`);
+}
+function pickCat(catId){
+  bubble("me", catName(catId));
+  listCategory(catId, true);
+}
+function listCategory(catId, quiet){
+  const items = KB.filter(t=>t.cat===catId);
+  const btns = items.map(t=>`<button class="btn" data-act="topic" data-id="${t.id}">${t.title}</button>`).join(" ");
+  bubble("bot", `<p>${quiet ? "" : `<b>${catName(catId)}</b> 에서 `}가장 가까운 증상을 골라주세요.</p>
+    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px">${btns}</div>`);
+}
+
+function ask(text){
+  if (!text.trim()) return;
+  bubble("me", text.replace(/</g,"&lt;"));
+  const topic = match(text);
+  if (topic) showTopic(topic);
+  else bubble("bot", `<p>그 증상은 아직 등록돼 있지 않네요. 아래에서 가장 가까운 분야를 골라주시면 체크리스트를 보여드릴게요.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">${CATS.map(c=>`<button class="btn" data-act="cat" data-id="${c.id}">${c.name}</button>`).join(" ")}</div>`);
+}
+
+$("#sendBtn").addEventListener("click", ()=>{ ask($("#q").value); $("#q").value=""; });
+$("#q").addEventListener("keydown", e=>{ if(e.key==="Enter"){ ask($("#q").value); $("#q").value=""; }});
+
+/* 아래 칩 = 인사말의 분야 버튼과 동일 */
+$("#chips").innerHTML = CATS.map(c=>`<button class="chip" data-id="${c.id}">${c.name}</button>`).join("");
+$("#chips").addEventListener("click", e=>{ const c=e.target.closest(".chip"); if(c) pickCat(c.dataset.id); });
+
+/* aside category list */
+$("#catlist").innerHTML = CATS.map(c=>{
+  const n = KB.filter(t=>t.cat===c.id).length;
+  return `<button data-act="cat" data-id="${c.id}">${c.name}<span class="n">${n}</span></button>`;
+}).join("");
+$("#catlist").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  if (!$("#view-chat").classList.contains("hidden")) pickCat(b.dataset.id);
+});
+
+/* ---------- manual view ---------- */
+$("#view-manual").innerHTML = `
+  <p class="lead">아래는 챗봇이 사용하는 점검 순서 전체입니다. 인쇄해서 자리에 두거나, 신규 입사자 안내에 그대로 쓰셔도 됩니다.
+  각 항목은 <b>위에서부터 순서대로</b> 확인하도록 정렬돼 있습니다.</p>
+  ` + CATS.map((c,ci)=>{
+    const items = KB.filter(t=>t.cat===c.id).map(t=>`
+      <div class="mitem">
+        <h3>${t.title}</h3>
+        <p class="kw">${t.kw.slice(0,6).join(" · ")}</p>
+        <ol>${t.steps.map(s=>`<li><b>${s.t}</b><span>${s.d}</span></li>`).join("")}</ol>
+      </div>`).join("");
+    return `<section class="mcat">
+      <h2><span class="num">${String(ci+1).padStart(2,"0")}</span>${c.name}</h2>
+      <p class="sub">${c.sub}</p>${items}</section>`;
+  }).join("");
+
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected", String(x===b)));
+    const chat = b.dataset.view === "chat";
+    $("#view-chat").classList.toggle("hidden", !chat);
+    $("#view-manual").classList.toggle("hidden", chat);
+  });
+});
+
+/* ---------- opening state ---------- */
+bubble("bot", `<p>안녕하세요. 증상을 평소 말하듯 적어주시면 확인 순서를 알려드립니다. <br> 예) 모니터가 안 나와요</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${CATS.map(c=>`<button class="btn" data-act="cat" data-id="${c.id}">${c.name}</button>`).join(" ")}</div>`);
+anchor = log.firstElementChild; place();
+
+// 챗이 준 링크(/selfcheck/#mon-signal)로 들어오면 그 증상을 바로 편다
+const hid = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+const hit = hid && KB.find(t => t.id === hid);
+if (hit){ bubble("me", hit.title); showTopic(hit); }
+</script>
+
+</body>
+</html>
