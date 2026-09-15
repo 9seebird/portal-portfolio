@@ -12,11 +12,13 @@ import httpx
 log = logging.getLogger("intake.portal")
 
 SERVICE_ID = "intake"
-SERVICE_NAME = "앱 입고 점검"
-SERVICE_DESC = "다른 부서에서 만든 앱을 사내 포털에 붙이기 전에, 회사 표준 규칙에 맞는지 자동으로 확인합니다."
+SERVICE_NAME = "앱 입고"
+SERVICE_DESC = ("다른 부서에서 만든 앱을 올리면 회사 표준 규칙에 맞는지 기계가 먼저 확인하고, "
+                "통과하면 담당자에게 검토 요청이 갑니다. 걸린 항목은 그대로 붙여넣어 고칠 수 있는 "
+                "프롬프트로 만들어 줍니다. 담당자는 원본을 받아 승인·반려합니다.")
 SERVICE_KEYWORDS = (
-    "입고 점검,앱 점검,앱 검토,표준 규칙,규칙 확인,zip 검사,배포 전 점검,"
-    "앱 제출,웍스AI,만든 앱,포털에 붙이기,check-intake"
+    "앱 입고,입고,입고 점검,앱 점검,앱 검토,표준 규칙,규칙 확인,zip 검사,배포 전 점검,"
+    "앱 제출,검토 요청,승인,반려,웍스AI,만든 앱,포털에 붙이기,check-intake"
 )
 
 REGISTER_TRIES = int(os.getenv("REGISTER_TRIES", "10"))
