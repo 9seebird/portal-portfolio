@@ -33,3 +33,8 @@ autodeploy.log
 
 # 체크리스트·ITO 비용처리의 내용과 지난 판 (guide-api 가 쓴다)
 it-guide/data/
+
+# 고치기 전에 남겨 둔 사본과 치워 둔 것. 저장소에 올릴 것이 아니다.
+*.백업
+*.백업_*
+_to_delete/
