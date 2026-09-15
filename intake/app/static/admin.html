@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>앱 입고 · 담당자</title>
+<style>
+:root{--ink:#1a1a1a;--sub:#6b7280;--line:#e5e7eb;--wash:#f7f8fa;
+  --ok:#15803d;--ok-bg:#eaf6ee;--warn:#a16207;--warn-bg:#fdf6e3;--bad:#b91c1c;--bad-bg:#fdecec;--key:#1f4e79}
+*{box-sizing:border-box}
+body{margin:0;background:var(--wash);color:var(--ink);font-family:"맑은 고딕","Malgun Gothic",system-ui,sans-serif;
+  line-height:1.65;word-break:keep-all;font-size:15px}
+.wrap{max-width:1040px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:25px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.lede{color:var(--sub);margin:0 0 22px;font-size:14.5px}
+.tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:13.5px;font-weight:700;padding:8px 16px;border-radius:100px;
+  border:1.5px solid var(--line);background:#fff;color:var(--sub);cursor:pointer}
+.tabs button.on{background:#111827;border-color:#111827;color:#fff}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;vertical-align:top}
+th{background:var(--wash);font-size:12.5px;color:var(--sub);white-space:nowrap}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:#fafbfc}
+.tag{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:100px;white-space:nowrap}
+.t-pass{background:var(--ok-bg);color:var(--ok)}.t-warn{background:var(--warn-bg);color:var(--warn)}
+.t-fail,.t-error{background:var(--bad-bg);color:var(--bad)}
+.t-ok{background:var(--ok-bg);color:var(--ok)}
+.t-bad{background:var(--bad-bg);color:var(--bad)}
+.t-checked{background:#eef2ff;color:#3730a3}.t-requested{background:#e0f2fe;color:#075985}
+.t-approved{background:var(--ok-bg);color:var(--ok)}.t-rejected{background:var(--bad-bg);color:var(--bad)}
+.t-superseded{background:#f1f2f4;color:#6b7280}
+.num{font-family:ui-monospace,Consolas,monospace;text-align:right;white-space:nowrap}
+pre{background:#0f1620;color:#dbe4ee;border-radius:10px;padding:16px 18px;overflow:auto;max-height:420px;
+  font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;margin:0}
+button.act{font:inherit;font-weight:700;font-size:13.5px;padding:9px 18px;border:none;border-radius:100px;
+  background:#111827;color:#fff;cursor:pointer}
+button.act:hover{background:#374151}
+button.act.no{background:#fff;color:var(--bad);border:1.5px solid #f0c9c9}
+button.act.no:hover{border-color:var(--bad)}
+input[type=text]{font:inherit;font-size:14px;padding:9px 12px;border:1.5px solid var(--line);border-radius:8px;flex:1;min-width:200px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:12.5px;color:var(--sub)}
+.empty{color:var(--sub);font-size:13.5px;padding:18px 0}
+.ov{position:fixed;inset:0;background:rgba(15,22,32,.5);display:flex;align-items:center;justify-content:center;
+  padding:20px;z-index:50}
+.ov .box{background:#fff;border-radius:14px;max-width:820px;width:100%;max-height:88vh;overflow:auto;padding:24px 26px}
+.ov h2{font-size:19px;margin:0 0 4px}
+.x{float:right;font-size:22px;color:var(--sub);cursor:pointer;line-height:1;border:0;background:none}
+dl{display:grid;grid-template-columns:100px 1fr;gap:6px 14px;margin:16px 0;font-size:13.5px}
+dt{color:var(--sub);font-weight:700}
+dd{margin:0}
+/* ── 위쪽 길목 ────────────────────────────────────────────────
+   왼쪽은 늘 포털로 돌아가는 길, 오른쪽은 이 앱의 다른 화면.
+   「← 포탈로」 는 포털이 주는 /back.js 가 맡는다 — 포털에서 열린
+   탭이면 포털 탭으로 옮겨 가고 이 탭을 닫는다. 앱마다 포털 탭이
+   하나씩 늘어나지 않게 하려는 것이다. */
+.nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 18px}
+.backportal{display:inline-block;padding:7px 13px;border:1px solid var(--line);border-radius:9px;
+  font-size:13px;text-decoration:none;color:var(--sub);background:#fff}
+.backportal:hover{background:#f3f4f6;color:var(--ink)}
+.togo{display:inline-block;padding:7px 13px;border:1.5px solid var(--line);
+  border-radius:9px;font-size:13px;font-weight:600;text-decoration:none;color:var(--ink);background:#fff}
+.togo:hover{border-color:var(--ink)}
+.togo.hot{border-color:#d92d20;color:#d92d20}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <a class="backportal" href="/">← 포탈로</a>
+    <a class="togo" id="togo" href="#">앱 올리는 화면 →</a>
+  </div>
+  <h1>앱 입고 · 담당자</h1>
+  <p class="lede">다른 팀이 올린 앱을 확인하고 승인합니다. 승인한 것만 깃에 올려 배포하시면 됩니다.</p>
+
+  <div class="tabs">
+    <button data-t="requested" class="on">검토 요청</button>
+    <button data-t="">전체</button>
+    <button data-t="approved">승인됨</button>
+    <button data-t="rejected">반려됨</button>
+    <button data-t="ledger">장부</button>
+  </div>
+
+  <div id="view"><div class="card"><p class="empty">불러오는 중…</p></div></div>
+</div>
+
+<script>
+// 주소는 상대경로로 둔다. 포털이 이 앱을 /intake/ 아래에 두는데
+// "/api/..." 로 부르면 포털 최상위로 가서 404 가 난다. (규칙 3)
+const BASE = location.pathname.replace(/\/(admin)?$/, '');
+// 담당자도 자기 앱을 올린다. 올리는 화면으로 가는 길을 열어 둔다.
+document.getElementById('togo').href = BASE + '/';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+const STATUS = {checked:'검사 완료', requested:'검토 요청', approved:'승인', rejected:'반려', superseded:'다시 올림'};
+const KIND = {intake:'입고', agent_run:'AI 작업', deploy:'배포'};
+let tab = 'requested';
+
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); tab = b.dataset.t; render();
+}));
+
+async function render() {
+  if (tab === 'ledger') return renderLedger();
+  const d = await (await fetch(BASE + '/api/intakes?status=' + encodeURIComponent(tab))).json();
+  if (!d.items.length) {
+    $('#view').innerHTML = '<div class="card"><p class="empty">해당하는 제출물이 없습니다.</p></div>';
+    return;
+  }
+  $('#view').innerHTML = '<div class="card"><table>' +
+    '<tr><th>올린 날</th><th>서비스</th><th>올린 사람</th><th>검사</th><th>상태</th></tr>' +
+    d.items.map(r =>
+      '<tr class="clickable" data-id="' + r.id + '">' +
+      '<td>' + esc(r.ts.slice(0, 16).replace('T', ' ')) + '</td>' +
+      '<td><b>' + esc(r.title || r.service_id) + '</b><br><span class="hint">' + esc(r.service_id) + '</span></td>' +
+      '<td>' + esc(r.actor_name) + '<br><span class="hint">' + esc(r.actor_dept) + '</span></td>' +
+      '<td><span class="tag t-' + r.verdict + '">✓' + r.ok_count + ' △' + r.warn_count + ' ✗' + r.bad_count + '</span></td>' +
+      '<td><span class="tag t-' + r.status + '">' + esc(STATUS[r.status] || r.status) + '</span></td></tr>'
+    ).join('') + '</table></div>';
+  document.querySelectorAll('tr.clickable').forEach(tr =>
+    tr.addEventListener('click', () => openDetail(tr.dataset.id)));
+}
+
+async function renderLedger() {
+  const d = await (await fetch(BASE + '/api/ledger?days=90')).json();
+  const rows = d.by_service.map(r =>
+    '<tr><td><b>' + esc(r.service_id) + '</b></td>' +
+    '<td class="num">' + r.intakes + '</td><td class="num">' + r.agent_runs + '</td>' +
+    '<td class="num">' + r.deploys + '</td>' +
+    '<td class="num">' + (r.tokens || 0).toLocaleString() + '</td>' +
+    '<td class="num">' + (r.cost_krw || 0).toLocaleString() + '</td>' +
+    '<td class="hint">' + esc((r.last_ts || '').slice(0, 16).replace('T', ' ')) + '</td></tr>').join('');
+  const recent = d.recent.map(e =>
+    '<tr><td>' + esc(e.ts.slice(0, 16).replace('T', ' ')) + '</td>' +
+    '<td>' + esc(KIND[e.kind] || e.kind) + '</td>' +
+    '<td>' + esc(e.service_id || '—') + '</td>' +
+    '<td>' + esc(e.summary || '') + '</td>' +
+    '<td>' + esc(e.actor_name || '') + '</td>' +
+    '<td class="num">' + (e.cost_krw ? e.cost_krw.toLocaleString() : '') + '</td></tr>').join('');
+  $('#view').innerHTML =
+    '<div class="card"><h3 style="margin:0 0 4px;font-size:16px">서비스별 (최근 ' + d.days + '일)</h3>' +
+    '<p class="hint" style="margin:0 0 12px">AI 작업을 웹으로 빼면 그 비용도 이 표에 같이 쌓입니다.</p>' +
+    (rows ? '<table><tr><th>서비스</th><th class="num">입고</th><th class="num">AI 작업</th>' +
+      '<th class="num">배포</th><th class="num">토큰</th><th class="num">비용(원)</th><th>마지막</th></tr>' +
+      rows + '</table>' : '<p class="empty">아직 기록이 없습니다.</p>') + '</div>' +
+    '<div class="card"><h3 style="margin:0 0 12px;font-size:16px">최근 이력</h3>' +
+    (recent ? '<table><tr><th>때</th><th>종류</th><th>서비스</th><th>내용</th><th>사람</th><th class="num">비용</th></tr>' +
+      recent + '</table>' : '<p class="empty">아직 기록이 없습니다.</p>') + '</div>';
+}
+
+async function openDetail(id) {
+  const r = await (await fetch(BASE + '/api/intakes/' + id)).json();
+  const done = r.status === 'approved' || r.status === 'rejected';
+  /* 승인 뒤 할 일이 여기서 갈린다.
+       이미 있는 서비스 → 깃에 올려 다시 배포하면 끝
+       새 서비스       → 포털 등록·접근 권한·nginx 설정이 더 붙는다
+     포털을 못 물어봤으면(null) 이 줄을 아예 그리지 않는다. 모르는 것을
+     아는 척하면 담당자가 그걸 믿고 한 단계를 건너뛴다. */
+  const known = r.portal_known;
+  const portalLine = known === null || known === undefined ? '' :
+    (known
+      ? '<dt>포털</dt><dd><span class="tag t-approved">이미 있는 서비스</span> ' +
+        '<span class="hint">' + esc(r.portal_name || r.service_id) +
+        ' — 깃에 올려 다시 배포하시면 됩니다.</span></dd>'
+      : '<dt>포털</dt><dd><span class="tag t-requested">새 서비스</span> ' +
+        '<span class="hint">포털에 <b>' + esc(r.service_id) + '</b> 이(가) 없습니다. ' +
+        '배포할 때 nginx 설정·포털 등록·접근 권한까지 같이 잡으셔야 합니다.</span></dd>');
+  const ov = document.createElement('div');
+  ov.className = 'ov';
+  ov.innerHTML =
+    '<div class="box"><button class="x">&times;</button>' +
+    '<h2>' + esc(r.title || r.service_id) + '</h2>' +
+    '<p class="hint">' + esc(r.service_id) + ' · ' + esc(r.actor_name) + ' (' + esc(r.actor_dept) + ')</p>' +
+    '<dl>' +
+      portalLine +
+      '<dt>올린 날</dt><dd>' + esc(r.ts.replace('T', ' ')) + '</dd>' +
+      '<dt>파일</dt><dd>' + esc(r.zip_name) + ' · ' + Math.round(r.zip_bytes / 1024) + 'KB<br>' +
+        '<span class="hint">sha256 ' + esc((r.zip_sha256 || '').slice(0, 16)) + '…</span></dd>' +
+      '<dt>검사</dt><dd><span class="tag t-' + r.verdict + '">✓' + r.ok_count + ' △' + r.warn_count + ' ✗' + r.bad_count + '</span></dd>' +
+      (r.note ? '<dt>전할 말</dt><dd>' + esc(r.note) + '</dd>' : '') +
+      '<dt>상태</dt><dd><span class="tag t-' + r.status + '">' + esc(STATUS[r.status] || r.status) + '</span>' +
+        (done ? ' <span class="hint">' + esc(r.admin_name || '') + ' · ' + esc((r.decided_at || '').slice(0, 16).replace('T', ' ')) +
+          (r.admin_note ? ' — ' + esc(r.admin_note) : '') + '</span>' : '') + '</dd>' +
+    '</dl>' +
+    '<div class="row"><a class="act" style="text-decoration:none;display:inline-block" ' +
+      'href="' + BASE + '/api/intakes/' + id + '/zip">원본 내려받기</a>' +
+      '<button class="act" style="background:#fff;color:#1a1a1a;border:1.5px solid var(--line)" id="fix">' +
+      '고칠 내용 프롬프트</button></div><div id="fixbox"></div>' +
+    (done ? '' :
+      '<div class="row"><input type="text" id="note" placeholder="남길 말 (반려 사유 등)">' +
+      '<button class="act" id="yes">승인</button><button class="act no" id="no">반려</button></div>') +
+    '<details style="margin-top:18px" open><summary class="hint" style="cursor:pointer;font-weight:700;margin-bottom:10px">검사 내용</summary>' +
+    '<pre>' + esc(r.report) + '</pre></details></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#fix').addEventListener('click', async () => {
+    const d = await (await fetch(BASE + '/api/intakes/' + id + '/fix-prompt')).json();
+    ov.querySelector('#fixbox').innerHTML =
+      '<p class="hint" style="margin:14px 0 8px">반려하실 때 이 내용을 그대로 남기시면, ' +
+      '만든 분이 쓰던 AI 에 붙여넣어 고칠 수 있습니다.</p>' +
+      '<textarea readonly id="fixtext" style="width:100%;min-height:260px;font-family:ui-monospace,Consolas,monospace;' +
+      'font-size:12.5px;line-height:1.7;border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;' +
+      'background:#fbfbfc;resize:vertical"></textarea>';
+    ov.querySelector('#fixtext').value = d.text;
+  });
+  // 닫는 길을 셋 둔다 — ✕, 바깥쪽 누르기, Esc. 상세를 열어 놓고
+  // 나갈 길을 못 찾는 일이 없게 한다.
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onEsc); };
+  function onEsc(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', onEsc);
+  ov.querySelector('.x').addEventListener('click', close);
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  if (!done) {
+    const decide = async decision => {
+      const note = ov.querySelector('#note').value.trim();
+      const res = await fetch(BASE + '/api/intakes/' + id + '/decide', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({decision, note})
+      });
+      if (!res.ok) { alert((await res.json()).detail || '처리하지 못했습니다'); return; }
+      close(); render();
+    };
+    ov.querySelector('#yes').addEventListener('click', () => decide('approved'));
+    ov.querySelector('#no').addEventListener('click', () => decide('rejected'));
+  }
+}
+render();
+</script>
+<!-- 「← 포탈로」 공통 동작. 포털에서 열린 탭이면 포털 탭으로 옮겨 가고
+     이 탭을 닫는다. 포털이 한 벌만 준다 (portal/static/back.js). -->
+<script src="/back.js" defer></script>
+</body>
+</html>

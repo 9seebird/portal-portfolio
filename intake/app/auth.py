@@ -44,3 +44,19 @@ def current_user(request: Request) -> dict:
 
 def require_user(request: Request) -> dict:
     return current_user(request)
+
+
+def require_admin(request: Request) -> dict:
+    """담당자(admin)만 통과. 승인·반려와 남의 제출물 열람에 쓴다.
+
+    포털이 「이 서비스의 담당자로 지정된 사람 + 포털 관리자」에게만
+    X-User-Role: admin 을 붙여 준다. 이 앱은 그 헤더만 읽는다.
+    혼자 돌 때(STANDALONE)는 로그인 자체가 없으므로 담당자 화면도 열어 둔다 —
+    사내망 안의 1인 도구라 나눌 상대가 없다.
+    """
+    user = current_user(request)
+    if _on("STANDALONE"):
+        return {**user, "role": "admin"}
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="담당자(admin) 권한이 필요합니다.")
+    return user

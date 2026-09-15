@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>앱 입고 점검</title>
+<title>앱 입고</title>
 <style>
 :root{--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--bg:#f7f8fa;--paper:#fff;
       --ok:#15803d;--okbg:#eaf6ee;--warn:#a16207;--warnbg:#fdf6e3;--bad:#b91c1c;--badbg:#fdeceb;--brand:#1f4e79}
@@ -57,11 +57,64 @@ pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:8px;overflow:aut
 .sample b{display:block;font-size:15px;margin-bottom:2px}
 .sample span{color:var(--muted);font-size:13px}
 .sample:disabled{opacity:.55;cursor:wait}
+
+/* ── 위쪽 길목 ────────────────────────────────────────────────
+   왼쪽은 늘 포털로 돌아가는 길, 오른쪽은 이 앱의 다른 화면.
+   「← 포탈로」 는 포털이 주는 /back.js 가 맡는다 — 포털에서 열린 탭이면
+   포털 탭으로 옮겨 가고 이 탭을 닫는다. 앱마다 포털 탭이 하나씩
+   늘어나지 않게 하려는 것이다. */
+.nav{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 18px}
+.backportal{display:inline-block;padding:7px 13px;border:1px solid var(--line);border-radius:9px;
+  font-size:13px;text-decoration:none;color:var(--muted);background:var(--paper)}
+.backportal:hover{background:#eef1f5;color:var(--ink)}
+.togo{display:inline-block;padding:7px 13px;border:1.5px solid var(--line);border-radius:9px;
+  font-size:13px;font-weight:700;text-decoration:none;color:var(--ink);background:var(--paper)}
+.togo:hover{border-color:var(--ink)}
+.togo.hot{border-color:#d92d20;color:#d92d20}
+
+/* 제출 칸 (사내판에서만 나온다) */
+label.f{display:block;font-size:13px;font-weight:700;margin:14px 0 5px}
+label.f i{font-style:normal;font-weight:400;color:var(--muted)}
+input.t,textarea.t{width:100%;font:inherit;font-size:14px;padding:9px 12px;border:1.5px solid var(--line);
+  border-radius:9px;background:var(--paper);color:inherit;outline:none}
+input.t:focus,textarea.t:focus{border-color:var(--brand)}
+textarea.t{min-height:64px;resize:vertical}
+.hint{font-size:12.5px;color:var(--muted);margin-top:5px}
+.hint code{background:#eef1f5;padding:1px 5px;border-radius:4px}
+.fixme{color:var(--warn);font-weight:700}
+.fixme button{font:inherit;font-size:12px;font-weight:700;padding:3px 10px;margin-left:6px;
+  border-radius:100px;border:1.5px solid var(--warn);background:var(--paper);color:var(--warn);cursor:pointer}
+.fixme button:hover{background:var(--warn);color:#fff}
+.dupe{color:var(--warn)}
+.freeok{color:var(--ok)}
+input.t.bad{border-color:var(--warn)}
+
+/* 「내가 올린 것」 */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:700;
+   padding:8px 10px;background:#f3f5f8;border-bottom:1px solid var(--line)}
+td{padding:11px 10px;border-bottom:1px solid #f1f3f5;vertical-align:top}
+tr:last-child td{border-bottom:0}
+.tag2{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+.s-checked{background:#eef2ff;color:#3730a3}.s-requested{background:#e0f2fe;color:#075985}
+.s-approved{background:var(--okbg);color:var(--ok)}.s-rejected{background:var(--badbg);color:var(--bad)}
+.s-superseded{background:#f1f2f4;color:#6b7280}
+.empty{color:var(--muted);font-size:13.5px;padding:16px 0}
+.reqrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.ghost{background:var(--paper);color:var(--ink);border:1.5px solid var(--line);font-weight:700}
+.ghost:hover{border-color:var(--ink)}
+textarea.fix{width:100%;min-height:300px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;
+  line-height:1.7;border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;background:#fbfbfc;resize:vertical}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>앱 입고 점검</h1>
+  <div class="nav">
+    <a class="backportal" href="/">← 포탈로</a>
+    <!-- 담당자일 때만 보인다 (paintTogo) -->
+    <a class="togo" id="togo" href="#" hidden>담당자 화면 →</a>
+  </div>
+  <h1>앱 입고</h1>
   <p class="lead" id="lead">불러오는 중…</p>
 
   <div class="card hide" id="samplecard">
@@ -75,10 +128,26 @@ pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:8px;overflow:aut
       <input type="file" id="pick" accept=".zip,application/zip" hidden>
     </div>
     <div class="file hide" id="fileline"></div>
-    <div style="margin-top:14px"><button class="go" id="go" disabled>점검하기</button></div>
+
+    <label class="f" for="sid">서비스 ID</label>
+    <input class="t" id="sid" placeholder="meeting-room" autocomplete="off">
+    <div class="hint" id="sidHint"></div>
+
+    <label class="f" for="title">앱 이름</label>
+    <input class="t" id="title" placeholder="회의실 예약" autocomplete="off">
+
+    <label class="f" for="note">전할 말 <i>(선택)</i></label>
+    <textarea class="t" id="note" placeholder="무엇을 하는 앱인지, 봐 주셨으면 하는 부분이 있는지 적어 주세요."></textarea>
+
+    <div style="margin-top:16px"><button class="go" id="go" disabled>올리고 검사하기</button></div>
   </div>
 
   <div id="out"></div>
+
+  <div class="card" id="minecard">
+    <h2 style="margin:0 0 10px">내가 올린 것</h2>
+    <div id="mine"><p class="empty">아직 올린 것이 없습니다.</p></div>
+  </div>
 </div>
 
 <script>
@@ -89,6 +158,10 @@ let chosen = null;
 // 주소는 상대경로로 둔다. 포털은 이 앱을 /intake/ 아래에 두는데,
 // "/api/check" 로 부르면 포털 최상위로 가서 404 가 난다. (규칙 3)
 const api = (p) => new URL(p, location.href).pathname;
+// ★ api() 는 **경로만** 돌려준다 (물음표 뒤는 날아간다).
+//   질의를 붙일 때는 이쪽을 쓴다. 전에 api("...?mine=1") 로 불렀다가
+//   조건이 조용히 빠진 채로 전부 돌아온 적이 있다.
+const apiq = (p, q) => api(p) + "?" + new URLSearchParams(q).toString();
 
 // 체험판인지 사내판인지 물어보고 화면을 정한다.
 // 화면이 스스로 정하지 않는다 — 서버가 무엇을 받는지가 진실이다.
@@ -112,18 +185,27 @@ const api = (p) => new URL(p, location.href).pathname;
       <b>✗ 가 하나라도 있으면 포털에 붙일 수 없습니다.</b> 고쳐서 다시 올려 보세요.
       이 화면은 파일을 저장하지 않습니다.`;
     $("#uploadcard").classList.remove("hide");
+    $("#sidHint").innerHTML = HINT_BASE;
+    $("#sid").addEventListener("input", () => { paintSid(); askSid(); });
+    $("#sid").addEventListener("blur",  () => { paintSid(); askSid(); });
   }
+  loadMine();
+  paintTogo();
 })();
 
 async function checkSample(btn){
   document.querySelectorAll(".sample").forEach(b => b.disabled = true);
   const old = btn.querySelector("b").textContent;
-  btn.querySelector("b").textContent = "점검 중…";
+  btn.querySelector("b").textContent = "올리는 중…";
   try{
-    const r = await fetch(api("api/check/" + encodeURIComponent(btn.dataset.id)), { method:"POST" });
+    // 체험판도 **같은 주소로 제출한다.** 예시만 다른 길로 들어가면
+    // 「예시에서는 되는데」가 생긴다. 서버가 파일 대신 예시 이름을 받을 뿐이다.
+    const body = new FormData(); body.append("sample_id", btn.dataset.id);
+    const r = await fetch(api("api/intakes"), { method:"POST", body });
     const j = await r.json();
     if(!r.ok) throw new Error(j.detail || "점검에 실패했습니다.");
-    show(render(j));
+    show(render(j)); wireActions();
+    loadMine();
   }catch(e){ show(err(e.message)); }
   btn.querySelector("b").textContent = old;
   document.querySelectorAll(".sample").forEach(b => b.disabled = false);
@@ -151,15 +233,24 @@ function choose(f){
 
 go.onclick = async () => {
   if(!chosen) return;
-  go.disabled = true; go.textContent = "점검 중…";
-  const body = new FormData(); body.append("file", chosen);
+  const why = sidProblem($("#sid").value);
+  if(!$("#sid").value.trim()){ show(err("서비스 ID 를 입력해 주세요.")); $("#sid").focus(); return; }
+  if(why){ paintSid(); show(err(why)); $("#sid").focus(); return; }
+
+  go.disabled = true; go.textContent = "올리고 검사하는 중…";
+  const body = new FormData();
+  body.append("file", chosen);
+  body.append("service_id", $("#sid").value.trim());
+  body.append("title", $("#title").value.trim());
+  body.append("note", $("#note").value.trim());
   try{
-    const r = await fetch(api("api/check"), { method:"POST", body });
+    const r = await fetch(api("api/intakes"), { method:"POST", body });
     const j = await r.json();
     if(!r.ok) throw new Error(j.detail || "점검에 실패했습니다.");
-    show(render(j));
+    show(render(j)); wireActions();
+    loadMine();
   }catch(e){ show(err(e.message)); }
-  go.disabled = false; go.textContent = "점검하기";
+  go.disabled = false; go.textContent = "올리고 검사하기";
 };
 
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -179,6 +270,9 @@ function render(j){
       <div><b>${esc(j.name)} — ${t}</b><p>${d}</p></div>
       <div class="tally">✓ ${k.ok} &nbsp; △ ${k.warn} &nbsp; ✗ ${k.bad}</div>
     </div>`;
+
+  CUR = j;
+  if(j.id) h += actions(j);
 
   // ✗ 와 △ 를 맨 위로 모은다. 고칠 사람이 찾아 헤매지 않게.
   const todo = [];
@@ -211,6 +305,174 @@ function render(j){
 
   h += `<details><summary>점검 원문 보기</summary><pre>${esc(j.raw)}</pre></details>`;
   return h;
+}
+
+/* ── 여기서부터 : 검사 뒤에 이어지는 것 ──────────────────────────
+   검사 결과만 보여 주고 끝내면 만든 사람은 "그래서 이제 뭘 하지" 에서 멈춘다.
+   통과했으면 담당자에게 보내는 버튼을, 걸렸으면 고칠 글을 그 자리에 둔다. */
+let CUR = null;
+
+function actions(j){
+  const can = j.verdict === "ok" || j.verdict === "warn";
+  // 고칠 것이 하나도 없으면 「고칠 내용」 버튼을 안 낸다. 눌러 봐야
+  // "걸렸습니다" 로 시작하는 글이 나와서 방금 본 ✓ 와 어긋난다.
+  const anyTodo = (j.tally.warn + j.tally.bad) > 0;
+  return `<div class="card"><div class="reqrow">` +
+    (can
+      ? `<button class="go" id="req">전산담당에게 검토 요청</button>
+         <span class="hint">요청하면 담당자가 원본을 받아 확인합니다.</span>`
+      : `<span class="hint">✗ 를 먼저 고쳐 주세요. 하나라도 있으면 요청할 수 없습니다.</span>`) +
+    (anyTodo ? `<button class="ghost" id="fix">고칠 내용 프롬프트 만들기</button>` : ``) +
+    `</div><div id="fixbox"></div></div>`;
+}
+
+function wireActions(){
+  const req = $("#req");
+  if(req) req.onclick = async () => {
+    req.disabled = true; req.textContent = "요청하는 중…";
+    try{
+      const r = await fetch(api("api/intakes/" + CUR.id + "/request"), { method:"POST" });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.detail || "요청하지 못했습니다.");
+      req.textContent = "요청했습니다 ✓";
+      resetForm();
+      loadMine();
+      paintTogo();
+    }catch(e){ req.disabled = false; req.textContent = "전산담당에게 검토 요청";
+               $("#fixbox").innerHTML = err(e.message); }
+  };
+  const fix = $("#fix");
+  if(fix) fix.onclick = async () => {
+    fix.disabled = true;
+    try{
+      const j = await (await fetch(api("api/intakes/" + CUR.id + "/fix-prompt"))).json();
+      $("#fixbox").innerHTML =
+        `<p class="hint" style="margin:0 0 8px">쓰시던 AI 에 그대로 붙여넣으시면 됩니다.</p>
+         <textarea class="fix" readonly id="fixtext"></textarea>`;
+      $("#fixtext").value = j.text;
+    }catch(e){ $("#fixbox").innerHTML = err("프롬프트를 만들지 못했습니다."); }
+    fix.disabled = false;
+  };
+}
+
+/* 다음 앱을 이어서 올릴 수 있게 입력칸을 비운다 */
+function resetForm(){
+  chosen = null;
+  const sid = $("#sid"); if(!sid) return;      // 체험판에는 이 칸이 없다
+  sid.value = ""; $("#title").value = ""; $("#note").value = "";
+  $("#pick").value = ""; fileline.classList.add("hide");
+  $("#sidHint").innerHTML = HINT_BASE; sid.classList.remove("bad");
+  go.disabled = true;
+  clearTimeout(sidTimer); sidSeq++;            // 비운 뒤에 옛 답이 날아와 덮지 않게
+}
+
+/* ── 담당자 화면으로 가는 길 ─────────────────────────────────────
+   담당자가 포털 카드를 누르면 이 화면으로 떨어진다. 여기엔 승인 버튼이
+   없어서, 길을 안 열어 두면 할 일을 못 찾고 헤맨다. */
+async function paintTogo(){
+  const a = $("#togo"); if(!a) return;
+  let me = null;
+  try{ me = await (await fetch(api("api/me"))).json(); }catch(e){ return; }
+  if(!me || me.role !== "admin") return;
+  a.href = api("admin"); a.hidden = false;
+  try{
+    const b = await (await fetch(api("api/badge"))).json();
+    if(b && b.count > 0){ a.textContent = "담당자 화면 — " + b.label + " →"; a.classList.add("hot"); }
+    else { a.textContent = "담당자 화면 →"; a.classList.remove("hot"); }
+  }catch(e){}
+}
+
+/* ── 내가 올린 것 ────────────────────────────────────────────── */
+const STATUS = {checked:"검사 완료", requested:"검토 요청함", approved:"승인",
+                rejected:"반려", superseded:"다시 올림"};
+
+async function loadMine(){
+  try{
+    const d = await (await fetch(apiq("api/intakes", {mine: 1}))).json();
+    if(!d.items.length){ $("#mine").innerHTML = `<p class="empty">아직 올린 것이 없습니다.</p>`; return; }
+    $("#mine").innerHTML =
+      `<table><tr><th>올린 날</th><th>서비스</th><th>검사</th><th>상태</th><th></th></tr>` +
+      d.items.map(r =>
+        `<tr><td>${esc(r.ts.slice(0,16).replace("T"," "))}</td>` +
+        `<td><b>${esc(r.title || r.service_id)}</b><br><span class="hint">${esc(r.service_id)}</span></td>` +
+        `<td><span class="tag2 s-checked">✓${r.ok_count} △${r.warn_count} ✗${r.bad_count}</span></td>` +
+        `<td><span class="tag2 s-${r.status}">${esc(STATUS[r.status] || r.status)}</span>` +
+        (r.admin_note ? `<br><span class="hint">${esc(r.admin_note)}</span>` : "") + `</td>` +
+        `<td><a href="${api("api/intakes/" + r.id + "/zip")}">받기</a></td></tr>`
+      ).join("") + `</table>`;
+  }catch(e){}
+}
+
+/* ── 서비스 ID 안내 ──────────────────────────────────────────── */
+const SID_OK = /^[a-z][a-z0-9-]{1,30}$/;
+const HINT_BASE = '영문 소문자로 시작하고 영문·숫자·붙임표만 씁니다. 주소가 됩니다 — <code>/meeting-room/</code>';
+
+function suggestSid(raw){
+  let v = (raw || "").trim().toLowerCase();
+  v = v.replace(/[\s_.]+/g, "-").replace(/[^a-z0-9-]/g, "")
+       .replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "").replace(/^[0-9]+/, "").replace(/^-+/, "");
+  return v.slice(0, 31);
+}
+
+/* 서버와 **같은 판정, 같은 말**이어야 한다. 화면에서는 되는데 올리면
+   안 되는 일이 생기면 그때부터 아무도 화면을 안 믿는다. */
+function sidProblem(raw){
+  const v = (raw || "").trim();
+  if(!v) return "";
+  const fix = suggestSid(v);
+  const tail = (fix && fix !== v.toLowerCase()) ? ` 「${fix}」 로 쓰시면 됩니다.` : "";
+  if(v.includes("_")) return "밑줄(_)은 인터넷 주소에 쓸 수 없습니다. 붙임표(-)로 바꿔 주세요." + tail;
+  if(v.includes(" ")) return "띄어쓰기는 주소에 쓸 수 없습니다. 붙임표(-)로 이어 주세요." + tail;
+  if(/[가-힣]/.test(v)) return "한글은 주소에 쓸 수 없습니다. 영문으로 적어 주세요." + tail;
+  if(v !== v.toLowerCase()) return "대문자는 쓰지 않습니다. 소문자로 적어 주세요." + tail;
+  if(/^[0-9]/.test(v)) return "숫자로 시작할 수 없습니다. 영문자로 시작해 주세요." + tail;
+  if(v.length < 2) return "두 글자 이상이어야 합니다.";
+  if(v.length > 31) return "31글자까지만 쓸 수 있습니다. 더 짧게 줄여 주세요.";
+  if(!SID_OK.test(v)) return "영문 소문자·숫자·붙임표만 씁니다." + tail;
+  return "";
+}
+
+function paintSid(){
+  const el = $("#sid"); if(!el) return;
+  const why = sidProblem(el.value);
+  const hint = $("#sidHint");
+  el.classList.toggle("bad", !!why);
+  if(!why){ hint.innerHTML = HINT_BASE; return; }
+  const fix = suggestSid(el.value);
+  hint.innerHTML = `<span class="fixme">${esc(why)}` +
+    (fix ? ` <button type="button" id="sidFix">「${esc(fix)}」 로 바꾸기</button>` : "") + `</span>`;
+  const b = $("#sidFix");
+  if(b) b.onclick = () => { el.value = fix; paintSid(); askSid(); el.focus(); };
+}
+
+/* 이미 쓰고 있는 주소인가. 글자 모양이 맞을 때만, 손을 멈춘 뒤에 물어본다.
+   **막지 않는다** — 이미 있는 앱을 고쳐 올릴 때는 같은 주소가 정답이다. */
+let sidTimer = null, sidSeq = 0;
+
+function askSid(){
+  clearTimeout(sidTimer);
+  const el = $("#sid"); if(!el) return;
+  const raw = el.value.trim();
+  if(!raw || sidProblem(raw)) return;
+  sidTimer = setTimeout(async () => {
+    const seq = ++sidSeq;
+    try{
+      const d = await (await fetch(apiq("api/service-id/check", {v: raw}))).json();
+      if(seq !== sidSeq || el.value.trim() !== raw) return;
+      const h = $("#sidHint");
+      if(d.kind === "portal"){
+        h.innerHTML = `<span class="dupe">⚠ ${esc(d.reason)}<br>고치신 것을 다시 올리는 거라면 이대로 두세요. <b>새 앱이면 다른 주소를 쓰셔야 합니다.</b></span>`;
+      } else if(d.kind === "pending"){
+        h.innerHTML = `<span class="dupe">⚠ ${esc(d.reason)}<br>같은 앱이면 이대로 두세요. 다른 앱이면 주소를 바꿔 주세요.</span>`;
+      } else if(d.kind === "free"){
+        h.innerHTML = `<span class="freeok">✓ ${esc(d.reason)}</span>`;
+      } else if(d.kind === "unknown"){
+        // 확인이 안 됐으면 확인이 안 됐다고 한다. 「비어 있습니다」 라고
+        // 말해 놓고 나중에 부딪히는 것이 제일 나쁘다.
+        h.innerHTML = `<span class="hint">${esc(d.reason)}</span>`;
+      }
+    }catch(e){}
+  }, 400);
 }
 </script>
 </body>
