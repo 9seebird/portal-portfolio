@@ -310,6 +310,17 @@
   /* 별과 글자가 겹치지 않게 오른쪽을 비워 둔다 */
   .card .n, .appitem .n{padding-right:44px}
 
+  /* ── 앱 배지 ──────────────────────────────────────────────
+     "그 앱에서 나를 기다리는 것이 몇 개인가". 앱 이름 옆에 붙는다.
+     앱이 스스로 /api/badge 로 숫자를 내놓을 때만 나온다(loadBadges 참고).
+     별·숨기기 버튼과 자리를 다투지 않게 이름줄 안에 흐른다. */
+  .bdg{
+    display:inline-block;margin-left:6px;padding:0 6px;min-width:16px;
+    border-radius:9px;background:#d92d20;color:#fff;
+    font-size:10.5px;font-weight:700;line-height:17px;text-align:center;
+    vertical-align:1px;
+  }
+
   .turn{margin-bottom:26px}
   .turn.user{display:flex;justify-content:flex-end}
   /* 말풍선과 첨부 표시를 세로로 쌓는다. 한 줄에 나란히 두면 파일 이름이
@@ -695,6 +706,11 @@ const H = { Authorization: "Bearer " + TOKEN };
 
 const SKEY = "portal.session";
 let SESSION = sessionRestore(), APPS = [], busy = false, started = false;
+
+/* 앱이 스스로 알려 준 "기다리는 일" 개수. {앱id: {count, label}} */
+let BADGES = {};
+let BADGE_AT = 0;                 // 마지막으로 물어본 때 (ms)
+const BADGE_GAP = 60 * 1000;      // 이 간격 안에는 다시 묻지 않는다
 let IS_ADMIN = false;
 let IS_DEMO  = false;
 
@@ -852,6 +868,89 @@ function newId(){ return "s-" + Date.now().toString(36) + Math.random().toString
 function el(t,c,x){ const e=document.createElement(t); if(c)e.className=c; if(x!=null)e.textContent=x; return e; }
 function toBottom(){ scroll.scrollTop = scroll.scrollHeight; }
 
+/* ── 앱 배지 ───────────────────────────────────────────────────
+   포털은 앱이 무슨 일을 하는지 모른다. 그래서 "몇 건 밀려 있는가" 를
+   포털이 셀 수는 없다. 대신 **앱에게 물어본다.**
+
+   앱이 지켜야 할 것은 이것 하나뿐이다:
+
+       GET  <앱주소>api/badge
+       200  {"count": 2, "label": "검토 요청 2건"}   ← 배지 붙음
+       200  {"count": 0, "label": ""}                ← 배지 없음
+       그 밖의 응답·실패                              ← 조용히 넘어감
+
+   포털은 count 만 보고 숫자를 띄우고, label 은 마우스를 올렸을 때 나온다.
+   배지를 낼 생각이 없는 앱은 아무것도 안 만들면 된다 — 404 가 오면 여기서
+   그냥 버린다. 그래서 이 기능 때문에 기존 앱을 고칠 일은 없다.
+
+   로그인은 앱 쪽도 포털이 앞단에서 처리하므로, 같은 쿠키로 부르면
+   그 앱이 "이 사람에게 몇 건" 인지를 알아서 판단해 준다. */
+function badgeUrl(app){
+  const u = (app.url || "").trim();
+  /* 같은 사이트 안의 앱만 물어본다. 바깥 주소는 쿠키도 안 가고
+     남의 서버에 대고 두드릴 일도 아니다. */
+  if(!u || u[0] !== "/") return "";
+  return (u.endsWith("/") ? u : u + "/") + "api/badge";
+}
+
+async function askBadge(app){
+  const url = badgeUrl(app);
+  if(!url) return null;
+  /* 앱 하나가 느리다고 첫 화면이 기다리면 안 된다. 2.5초에 끊는다. */
+  const ac = new AbortController();
+  const t = setTimeout(()=>ac.abort(), 2500);
+  try{
+    const r = await fetch(url, { signal: ac.signal, credentials: "same-origin" });
+    if(!r.ok) return null;
+    /* 주소를 못 찾은 앱이 404 대신 첫 화면 HTML 을 돌려주는 경우가 있다.
+       JSON 이 아니면 배지가 아니다. */
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+    if(ct.indexOf("application/json") < 0) return null;
+    const j = await r.json();
+    const n = parseInt(j && j.count, 10);
+    if(!(n > 0)) return null;
+    return { count: n, label: (j.label || "") };
+  }catch(e){ return null; }
+  finally{ clearTimeout(t); }
+}
+
+/* 앱 전체에 한 번씩 물어보고, 하나라도 달라졌으면 화면을 다시 그린다.
+   화면을 먼저 띄우고 배지는 뒤따라 붙는다 — 배지 때문에 첫 화면이
+   늦게 뜨는 것이 제일 나쁘다. */
+async function loadBadges(force){
+  const now = Date.now();
+  if(!force && now - BADGE_AT < BADGE_GAP) return;
+  BADGE_AT = now;
+  if(!APPS.length) return;
+
+  const got = {};
+  await Promise.all(APPS.map(async a => {
+    const b = await askBadge(a);
+    if(b) got[a.id] = b;
+  }));
+
+  if(JSON.stringify(got) === JSON.stringify(BADGES)) return;   // 달라진 게 없다
+  BADGES = got;
+  const ha = document.querySelector(".heroapps");
+  if(ha) ha.replaceWith(heroApps());
+  if(pop.classList.contains("open")) renderApps(document.getElementById("appq").value);
+}
+
+/* 이름줄 뒤에 붙일 알약. 배지가 없으면 아무것도 안 만든다. */
+function badgeTag(app){
+  const b = BADGES[app.id];
+  if(!b) return null;
+  const s = el("span","bdg", b.count > 99 ? "99+" : String(b.count));
+  s.title = b.label || (b.count + "건");
+  return s;
+}
+
+/* 다른 탭에서 일을 처리하고 돌아왔을 때 숫자가 그대로면 안 된다.
+   창이 다시 앞으로 나올 때 한 번 더 물어본다(위의 간격 제한은 지킨다). */
+document.addEventListener("visibilitychange", ()=>{
+  if(!document.hidden) loadBadges(false);
+});
+
 /* ── 앱 런처 ── */
 function renderApps(filter){
   const box = document.getElementById("applist");
@@ -865,7 +964,9 @@ function renderApps(filter){
     it.className="appitem" + (isFav(a.id) ? " pinned" : "")
                           + (isHidden(a.id) ? " dim" : "");
     it.href=a.url; it.target="_blank"; it.rel="opener";
-    it.appendChild(el("div","n",a.name));
+    const inn = el("div","n",a.name);
+    const ib = badgeTag(a); if(ib) inn.appendChild(ib);
+    it.appendChild(inn);
     it.appendChild(el("div","d",a.desc));
     it.appendChild(favStar(a, () => renderApps(filter)));
     /* 여기서 숨겨도 목록에서는 사라지지 않는다. 런처는 모든 앱으로 가는
@@ -999,7 +1100,9 @@ function heroApps(){
       card.className="card" + (isFav(a.id) ? " pinned" : "")
                             + (isHidden(a.id) ? " dim" : "");
       card.href=a.url; card.target="_blank"; card.rel="opener";
-      card.appendChild(el("div","n",a.name));
+      const cn = el("div","n",a.name);
+      const cb = badgeTag(a); if(cb) cn.appendChild(cb);
+      card.appendChild(cn);
       card.appendChild(el("div","d",a.desc));
       // 고정을 바꾸면 순서가 달라진다. 그 자리에서 다시 그린다.
       card.appendChild(favStar(a, () => { list = ranked(AS); draw(f); }));
@@ -1576,6 +1679,7 @@ async function loadMe(){
     document.getElementById("adminlink").style.display = IS_ADMIN ? "flex" : "none";
     renderHero();
     reveal();                       // 여기까지 왔으면 보여줘도 되는 화면이다
+    loadBadges(true);               // 배지는 화면을 띄운 뒤에 뒤따라 붙는다
   }catch(e){
     document.getElementById("nm").textContent = "인증 실패";
     document.getElementById("rl").textContent = "TOKEN 확인";

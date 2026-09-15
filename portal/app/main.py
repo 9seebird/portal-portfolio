@@ -396,6 +396,27 @@ def service_register(req: ServiceRegister, x_service_token: str = Header(default
     return {"registered": True, "updated": False}
 
 
+@app.get("/api/services/ids")
+def service_ids(x_service_token: str = Header(default="")):
+    """이미 쓰고 있는 서비스 ID 목록. 옆 서비스가 중복을 미리 걸러내는 데 쓴다.
+
+    앱 입고(intake)가 이것을 본다. 앱을 올릴 때 서비스 ID 를 적게 하는데,
+    이미 있는 주소를 새 앱이 가져가면 나중에 nginx 에서 둘이 부딪힌다.
+    화면에서 미리 알려 주려면 "지금 뭐가 있는지" 를 알아야 한다.
+
+    **id 와 이름만 준다.** 접근 범위·담당자·켜짐 여부는 권한이 걸린
+    정보라 여기로 내보내지 않는다. 그건 /api/admin/services 가 관리자에게만
+    준다. 사람 쿠키가 아니라 서비스 사이의 공유 토큰으로 확인한다.
+    """
+    expected = os.environ.get("AUDIT_TOKEN", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="AUDIT_TOKEN 이 설정되지 않았습니다.")
+    if not secrets.compare_digest(x_service_token, expected):
+        raise HTTPException(status_code=403, detail="서비스 토큰이 올바르지 않습니다.")
+    return {"items": [{"id": s["id"], "name": s.get("name") or ""}
+                      for s in services.all_services(include_disabled=True)]}
+
+
 @app.post("/api/admin/services/examples")
 def service_examples(me: User = Depends(admin_user)):
     """예시 서비스 넣기. 처음 화면이 비어 있을 때 형태를 보려는 용도."""
