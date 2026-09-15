@@ -987,9 +987,21 @@ document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
 async function api(url, opt){
   const r = await fetch(url, { headers:H, ...opt });
   if(r.status===401){ localStorage.removeItem(KEY); location.replace("/login"); return null; }
-  if(r.status===403){ document.body.innerHTML =
-    '<div style="padding:70px;text-align:center;color:#5f6470">관리자 권한이 필요합니다. '
-    +'<a href="/">포탈로</a></div>'; reveal(); return null; }
+  if(r.status===403){
+    /* 403 이 두 가지 뜻으로 온다.
+         ① 관리자가 아니다            → 화면을 보여 줄 이유가 없다
+         ② 체험판이라 저장을 막았다    → 화면은 그대로 두고 이유만 알려야 한다
+       전에는 둘을 안 가르고 무조건 「관리자 권한이 필요합니다」 로 덮어썼다.
+       그래서 체험판에서 서비스를 켜려다 막히면, 관리자로 로그인해 있는데도
+       권한이 없다는 말이 뜨고 화면까지 통째로 사라졌다. 원인을 짐작할 수 없다. */
+    const j = await readBody(r);
+    const msg = (j && j.detail) || "관리자 권한이 필요합니다.";
+    const writing = !!(opt && opt.method && opt.method.toUpperCase() !== "GET");
+    if(writing){ toast(msg.split("\n")[0], true); reveal(); return null; }
+    document.body.innerHTML =
+      '<div style="padding:70px;text-align:center;color:#5f6470;white-space:pre-line">'
+      + msg.replace(/</g,"&lt;") + '\n\n<a href="/">포탈로</a></div>';
+    reveal(); return null; }
   // 서버가 제대로 답했다 = 로그인도 됐고 관리자도 맞다. 이제 보여준다.
   reveal();
   const j = await readBody(r);
