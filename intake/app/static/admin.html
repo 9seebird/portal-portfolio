@@ -64,6 +64,9 @@ dd{margin:0}
   border-radius:9px;font-size:13px;font-weight:600;text-decoration:none;color:var(--ink);background:#fff}
 .togo:hover{border-color:var(--ink)}
 .togo.hot{border-color:#d92d20;color:#d92d20}
+.warnbox{background:#fdf6e3;color:#a16207;border-radius:9px;padding:9px 13px;font-size:13px;margin:0 0 8px}
+dd.note{white-space:pre-line}
+code{background:#eef1f5;padding:1px 5px;border-radius:4px;font-size:12.5px}
 </style>
 </head>
 <body>
@@ -151,6 +154,69 @@ async function renderLedger() {
       recent + '</table>' : '<p class="empty">아직 기록이 없습니다.</p>') + '</div>';
 }
 
+/* ── 무엇이 바뀌었나 ─────────────────────────────────────────────
+   담당자에게 patch 를 던지고 「읽어 보세요」 하면 아무도 안 읽는다.
+   기계가 센 것과 눈여겨볼 것을 먼저 보여 주고, 사람 말 요약은 눌러서 만든다
+   (AI 를 부르는 일이라 열 때마다 자동으로 부르지 않는다). */
+async function paintChanges(ov, id, row) {
+  const slot = ov.querySelector('#chg');
+  let c;
+  try { c = await (await fetch(BASE + '/api/intakes/' + id + '/changes')).json(); }
+  catch (e) { return; }
+  if (!c.available) {
+    slot.innerHTML = '<p class="hint" style="margin-top:16px">무엇이 바뀌었나 — ' +
+      esc(c.why || '견줄 것이 없습니다.') + '</p>';
+    return;
+  }
+  const n = (c.files || []).length;
+  let h = '<h3 style="font-size:14px;margin:22px 0 8px">무엇이 바뀌었나</h3>' +
+    '<p class="hint" style="margin:0 0 10px">고친 파일 <b>' + n + '</b>개 · 늘어난 줄 <b>+' +
+      (c.added_lines || 0) + '</b> · 지운 줄 <b>-' + (c.deleted_lines || 0) + '</b>' +
+      ((c.removed || []).length ? ' · zip 에 없는 파일 <b>' + c.removed.length + '</b>개' : '') + '</p>';
+  (c.risks || []).forEach(x => {
+    h += '<p class="warnbox">⚠ <b>' + esc(x.title) + '</b> ' + esc(x.detail || '') + '</p>';
+  });
+  if (n) {
+    h += '<details><summary class="hint" style="cursor:pointer">파일별로 보기</summary>' +
+      '<p class="hint" style="margin:8px 0 0;line-height:2">' + c.files.map(f =>
+        esc(f.path) + ' <b>+' + f.add + '</b>/<b>-' + f.del + '</b>' + (f.new ? ' (새 파일)' : '')
+      ).join('<br>') + '</p></details>';
+  }
+  h += '<div class="row"><a class="act" style="text-decoration:none;display:inline-block" href="' +
+    BASE + '/api/intakes/' + id + '/diff?download=1">반영 파일(.patch) 받기</a>' +
+    '<button class="act" style="background:#fff;color:#1a1a1a;border:1.5px solid var(--line)" id="mksum">' +
+    '사람 말로 요약 만들기 (AI)</button></div><div id="sumslot"></div>' +
+    '<p class="hint" style="margin:10px 0 0">받은 파일을 저장소 뿌리에 두고 <code>git apply ' +
+    esc(row.service_id) + '-' + id + '.patch</code> → 커밋 → <code>./deploy.sh ' +
+    esc(c.folder || row.service_id) + '</code> 하시면 반영됩니다. zip 을 통째로 덮어쓰지 않아서 ' +
+    '그 사이 남이 고친 것이 사라지지 않습니다.</p>';
+  slot.innerHTML = h;
+  if (c.summary) paintSummary(ov, c.summary);
+  const b = ov.querySelector('#mksum');
+  if (b) b.addEventListener('click', async () => {
+    b.disabled = true; b.textContent = '요약하는 중…';
+    try {
+      const res = await fetch(BASE + '/api/intakes/' + id + '/changes/summary', {method: 'POST'});
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.detail || '요약하지 못했습니다.');
+      paintSummary(ov, d);
+      b.textContent = '요약했습니다 ✓';
+    } catch (e) {
+      ov.querySelector('#sumslot').innerHTML = '<p class="hint" style="color:#b91c1c">' + esc(e.message) + '</p>';
+      b.disabled = false; b.textContent = '사람 말로 요약 만들기 (AI)';
+    }
+  });
+}
+
+function paintSummary(ov, s) {
+  const rows = [['추가된 것', s.added], ['바뀐 것', s.changed], ['빠진 것', s.gone], ['봐야 할 것', s.watch]]
+    .filter(x => (x[1] || '').trim());
+  ov.querySelector('#sumslot').innerHTML = rows.length
+    ? '<dl style="margin-top:14px">' + rows.map(x =>
+        '<dt>' + x[0] + '</dt><dd class="note">' + esc(x[1]) + '</dd>').join('') + '</dl>'
+    : '<p class="hint">요약할 것이 없습니다.</p>';
+}
+
 async function openDetail(id) {
   const r = await (await fetch(BASE + '/api/intakes/' + id)).json();
   const done = r.status === 'approved' || r.status === 'rejected';
@@ -176,7 +242,8 @@ async function openDetail(id) {
     '<p class="hint">' + esc(r.service_id) + ' · ' + esc(r.actor_name) + ' (' + esc(r.actor_dept) + ')</p>' +
     '<dl>' +
       portalLine +
-      '<dt>올린 날</dt><dd>' + esc(r.ts.replace('T', ' ')) + '</dd>' +
+      '<dt>등록일</dt><dd>' + esc(r.ts.replace('T', ' ')) +
+        (r.kind === 'edit' ? ' <span class="tag t-requested">기존 서비스 고침</span>' : '') + '</dd>' +
       '<dt>파일</dt><dd>' + esc(r.zip_name) + ' · ' + Math.round(r.zip_bytes / 1024) + 'KB<br>' +
         '<span class="hint">sha256 ' + esc((r.zip_sha256 || '').slice(0, 16)) + '…</span></dd>' +
       '<dt>검사</dt><dd><span class="tag t-' + r.verdict + '">✓' + r.ok_count + ' △' + r.warn_count + ' ✗' + r.bad_count + '</span></dd>' +
@@ -189,12 +256,14 @@ async function openDetail(id) {
       'href="' + BASE + '/api/intakes/' + id + '/zip">원본 내려받기</a>' +
       '<button class="act" style="background:#fff;color:#1a1a1a;border:1.5px solid var(--line)" id="fix">' +
       '고칠 내용 프롬프트</button></div><div id="fixbox"></div>' +
+    '<div id="chg"></div>' +
     (done ? '' :
       '<div class="row"><input type="text" id="note" placeholder="남길 말 (반려 사유 등)">' +
       '<button class="act" id="yes">승인</button><button class="act no" id="no">반려</button></div>') +
     '<details style="margin-top:18px" open><summary class="hint" style="cursor:pointer;font-weight:700;margin-bottom:10px">검사 내용</summary>' +
     '<pre>' + esc(r.report) + '</pre></details></div>';
   document.body.appendChild(ov);
+  paintChanges(ov, id, r);
   ov.querySelector('#fix').addEventListener('click', async () => {
     const d = await (await fetch(BASE + '/api/intakes/' + id + '/fix-prompt')).json();
     ov.querySelector('#fixbox').innerHTML =

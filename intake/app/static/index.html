@@ -105,6 +105,28 @@ tr:last-child td{border-bottom:0}
 .ghost:hover{border-color:var(--ink)}
 textarea.fix{width:100%;min-height:300px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;
   line-height:1.7;border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;background:#fbfbfc;resize:vertical}
+
+/* ── 위쪽 탭 (한 번에 한 칸만 보인다) ──────────────────────────
+   두 칸을 나란히 두면 화면이 좁아지고 무엇을 하는 곳인지 흐려진다. */
+.seg{display:inline-flex;background:#eef1f5;border-radius:10px;padding:3px;margin:0 0 16px}
+.seg button{background:transparent;color:var(--muted);font-weight:700;font-size:13.5px;padding:8px 16px;border-radius:8px}
+.seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.mini{font-size:12.5px;padding:7px 13px;border-radius:100px}
+select.t{appearance:none;background:var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.6'/></svg>") no-repeat right 12px center}
+.need{color:var(--bad);font-weight:700}
+
+/* AI 가 쓴 요약 · 무엇이 바뀌었나 */
+.aisum{white-space:pre-line;color:var(--ink);background:#fbfaf6;border:1px solid #ece7d9;
+  border-radius:10px;padding:14px 16px;font-size:14px;margin:0}
+.chg{display:flex;gap:18px;flex-wrap:wrap;font-size:13.5px;color:var(--muted);margin:0 0 10px}
+.chg b{color:var(--ink)}
+.risk{background:var(--warnbg);color:var(--warn);border-radius:9px;padding:10px 14px;
+  font-size:13.5px;margin:0 0 8px}
+.risk b{display:block}
+.pv{background:#f4f8fc;border:1px solid #d9e6f2;border-radius:10px;padding:14px 16px;font-size:13.5px}
+.pv b{display:block;margin-bottom:6px}
+.pv li{display:list-item;border:0;padding:2px 0 2px 2px;font-size:13.5px;margin-left:16px;list-style:disc}
+.cost{font-size:12.5px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -117,6 +139,12 @@ textarea.fix{width:100%;min-height:300px;font-family:ui-monospace,Consolas,monos
   <h1>앱 입고</h1>
   <p class="lead" id="lead">불러오는 중…</p>
 
+  <div class="seg hide" id="tabs">
+    <button class="on" data-pane="new">앱 올리기 · 검사</button>
+    <button data-pane="edit">기존 서비스 고치기</button>
+  </div>
+
+  <div id="paneNew">
   <div class="card hide" id="samplecard">
     <div id="samples"></div>
   </div>
@@ -143,6 +171,30 @@ textarea.fix{width:100%;min-height:300px;font-family:ui-monospace,Consolas,monos
   </div>
 
   <div id="out"></div>
+  </div><!-- /paneNew -->
+
+  <!-- 이미 포털에서 돌고 있는 서비스를 요청 한 줄로 고쳐 본다.
+       고친 것은 **제출물**로 남을 뿐이다. 저장소에 쓰거나 배포하지 않는다. -->
+  <div class="card hide" id="paneEdit">
+    <p class="hint" id="eLead" style="margin-top:0"></p>
+
+    <label class="f" for="svc">고칠 서비스</label>
+    <select class="t" id="svc"></select>
+
+    <div class="reqrow" style="margin:12px 0 0">
+      <button class="ghost mini" id="svcDl">지금 코드 내려받기</button>
+      <span class="hint" id="svcDlMsg">쓰시던 AI 도구로 직접 고치실 때 받아 가세요. 비밀값(.env)은 빼고 담습니다.</span>
+    </div>
+
+    <label class="f" for="ask">무엇을 고칠까요 <i>(한두 줄로)</i></label>
+    <textarea class="t" id="ask" placeholder="예) 목록 맨 위에 「이번 달 합계」 한 줄을 넣어 주세요."></textarea>
+
+    <div class="reqrow" style="margin-top:14px">
+      <button class="go" id="eGo">AI 에게 고치게 하기</button>
+      <span class="hint" id="eLimit"></span>
+    </div>
+    <div id="eout"></div>
+  </div>
 
   <div class="card" id="minecard">
     <h2 style="margin:0 0 10px">내가 올린 것</h2>
@@ -191,7 +243,22 @@ const apiq = (p, q) => api(p) + "?" + new URLSearchParams(q).toString();
   }
   loadMine();
   paintTogo();
+  wireTabs();
+  wireEdit();
+  loadAi();
 })();
+
+/* ── 탭 ──────────────────────────────────────────────────────── */
+function wireTabs(){
+  $("#tabs").classList.remove("hide");
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+    const edit = b.dataset.pane === "edit";
+    $("#paneNew").classList.toggle("hide", edit);
+    $("#paneEdit").classList.toggle("hide", !edit);
+    if(edit && !SVCS) loadServices();
+  });
+}
 
 async function checkSample(btn){
   document.querySelectorAll(".sample").forEach(b => b.disabled = true);
@@ -322,6 +389,10 @@ function actions(j){
       ? `<button class="go" id="req">전산담당에게 검토 요청</button>
          <span class="hint">요청하면 담당자가 원본을 받아 확인합니다.</span>`
       : `<span class="hint">✗ 를 먼저 고쳐 주세요. 하나라도 있으면 요청할 수 없습니다.</span>`) +
+    (j.verdict === "bad" && AI.enabled
+      ? `<button class="go" id="aifix">AI 가 고치기</button>` +
+        (AI.limit ? `<span class="hint">오늘 ${AI.limit.left}번 남았습니다</span>` : ``)
+      : ``) +
     (anyTodo ? `<button class="ghost" id="fix">고칠 내용 프롬프트 만들기</button>` : ``) +
     `</div><div id="fixbox"></div></div>`;
 }
@@ -341,6 +412,8 @@ function wireActions(){
     }catch(e){ req.disabled = false; req.textContent = "전산담당에게 검토 요청";
                $("#fixbox").innerHTML = err(e.message); }
   };
+  const af = $("#aifix");
+  if(af) af.onclick = () => runFix(af);
   const fix = $("#fix");
   if(fix) fix.onclick = async () => {
     fix.disabled = true;
@@ -391,16 +464,267 @@ async function loadMine(){
     const d = await (await fetch(apiq("api/intakes", {mine: 1}))).json();
     if(!d.items.length){ $("#mine").innerHTML = `<p class="empty">아직 올린 것이 없습니다.</p>`; return; }
     $("#mine").innerHTML =
-      `<table><tr><th>올린 날</th><th>서비스</th><th>검사</th><th>상태</th><th></th></tr>` +
+      `<table><tr><th>등록일</th><th>서비스</th><th>검사</th><th>상태</th><th></th></tr>` +
       d.items.map(r =>
         `<tr><td>${esc(r.ts.slice(0,16).replace("T"," "))}</td>` +
-        `<td><b>${esc(r.title || r.service_id)}</b><br><span class="hint">${esc(r.service_id)}</span></td>` +
+        `<td><b>${esc(r.title || r.service_id)}</b>` +
+        (r.kind === "edit" ? ` <span class="tag2 s-checked">기존 서비스 고침</span>` : ``) +
+        `<br><span class="hint">${esc(r.service_id)}</span></td>` +
         `<td><span class="tag2 s-checked">✓${r.ok_count} △${r.warn_count} ✗${r.bad_count}</span></td>` +
         `<td><span class="tag2 s-${r.status}">${esc(STATUS[r.status] || r.status)}</span>` +
         (r.admin_note ? `<br><span class="hint">${esc(r.admin_note)}</span>` : "") + `</td>` +
         `<td><a href="${api("api/intakes/" + r.id + "/zip")}">받기</a></td></tr>`
       ).join("") + `</table>`;
   }catch(e){}
+}
+
+/* ── AI 를 쓸 수 있나 ────────────────────────────────────────────
+   키가 없으면 버튼을 아예 안 낸다. 눌러 보고 "꺼져 있습니다" 를 읽게 하지 않는다. */
+let AI = {enabled:false, limit:null};
+
+async function loadAi(){
+  try{ AI = await (await fetch(api("api/ai"))).json(); }catch(e){}
+  ELIMIT = AI.limit || ELIMIT;
+}
+
+/* ── 걸린 앱을 AI 가 고치기 ─────────────────────────────────────
+   ✗ 가 있는 제출물을 AI 가 고쳐서 **새 제출물**로 남긴다. 원본은 그대로 둔다 —
+   AI 가 더 망쳐 놓았을 때 돌아갈 자리가 있어야 한다. */
+async function runFix(btn){
+  btn.disabled = true; btn.textContent = "AI 가 고치는 중… (1~3분)";
+  $("#fixbox").innerHTML = `<p class="hint">걸린 항목을 보고 파일을 고친 뒤, 고친 것을 다시 검사합니다.</p>`;
+  try{
+    const r = await fetch(api("api/intakes/" + CUR.id + "/ai-fix"), {method:"POST"});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || "고치지 못했습니다.");
+    j.title = CUR.name || "";
+    $("#fixbox").innerHTML = editResult(j);
+    wireEditResult(j);
+    loadMine();
+    try{ const d = await (await fetch(api("api/ai"))).json(); AI = d; ELIMIT = d.limit || ELIMIT; }catch(e){}
+    paintChanges(j.id);
+    paintPreview();
+  }catch(e){
+    $("#fixbox").innerHTML = err(e.message);
+    btn.disabled = false; btn.textContent = "AI 가 고치기";
+  }
+}
+
+/* ── 기존 서비스 고치기 ──────────────────────────────────────────
+   「내려받아서 내가 고치기」와 「요청 한 줄로 AI 가 고치기」 둘 다 둔다.
+   어느 쪽이든 나오는 것은 같다 — 제출물 하나 + 반영 파일(.patch) 하나.
+   저장소에 쓰거나 배포하는 길은 여기 없다. 승인 뒤에 사람이 한다. */
+let SVCS = null, ELIMIT = null;
+
+async function loadServices(){
+  const sel = $("#svc");
+  sel.innerHTML = `<option value="">불러오는 중…</option>`;
+  let d;
+  try{ d = await (await fetch(api("api/services"))).json(); }
+  catch(e){ sel.innerHTML = `<option value="">불러오지 못했습니다</option>`; return; }
+  SVCS = d.items || [];
+  ELIMIT = d.limit || null;
+  $("#eLead").innerHTML = ELIMIT
+    ? `포털에서 <b>지금 돌고 있는 서비스</b>를 요청 한 줄로 고쳐 봅니다.
+       AI 를 실제로 부릅니다 — 그래서 <b>하루 ${ELIMIT.daily}번</b>까지만 열어 둡니다.
+       고친 것은 검사를 다시 받고 제출물로 남을 뿐, 이 자리에서 배포되지는 않습니다.`
+    : `포털에서 지금 돌고 있는 서비스를 요청 한 줄로 고칩니다. 고친 것은 검사를 다시 받고
+       담당자 승인을 기다립니다. 이 자리에서 깃에 올리거나 배포하지 않습니다.`;
+  paintLimit();
+  if(!d.enabled){
+    // 키가 없으면 「내려받아서 직접 고치기」는 그대로 두고 AI 만 잠근다.
+    $("#eGo").disabled = true;
+    $("#eLimit").innerHTML = `<span class="need">지금은 AI 수정이 꺼져 있습니다.</span>
+      아래 [지금 코드 내려받기] 로 받아서 쓰시던 AI 로 고치실 수 있습니다.`;
+  }
+  if(!SVCS.length){
+    sel.innerHTML = `<option value="">고칠 수 있는 서비스가 없습니다</option>`;
+    $("#eout").innerHTML = `<p class="hint" style="margin-top:14px">` +
+      (!d.portal_ok ? `포털에 물어보지 못했습니다. 포털을 통해 들어와 주세요.`
+       : !d.repo_ok ? `코드를 읽을 수 없습니다 (저장소가 붙어 있지 않습니다).`
+       : `아직 등록된 서비스가 없습니다.`) + `</p>`;
+    $("#eGo").disabled = true;
+    return;
+  }
+  sel.innerHTML = `<option value="">— 고를 서비스 —</option>` +
+    SVCS.map(x => `<option value="${esc(x.id)}">${esc(x.title)}${
+      x.shared ? " (한 폴더를 여러 화면이 같이 씁니다)" : ""}</option>`).join("");
+}
+
+function paintLimit(){
+  if(!ELIMIT) return;
+  $("#eLimit").innerHTML = ELIMIT.left > 0
+    ? `오늘 ${ELIMIT.left}번 남았습니다 (하루 ${ELIMIT.daily}번)`
+    : `<span class="need">오늘 몫을 다 썼습니다. 내일 다시 열립니다.</span>`;
+  $("#eGo").disabled = ELIMIT.left <= 0;
+}
+
+/* 지금 코드 내려받기 — 고를 것을 안 고르고 누르면 옆에 빨간 글씨로 알린다 */
+function wireEdit(){
+  $("#svcDl").onclick = () => {
+    const id = $("#svc").value;
+    const msg = $("#svcDlMsg");
+    if(!id){
+      msg.innerHTML = `<span class="need">먼저 고칠 서비스를 골라 주세요.</span>`;
+      $("#svc").focus();
+      return;
+    }
+    msg.innerHTML = `받는 중입니다… 비밀값(.env)과 운영 자료(data/)는 빼고 담습니다.`;
+    location.href = api("api/services/" + id + "/source");
+  };
+  $("#svc").onchange = () => {
+    $("#svcDlMsg").innerHTML = `쓰시던 AI 도구로 직접 고치실 때 받아 가세요. 비밀값(.env)은 빼고 담습니다.`;
+  };
+  $("#eGo").onclick = runEdit;
+}
+
+async function runEdit(){
+  const id = $("#svc").value, ask = $("#ask").value.trim(), btn = $("#eGo");
+  if(!id){ $("#svcDlMsg").innerHTML = `<span class="need">먼저 고칠 서비스를 골라 주세요.</span>`; return; }
+  if(ask.length < 5){ $("#eout").innerHTML = err("무엇을 고칠지 한 줄로 적어 주세요."); return; }
+  btn.disabled = true; btn.textContent = "AI 가 고치는 중… (1~3분)";
+  $("#eout").innerHTML = `<p class="hint" style="margin-top:14px">코드를 읽고, 바꿀 곳을 찾아 고치고,
+    고친 것을 다시 검사합니다. 창을 닫지 말고 기다려 주세요.</p>`;
+  try{
+    const r = await fetch(api("api/services/" + id + "/ai-edit"),
+      {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({request: ask})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || "고치지 못했습니다.");
+    $("#eout").innerHTML = editResult(j);
+    wireEditResult(j);
+    loadMine();
+    try{ const d = await (await fetch(api("api/ai"))).json(); ELIMIT = d.limit || ELIMIT; }catch(e){}
+    paintLimit();
+    paintChanges(j.id);
+    paintPreview();
+  }catch(e){ $("#eout").innerHTML = err(e.message); }
+  btn.textContent = "AI 에게 고치게 하기"; btn.disabled = false;
+  paintLimit();
+}
+
+const money = (n) => (n || 0) < 1 ? "1원 미만" : Math.round(n).toLocaleString("ko-KR") + "원";
+
+function editResult(j){
+  /* 두 곳에서 같은 모양으로 쓴다 — 걸린 앱을 고친 것과, 돌고 있는 서비스를 고친 것.
+     막는 기준만 다르다. 이미 돌고 있는 앱은 원래 ✗ 가 있을 수 있어서
+     「고치면서 늘지만 않았나」를 보고, 새로 올린 앱은 ✗ 가 하나도 없어야 한다. */
+  const isEdit = j.kind === "edit";
+  const worse = isEdit ? (j.bad || 0) > (j.base_bad || 0) : (j.bad || 0) > 0;
+  const kind = worse ? "bad" : (j.warn ? "warn" : "ok");
+  const head = worse ? (isEdit ? "이대로는 안 됩니다" : "아직 ✗ 가 남았습니다") : "고쳤습니다";
+  const desc = worse
+    ? (isEdit ? "고치면서 ✗ 가 늘었습니다. 요청하지 말고 다시 시도해 주세요."
+              : "한 번 더 고치거나, 코드를 받아 직접 고쳐 주세요.")
+    : "검사를 다시 돌렸습니다. 아래를 보고 검토 요청하세요.";
+  return `<div class="verdict ${kind}" style="margin-top:18px">
+      <div><b>${esc(j.title || "")} — ${head}</b><p>${desc}</p></div>
+      <div class="tally">✓ ${j.ok} &nbsp; △ ${j.warn} &nbsp; ✗ ${j.bad}
+        ${j.base_bad ? `<br><span style="font-size:11.5px">고치기 전 ✗ ${j.base_bad}</span>` : ``}</div>
+    </div>
+
+    <div class="card"><h2 style="margin-top:0">AI 가 한 일</h2>
+      <p class="aisum">${esc(j.summary || "(요약이 없습니다)")}</p>
+      ${j.human ? `<h2>사람이 해야 하는 것</h2><p class="aisum">${esc(j.human)}</p>` : ``}
+      <p class="cost" style="margin:12px 0 0">고친 파일 ${(j.files||[]).length}개
+        ${(j.failed||[]).length ? ` · 못 찾은 곳 ${j.failed.length}개` : ``}
+        · ${Math.round((j.duration_ms||0)/1000)}초
+        · 토큰 ${(j.tokens_in||0).toLocaleString()}/${(j.tokens_out||0).toLocaleString()}
+        · 약 ${money(j.cost_krw)}</p>
+    </div>
+
+    <div class="card" id="chgcard"><h2 style="margin-top:0">무엇이 바뀌었나</h2>
+      <div id="chslot"><p class="hint">견주는 중…</p></div>
+    </div>
+
+    <div class="card" id="pvcard"><h2 style="margin-top:0">미리 띄워 보기</h2>
+      <div id="pvslot"></div>
+    </div>
+
+    <div class="card"><div class="reqrow">
+      ${worse ? `<span class="hint">${isEdit ? "✗ 가 늘어서" : "✗ 가 남아서"} 요청할 수 없습니다.</span>`
+              : `<button class="go" id="ereq">전산담당에게 검토 요청</button>
+                 <span class="hint">승인하면 담당자가 반영 파일로 올립니다.</span>`}
+      ${isEdit ? `<a class="ghost mini" style="text-decoration:none;display:inline-block"
+         href="${api("api/intakes/" + j.id + "/diff")}?download=1">반영 파일(.patch) 받기</a>` : ``}
+      <a class="ghost mini" style="text-decoration:none;display:inline-block"
+         href="${api("api/intakes/" + j.id + "/zip")}">고친 코드 zip 받기</a>
+    </div><div id="ereqmsg"></div></div>`;
+}
+
+function wireEditResult(j){
+  const b = $("#ereq");
+  if(!b) return;
+  b.onclick = async () => {
+    b.disabled = true; b.textContent = "요청하는 중…";
+    try{
+      const r = await fetch(api("api/intakes/" + j.id + "/request"), {method:"POST"});
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.detail || "요청하지 못했습니다.");
+      b.textContent = "요청했습니다 ✓";
+      loadMine(); paintTogo();
+    }catch(e){ b.disabled = false; b.textContent = "전산담당에게 검토 요청";
+               $("#ereqmsg").innerHTML = err(e.message); }
+  };
+}
+
+/* ── 무엇이 바뀌었나 (기계가 센 것 → 눈여겨볼 것 → AI 가 쓴 사람 말) ── */
+async function paintChanges(id){
+  const slot = $("#chslot"); if(!slot) return;
+  let c;
+  try{ c = await (await fetch(api("api/intakes/" + id + "/changes"))).json(); }
+  catch(e){ slot.innerHTML = `<p class="hint">견주지 못했습니다.</p>`; return; }
+  if(!c.available){ slot.innerHTML = `<p class="hint">${esc(c.why || "견줄 것이 없습니다.")}</p>`; return; }
+  const n = (c.files || []).length;
+  let h = `<p class="chg"><span>고친 파일 <b>${n}</b>개</span>
+      <span>늘어난 줄 <b>+${c.added_lines || 0}</b></span>
+      <span>지운 줄 <b>-${c.deleted_lines || 0}</b></span>
+      ${(c.removed||[]).length ? `<span>zip 에 없는 파일 <b>${c.removed.length}</b>개</span>` : ``}</p>`;
+  (c.risks || []).forEach(r => {
+    h += `<p class="risk"><b>${esc(r.title)}</b>${esc(r.detail || "")}</p>`;
+  });
+  if(n){
+    h += `<details><summary>파일별로 보기</summary><ul>` + c.files.map(f =>
+      `<li><span class="m note">·</span><span>${esc(f.path)}
+         <span class="hint">+${f.add} / -${f.del}${f.new ? " · 새 파일" : ""}</span></span></li>`).join("") +
+      `</ul></details>`;
+  }
+  h += `<div id="sumslot" style="margin-top:14px"></div>`;
+  slot.innerHTML = h;
+  if(c.summary) paintSummary(c.summary);
+  else $("#sumslot").innerHTML =
+    `<button class="ghost mini" id="mksum">사람 말로 요약 만들기 (AI)</button>
+     <span class="hint"> patch 를 읽지 않고도 무엇이 올라가는지 알 수 있게 해 줍니다.</span>`;
+  const b = $("#mksum");
+  if(b) b.onclick = async () => {
+    b.disabled = true; b.textContent = "요약하는 중…";
+    try{
+      const r = await fetch(api("api/intakes/" + id + "/changes/summary"), {method:"POST"});
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.detail || "요약하지 못했습니다.");
+      paintSummary(d);
+    }catch(e){ $("#sumslot").innerHTML = err(e.message); }
+  };
+}
+
+function paintSummary(s){
+  const rows = [["추가된 것", s.added], ["바뀐 것", s.changed], ["빠진 것", s.gone],
+                ["봐야 할 것", s.watch]].filter(([, v]) => (v || "").trim());
+  $("#sumslot").innerHTML = rows.length
+    ? rows.map(([k, v]) => `<h2 style="margin:12px 0 6px">${k}</h2><p class="aisum">${esc(v)}</p>`).join("") +
+      `<p class="cost" style="margin:10px 0 0">토큰 ${(s.tokens_in||0).toLocaleString()}/${(s.tokens_out||0).toLocaleString()} · 약 ${money(s.cost_krw)}</p>`
+    : `<p class="hint">요약할 것이 없습니다.</p>`;
+}
+
+/* ── 미리 띄워 보기 (체험판은 설명만) ─────────────────────────── */
+async function paintPreview(){
+  const slot = $("#pvslot"); if(!slot) return;
+  let p;
+  try{ p = await (await fetch(api("api/preview-info"))).json(); }
+  catch(e){ slot.innerHTML = ``; return; }
+  slot.innerHTML = `<div class="pv"><b>${esc(p.title)}</b>
+    <p style="margin:0 0 8px">${esc(p.why)}</p>
+    <ul>${(p.how || []).map(x => `<li>${x}</li>`).join("")}</ul>
+    <p style="margin:10px 0 0;color:#4a5b6b">${esc(p.why_needed || "")}</p></div>`;
 }
 
 /* ── 서비스 ID 안내 ──────────────────────────────────────────── */

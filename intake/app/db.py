@@ -94,9 +94,25 @@ def connect() -> sqlite3.Connection:
     return con
 
 
+# 뒤에 붙은 칸. 이미 있는 db 에도 뜰 때 한 번씩 붙인다 (없으면 조용히 넘어간다).
+#   kind      = new  : 새 앱을 올린 것 | edit : 이미 돌고 있는 서비스를 고친 것
+#   base_bad  = 고치기 **전**의 ✗ 개수. 이미 돌고 있는 앱은 원래 ✗ 가 있을 수 있어서,
+#               「고치면서 늘지만 않았나」를 보려면 전의 숫자가 필요하다.
+ADDED_COLUMNS = [
+    ("intakes", "kind", "TEXT DEFAULT 'new'"),
+    ("intakes", "base_bad", "INTEGER DEFAULT 0"),
+]
+
+
 def init() -> None:
     with connect() as con:
         con.executescript(SCHEMA)
+        for table, col, decl in ADDED_COLUMNS:
+            try:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+            except sqlite3.OperationalError:
+                pass       # 이미 있다
+        con.commit()
 
 
 # ── 장부에 한 줄 남기기 ────────────────────────────────────────────

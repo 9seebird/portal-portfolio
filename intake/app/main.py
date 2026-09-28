@@ -32,16 +32,22 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
+import shutil
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               PlainTextResponse)
 from fastapi.staticfiles import StaticFiles
+from starlette.background import BackgroundTask
 
-from . import db, demo_seed, fixes, portal
+from . import ai_edit, ai_fix, changes, db, demo_limit, demo_seed, fixes, portal
 from .auth import current_user, require_admin, require_user
 from .checker import BadZip, run
 from .service_id import check_service_id
@@ -231,6 +237,8 @@ async def create_intake(
                            note=meta["hint"], user=user, zip_name=path.name,
                            zip_bytes=len(data), sample_id=meta["id"],
                            sha256=hashlib.sha256(data).hexdigest())
+        # AI 로 고칠 때 원본이 필요하다. 예시도 올린 것과 같은 자리에 둔다.
+        (ZIP_DIR / f"{intake_id}.zip").write_bytes(data)
         await portal.send_audit("앱 제출(예시)", user, f'{meta["sid"]} · {meta["label"]}')
         return JSONResponse({"id": intake_id, "name": meta["label"], "sample": meta, **result})
 
@@ -295,7 +303,7 @@ async def list_intakes(request: Request, status: str = "", mine: int = 0) -> dic
         args.append(status)
     sql = ("SELECT id, ts, service_id, title, actor_id, actor_name, actor_dept, "
            "zip_name, sample_id, zip_bytes, ok_count, warn_count, bad_count, verdict, "
-           "status, admin_name, admin_note, decided_at FROM intakes")
+           "status, admin_name, admin_note, decided_at, kind, base_bad FROM intakes")
     if where:
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY id DESC LIMIT 300"
@@ -382,7 +390,11 @@ async def request_review(request: Request, intake_id: int) -> dict:
         row = dict(row)
         if row["actor_id"] != user["id"] and user["role"] != "admin":
             raise HTTPException(403, "내가 올린 것만 요청할 수 있습니다.")
-        if row["verdict"] in ("bad", "error"):
+        if row.get("kind") == "edit" and row["verdict"] == "bad":
+            # 이미 돌고 있는 서비스는 원래 ✗ 가 있을 수 있다. 고치면서 **늘리지만** 않으면 된다.
+            if row["bad_count"] > (row["base_bad"] or 0):
+                raise HTTPException(400, "고치면서 ✗ 가 늘었습니다. 이대로는 요청할 수 없습니다.")
+        elif row["verdict"] in ("bad", "error"):
             raise HTTPException(400, "✗ 가 있는 상태로는 요청할 수 없습니다. 고쳐서 다시 올려 주세요.")
         if row["status"] != "checked":
             raise HTTPException(400, "이미 요청했거나 처리된 제출물입니다.")
@@ -460,6 +472,356 @@ async def get_ledger(request: Request, days: int = 30) -> dict:
             "       tokens_in, tokens_out, cost_krw FROM events "
             " ORDER BY id DESC LIMIT 100").fetchall()]
     return {"days": days, "by_service": rows, "recent": recent}
+
+
+# ── AI 로 고치기 ───────────────────────────────────────────────────
+# 사내판(app-intake)과 **같은 모듈**을 그대로 쓴다 (ai_fix · ai_edit · changes).
+# 체험판에서 다른 것은 세 가지뿐이다.
+#   · AI 를 진짜로 부르지만 하루 횟수를 막는다 (demo_limit).
+#   · 「미리 띄워 보기」는 설명만 보여 준다 — 공개된 서버에서 남의 컨테이너를
+#     띄우는 길을 열어 둘 이유가 없다. 사내판에는 실제로 띄우는 실행기가 있다.
+#   · 담당자 지정이 없다. 사내판은 「그 앱의 담당자 + 포털 관리자」에게만 보인다.
+def _load_intake(intake_id: int) -> dict:
+    with db.connect() as con:
+        row = con.execute("SELECT * FROM intakes WHERE id = ?", (intake_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "없는 제출물입니다.")
+    return dict(row)
+
+
+@app.get("/api/ai")
+async def ai_status(request: Request) -> dict:
+    """AI 를 쓸 수 있는지, 오늘 몇 번 남았는지. 화면이 버튼을 잠글 때 쓴다."""
+    require_user(request)
+    out = {"enabled": ai_fix.enabled(), "demo": DEMO, "model": ai_fix.MODEL}
+    if DEMO:
+        out["limit"] = await run_in_threadpool(demo_limit.status)
+    return out
+
+
+def _guard(*, gap: bool = True) -> None:
+    """체험판이면 하루 상한을 본다. 사내판에서는 아무것도 하지 않는다."""
+    if not ai_fix.enabled():
+        raise HTTPException(400, "AI 수정이 꺼져 있습니다. (AI_API_KEY 가 없습니다)")
+    if DEMO:
+        try:
+            demo_limit.check(gap=gap)
+        except demo_limit.Blocked as e:
+            raise HTTPException(429, str(e)) from None
+
+
+@app.post("/api/intakes/{intake_id}/ai-fix")
+async def run_ai_fix(request: Request, intake_id: int) -> JSONResponse:
+    """✗ 가 있는 제출물을 AI 가 고쳐서 **새 제출물**로 남긴다. 원본은 그대로 둔다."""
+    user = require_user(request)
+    _guard()
+    row = _load_intake(intake_id)
+    if not _visible(row, user):
+        raise HTTPException(403, "내가 올린 것만 고칠 수 있습니다.")
+    if row["verdict"] != "bad":
+        raise HTTPException(400, "✗ 가 있는 제출물만 AI 로 고칠 수 있습니다.")
+    src = ZIP_DIR / f"{intake_id}.zip"
+    if not src.exists():
+        raise HTTPException(404, "원본 파일이 없습니다.")
+
+    try:
+        fx = await run_in_threadpool(
+            ai_fix.run, src, report=row["report"] or "", service_id=row["service_id"],
+            title=row["title"] or "", verdict=row["verdict"])
+    except ai_fix.AIFixError as e:
+        with db.connect() as con:
+            db.add_event(con, kind="agent_run", service_id=row["service_id"], actor=user,
+                         summary=f"#{intake_id} AI 수정 실패 — {e}"[:500], status="error",
+                         ref_id=intake_id, meta={"from": intake_id, "model": ai_fix.MODEL})
+            con.commit()
+        raise HTTPException(502, str(e)) from None
+
+    result, tmp = fx["result"], fx["zip"]
+    try:
+        data = tmp.read_bytes()
+        stem = (row["zip_name"] or row["service_id"]).removesuffix(".zip")
+        with db.connect() as con:
+            cur = con.execute(
+                """INSERT INTO intakes
+                   (ts, service_id, title, note, actor_id, actor_name, actor_dept,
+                    zip_name, zip_bytes, zip_sha256,
+                    ok_count, warn_count, bad_count, verdict, report, status, kind)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'checked','new')""",
+                (db.now_kst(), row["service_id"], row["title"],
+                 f"[AI 수정] #{intake_id} 원본을 AI 가 고쳤습니다.\n\n{fx['summary']}".strip(),
+                 row["actor_id"], row["actor_name"], row["actor_dept"],
+                 f"{stem}_AI수정.zip", len(data), hashlib.sha256(data).hexdigest(),
+                 result.get("ok", 0), result.get("warn", 0), result.get("bad", 0),
+                 result["verdict"], result["report"]))
+            new_id = int(cur.lastrowid)
+            db.add_event(
+                con, kind="agent_run", service_id=row["service_id"], actor=user,
+                summary=f"#{intake_id} AI 수정 → #{new_id} · 검수 {result['verdict']}",
+                status=result["verdict"], ref_id=new_id,
+                tokens_in=fx["tokens_in"], tokens_out=fx["tokens_out"],
+                cost_krw=fx["cost_krw"], duration_ms=fx["duration_ms"],
+                meta={"from": intake_id, "model": fx["model"], "rounds": fx["rounds"],
+                      "files": fx["files"], "refused": fx["refused"]})
+            con.commit()
+        shutil.move(str(tmp), str(ZIP_DIR / f"{new_id}.zip"))
+        (ZIP_DIR / f"{new_id}.diff.txt").write_text(fx["diff"], encoding="utf-8")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    await portal.send_audit("AI 수정", user, f"{row['service_id']} · #{intake_id} → #{new_id}")
+    return JSONResponse({"id": new_id, "from": intake_id, "summary": fx["summary"],
+                         "diff": fx["diff"], "files": fx["files"], "refused": fx["refused"],
+                         **{k: result.get(k) for k in ("verdict", "ok", "warn", "bad", "report")},
+                         **{k: fx[k] for k in ("tokens_in", "tokens_out", "cost_krw",
+                                               "duration_ms", "rounds")}})
+
+
+# ── 기존 서비스 고치기 ─────────────────────────────────────────────
+async def _editable_services(user: dict) -> tuple[list[dict], bool]:
+    """(고칠 수 있는 서비스, 포털에 물어봤는가).
+
+    목록은 포털 첫 화면의 카드 이름·순서를 그대로 따른다 (ai_edit.catalog).
+    사내판은 여기서 「그 앱의 담당자인가」를 한 번 더 걸러 낸다. 체험판에는
+    담당자 지정이 없어서 들어온 사람 모두에게 보인다 — 보여 주려고 만든 화면이다.
+    """
+    names = await portal.taken_ids()
+    if names is None:
+        return [], False
+    return ai_edit.catalog(names), True
+
+
+@app.get("/api/services")
+async def list_services(request: Request) -> dict:
+    user = require_user(request)
+    items, portal_ok = await _editable_services(user)
+    out = {"items": items, "enabled": ai_fix.enabled(), "portal_ok": portal_ok,
+           "repo_ok": ai_edit.REPO.is_dir() and any(ai_edit.REPO.iterdir())}
+    if DEMO:
+        out["limit"] = await run_in_threadpool(demo_limit.status)
+    return out
+
+
+async def _entry(user: dict, service_id: str) -> dict:
+    items, _ = await _editable_services(user)
+    entry = next((x for x in items if x["id"] == service_id), None)
+    if entry is None:
+        raise HTTPException(403, "고칠 수 없는 서비스입니다.")
+    return entry
+
+
+@app.get("/api/services/{service_id}/source")
+async def download_source(request: Request, service_id: str) -> FileResponse:
+    """지금 돌고 있는 그 서비스의 코드를 zip 으로 받는다.
+
+    자기가 쓰던 AI 도구로 고치고 싶은 사람을 위한 길이다. 비밀값(.env)과
+    운영 자료(data/)는 넣지 않는다.
+    """
+    user = require_user(request)
+    entry = await _entry(user, service_id)
+    try:
+        path = await run_in_threadpool(ai_edit.source_zip, entry["folder"])
+    except ai_fix.AIFixError as e:
+        raise HTTPException(400, str(e)) from None
+    await portal.send_audit("서비스 코드 내려받기", user, f"{service_id} ({entry['folder']})")
+    return FileResponse(path, media_type="application/zip",
+                        filename=f"{entry['folder']}_현재코드.zip",
+                        background=BackgroundTask(lambda: path.unlink(missing_ok=True)))
+
+
+@app.post("/api/services/{service_id}/ai-edit")
+async def run_ai_edit(request: Request, service_id: str) -> JSONResponse:
+    """요청 한 줄로 이미 돌고 있는 서비스를 고쳐 본다. 저장소에는 쓰지 않는다."""
+    user = require_user(request)
+    _guard()
+    entry = await _entry(user, service_id)
+    body = await request.json()
+    ask = (body.get("request") or "").strip()[:4000]
+    if len(ask) < 5:
+        raise HTTPException(400, "무엇을 고칠지 한 줄로 적어 주세요.")
+    try:
+        fx = await run_in_threadpool(ai_edit.run, entry, ask)
+    except ai_fix.AIFixError as e:
+        tin, tout = getattr(e, "tokens", (0, 0))
+        with db.connect() as con:
+            db.add_event(con, kind="agent_run", service_id=service_id, actor=user,
+                         summary=f"기존 서비스 AI 수정 실패 — {e}"[:500], status="error",
+                         tokens_in=tin, tokens_out=tout,
+                         cost_krw=round(tin / 1e6 * ai_fix.PRICE_IN_KRW
+                                        + tout / 1e6 * ai_fix.PRICE_OUT_KRW, 1),
+                         meta={"request": ask[:500], "model": ai_fix.MODEL})
+            con.commit()
+        raise HTTPException(502, str(e)) from None
+
+    result, base, tmp = fx["result"], fx["base"], fx["zip"]
+    note = f"[기존 서비스 고치기] 요청: {ask}\n\n{fx['summary']}"
+    if fx["human"]:
+        note += f"\n\n[사람이 할 일]\n{fx['human']}"
+    try:
+        data = tmp.read_bytes()
+        with db.connect() as con:
+            cur = con.execute(
+                """INSERT INTO intakes
+                   (ts, service_id, title, note, actor_id, actor_name, actor_dept,
+                    zip_name, zip_bytes, zip_sha256,
+                    ok_count, warn_count, bad_count, verdict, report, status, kind, base_bad)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'checked','edit',?)""",
+                (db.now_kst(), service_id, entry["title"], note.strip(),
+                 user["id"], user["name"], user["dept"],
+                 f"{service_id}_AI수정.zip", len(data), hashlib.sha256(data).hexdigest(),
+                 result.get("ok", 0), result.get("warn", 0), result.get("bad", 0),
+                 result["verdict"], result["report"], base.get("bad", 0)))
+            new_id = int(cur.lastrowid)
+            db.add_event(
+                con, kind="agent_run", service_id=service_id, actor=user,
+                summary=f"기존 서비스 AI 수정 → #{new_id} · {ask[:80]}",
+                status=result["verdict"], ref_id=new_id,
+                tokens_in=fx["tokens_in"], tokens_out=fx["tokens_out"],
+                cost_krw=fx["cost_krw"], duration_ms=fx["duration_ms"],
+                meta={"request": ask[:500], "model": fx["model"], "rounds": fx["rounds"],
+                      "files": fx["files"], "failed": len(fx["failed"])})
+            con.commit()
+        shutil.move(str(tmp), str(ZIP_DIR / f"{new_id}.zip"))
+        (ZIP_DIR / f"{new_id}.diff.txt").write_text(fx["diff"], encoding="utf-8")
+        (ZIP_DIR / f"{new_id}.folder.txt").write_text(entry["folder"], encoding="utf-8")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    await portal.send_audit("기존 서비스 AI 수정", user, f"{service_id} · #{new_id} · {ask[:80]}")
+    return JSONResponse({
+        "id": new_id, "kind": "edit", "service_id": service_id, "title": entry["title"],
+        "folder": entry["folder"],
+        **{k: result.get(k) for k in ("verdict", "ok", "warn", "bad", "report")},
+        "base_bad": base.get("bad", 0), "base_warn": base.get("warn", 0),
+        **{k: fx[k] for k in ("summary", "human", "diff", "files", "failed", "tokens_in",
+                              "tokens_out", "cost_krw", "duration_ms", "rounds")}})
+
+
+# ── 무엇이 바뀌었나 ────────────────────────────────────────────────
+# 세 겹으로 보여 준다. 기계가 센 것 → 눈여겨볼 것 → AI 가 쓴 사람 말.
+# 담당자가 patch 를 열어 읽지 않아도 무엇이 올라가는지 알 수 있어야 한다.
+def _changes_paths(intake_id: int) -> tuple[Path, Path]:
+    return ZIP_DIR / f"{intake_id}.diff.txt", ZIP_DIR / f"{intake_id}.summary.json"
+
+
+def _folder_of(row: dict) -> str:
+    path = ZIP_DIR / f'{row["id"]}.folder.txt'
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
+    return row["service_id"]
+
+
+def _prepare_changes(row: dict) -> dict:
+    """반영 파일(.patch)이 없으면 만들고, 기계가 읽어 낸 것을 돌려준다."""
+    intake_id = int(row["id"])
+    patch_path, sum_path = _changes_paths(intake_id)
+    folder = _folder_of(row)
+    if not patch_path.exists():
+        folder_path = ai_edit.REPO / folder
+        if folder not in ai_edit._folders() or not folder_path.is_dir():
+            return {"available": False,
+                    "why": "저장소에 같은 이름의 서비스가 없어서 견줄 코드가 없습니다 "
+                           "(새로 붙이는 앱입니다)."}
+        got = changes.build(ZIP_DIR / f"{intake_id}.zip", folder, folder_path)
+        if not got["patch"] and not got["removed"]:
+            return {"available": False, "why": "지금 운영 중인 코드와 다른 곳이 없습니다."}
+        patch_path.write_text(got["patch"], encoding="utf-8")
+        (ZIP_DIR / f"{intake_id}.removed.txt").write_text("\n".join(got["removed"]),
+                                                          encoding="utf-8")
+    rm_path = ZIP_DIR / f"{intake_id}.removed.txt"
+    removed = ([x for x in rm_path.read_text(encoding="utf-8").splitlines() if x]
+               if rm_path.exists() else [])
+    patch = patch_path.read_text(encoding="utf-8")
+    out = {"available": True, "folder": folder, "removed": removed,
+           **changes.analyze(patch, removed)}
+    if sum_path.exists():
+        out["summary"] = json.loads(sum_path.read_text(encoding="utf-8"))
+    return out
+
+
+@app.get("/api/intakes/{intake_id}/changes")
+async def get_changes(request: Request, intake_id: int) -> dict:
+    user = require_user(request)
+    row = _load_intake(intake_id)
+    if not _visible(row, user):
+        raise HTTPException(403, "내가 올린 것만 볼 수 있습니다.")
+    try:
+        return await run_in_threadpool(_prepare_changes, row)
+    except (OSError, zipfile.BadZipFile) as e:
+        return {"available": False, "why": f"견주지 못했습니다 — {e}"}
+
+
+@app.post("/api/intakes/{intake_id}/changes/summary")
+async def make_summary(request: Request, intake_id: int) -> dict:
+    """AI 로 사람 말 요약을 만든다. 한 제출물에 한 번만 만들고 파일로 남긴다."""
+    user = require_user(request)
+    row = _load_intake(intake_id)
+    if not _visible(row, user):
+        raise HTTPException(403, "내가 올린 것만 볼 수 있습니다.")
+    info = await run_in_threadpool(_prepare_changes, row)
+    if not info.get("available"):
+        raise HTTPException(400, info.get("why") or "견줄 것이 없습니다.")
+    patch_path, sum_path = _changes_paths(intake_id)
+    if sum_path.exists():        # 이미 있으면 AI 를 또 부르지 않는다
+        return json.loads(sum_path.read_text(encoding="utf-8"))
+    _guard(gap=False)
+    try:
+        got = await run_in_threadpool(changes.ai_summary,
+                                      patch_path.read_text(encoding="utf-8"),
+                                      row["title"] or row["service_id"], info.get("removed"))
+    except ai_fix.AIFixError as e:
+        raise HTTPException(502, str(e)) from None
+    sum_path.write_text(json.dumps(got, ensure_ascii=False), encoding="utf-8")
+    with db.connect() as con:
+        db.add_event(con, kind="agent_run", service_id=row["service_id"], actor=user,
+                     summary=f"#{intake_id} 변경 요약 만듦", status="done",
+                     tokens_in=got["tokens_in"], tokens_out=got["tokens_out"],
+                     cost_krw=got["cost_krw"], ref_id=intake_id)
+        con.commit()
+    return got
+
+
+@app.get("/api/intakes/{intake_id}/diff")
+async def get_diff(request: Request, intake_id: int, download: int = 0) -> PlainTextResponse:
+    """무엇이 바뀌었는지 (patch). 저장소 뿌리에서 `git apply` 로 그대로 들어간다."""
+    user = require_user(request)
+    row = _load_intake(intake_id)
+    if not _visible(row, user):
+        raise HTTPException(403, "내가 올린 것만 볼 수 있습니다.")
+    path = _changes_paths(intake_id)[0]
+    if not path.exists():
+        info = await run_in_threadpool(_prepare_changes, row)
+        if not info.get("available") or not path.exists():
+            raise HTTPException(404, info.get("why") or "바뀐 부분을 만들 수 없습니다.")
+    headers = ({"Content-Disposition":
+                f'attachment; filename="{row["service_id"]}-{intake_id}.patch"'}
+               if download else None)
+    return PlainTextResponse(path.read_text(encoding="utf-8"), headers=headers)
+
+
+# ── 미리 띄워 보기 (체험판은 설명만) ───────────────────────────────
+# 사내판에는 고친 것을 **따로 띄워서 눌러 보는** 실행기가 있다. 여기서는 설명만
+# 한다. 공개된 서버에서 아무나 컨테이너를 띄우는 길을 열어 둘 이유가 없다.
+PREVIEW_INFO = {
+    "available": False,
+    "title": "미리 띄워 보기 (사내판 기능)",
+    "why": "체험판에서는 설명만 보여 드립니다. 공개된 서버에서 컨테이너를 띄우는 "
+           "길을 열어 두지 않습니다.",
+    "how": [
+        "고친 코드를 **운영과 따로** 띄운다. 운영 서비스는 그대로 돈다.",
+        "임시 주소(/preview/12/)로 담당자만 들어가 실제로 눌러 본다.",
+        "바깥 인터넷을 막고, 비밀값(.env)을 넣지 않고, 권한을 뺀 컨테이너로 띄운다.",
+        "2시간 뒤 스스로 사라진다. 승인 전에 눌러 보고 판단할 수 있다.",
+    ],
+    "why_needed": "검사와 AI 요약이 통과라고 해도, 눌러 봐야 아는 것이 있다 — "
+                  "실제로 이 기능으로 「드래그하면 파란 테두리가 안 지워지는」 버그를 "
+                  "승인 전에 잡았다.",
+}
+
+
+@app.get("/api/preview-info")
+async def preview_info(request: Request) -> dict:
+    require_user(request)
+    return PREVIEW_INFO
 
 
 # ── 화면 ───────────────────────────────────────────────────────────
