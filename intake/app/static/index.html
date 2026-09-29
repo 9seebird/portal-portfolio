@@ -115,6 +115,21 @@ textarea.fix{width:100%;min-height:300px;font-family:ui-monospace,Consolas,monos
 select.t{appearance:none;background:var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.6'/></svg>") no-repeat right 12px center}
 .need{color:var(--bad);font-weight:700}
 
+/* 고칠 서비스 고르기 — 기본 <select> 대신 카드로 고른다.
+   이 화면의 예시 카드와 같은 모양이라 두 칸이 한 벌로 보이고,
+   폴더 이름과 「한 폴더를 같이 쓴다」 같은 단서를 줄 안에서 안 잘리게 보여 준다. */
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-top:6px}
+.pick{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;
+  background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;transition:.15s}
+.pick:hover{border-color:var(--brand);background:#f4f8fc}
+.pick.on{border-color:var(--brand);background:#eef5fc}
+.pick b{display:block;font-size:14.5px;margin-bottom:2px}
+.pick .who{color:var(--muted);font-size:12px;font-family:ui-monospace,Consolas,monospace}
+.pick .dot{flex:0 0 15px;height:15px;border-radius:50%;border:1.5px solid #c7cdd6;margin-top:3px;transition:.15s}
+.pick.on .dot{border-color:var(--brand);background:var(--brand);box-shadow:inset 0 0 0 3px #fff}
+.pick .sh{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;
+  padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
+
 /* AI 가 쓴 요약 · 무엇이 바뀌었나 */
 .aisum{white-space:pre-line;color:var(--ink);background:#fbfaf6;border:1px solid #ece7d9;
   border-radius:10px;padding:14px 16px;font-size:14px;margin:0}
@@ -178,8 +193,8 @@ select.t{appearance:none;background:var(--paper) url("data:image/svg+xml;utf8,<s
   <div class="card hide" id="paneEdit">
     <p class="hint" id="eLead" style="margin-top:0"></p>
 
-    <label class="f" for="svc">고칠 서비스</label>
-    <select class="t" id="svc"></select>
+    <label class="f">고칠 서비스</label>
+    <div class="picks" id="svclist"><p class="hint" style="margin:6px 0 0">불러오는 중…</p></div>
 
     <div class="reqrow" style="margin:12px 0 0">
       <button class="ghost mini" id="svcDl">지금 코드 내려받기</button>
@@ -514,14 +529,15 @@ async function runFix(btn){
    「내려받아서 내가 고치기」와 「요청 한 줄로 AI 가 고치기」 둘 다 둔다.
    어느 쪽이든 나오는 것은 같다 — 제출물 하나 + 반영 파일(.patch) 하나.
    저장소에 쓰거나 배포하는 길은 여기 없다. 승인 뒤에 사람이 한다. */
-let SVCS = null, ELIMIT = null;
+let SVCS = null, ELIMIT = null, PICKED = "";
+
+const noSvc = (msg) => `<p class="hint" style="margin:6px 0 0">${msg}</p>`;
 
 async function loadServices(){
-  const sel = $("#svc");
-  sel.innerHTML = `<option value="">불러오는 중…</option>`;
+  const box = $("#svclist");
   let d;
   try{ d = await (await fetch(api("api/services"))).json(); }
-  catch(e){ sel.innerHTML = `<option value="">불러오지 못했습니다</option>`; return; }
+  catch(e){ box.innerHTML = noSvc("목록을 불러오지 못했습니다."); return; }
   SVCS = d.items || [];
   ELIMIT = d.limit || null;
   $("#eLead").innerHTML = ELIMIT
@@ -538,17 +554,29 @@ async function loadServices(){
       아래 [지금 코드 내려받기] 로 받아서 쓰시던 AI 로 고치실 수 있습니다.`;
   }
   if(!SVCS.length){
-    sel.innerHTML = `<option value="">고칠 수 있는 서비스가 없습니다</option>`;
-    $("#eout").innerHTML = `<p class="hint" style="margin-top:14px">` +
-      (!d.portal_ok ? `포털에 물어보지 못했습니다. 포털을 통해 들어와 주세요.`
-       : !d.repo_ok ? `코드를 읽을 수 없습니다 (저장소가 붙어 있지 않습니다).`
-       : `아직 등록된 서비스가 없습니다.`) + `</p>`;
+    box.innerHTML = noSvc(
+      !d.portal_ok ? "포털에 물어보지 못했습니다. 포털을 통해 들어와 주세요."
+      : !d.repo_ok ? "코드를 읽을 수 없습니다 (저장소가 붙어 있지 않습니다)."
+      : "아직 등록된 서비스가 없습니다.");
     $("#eGo").disabled = true;
     return;
   }
-  sel.innerHTML = `<option value="">— 고를 서비스 —</option>` +
-    SVCS.map(x => `<option value="${esc(x.id)}">${esc(x.title)}${
-      x.shared ? " (한 폴더를 여러 화면이 같이 씁니다)" : ""}</option>`).join("");
+  box.innerHTML = SVCS.map(x =>
+    `<button class="pick" data-id="${esc(x.id)}">
+       <span class="dot"></span>
+       <span style="flex:1"><b>${esc(x.title)}</b>
+         <span class="who">${esc(x.folder)}${x.focus ? "/" + esc(x.focus) : ""}</span>
+         ${x.shared ? `<span class="sh">한 폴더를 여러 화면이 같이 씁니다</span>` : ``}</span>
+     </button>`).join("");
+  box.querySelectorAll(".pick").forEach(b => b.onclick = () => choosePick(b));
+}
+
+/* 고른 것은 한 곳에만 둔다 (PICKED). 화면 표시와 실제 값이 갈리면
+   「분명히 골랐는데 안 골랐다고 나오는」 일이 생긴다. */
+function choosePick(btn){
+  PICKED = btn.dataset.id;
+  $("#svclist").querySelectorAll(".pick").forEach(x => x.classList.toggle("on", x === btn));
+  $("#svcDlMsg").innerHTML = `쓰시던 AI 도구로 직접 고치실 때 받아 가세요. 비밀값(.env)은 빼고 담습니다.`;
 }
 
 function paintLimit(){
@@ -562,24 +590,21 @@ function paintLimit(){
 /* 지금 코드 내려받기 — 고를 것을 안 고르고 누르면 옆에 빨간 글씨로 알린다 */
 function wireEdit(){
   $("#svcDl").onclick = () => {
-    const id = $("#svc").value;
+    const id = PICKED;
     const msg = $("#svcDlMsg");
     if(!id){
       msg.innerHTML = `<span class="need">먼저 고칠 서비스를 골라 주세요.</span>`;
-      $("#svc").focus();
+      $("#svclist").scrollIntoView({behavior:"smooth", block:"nearest"});
       return;
     }
     msg.innerHTML = `받는 중입니다… 비밀값(.env)과 운영 자료(data/)는 빼고 담습니다.`;
     location.href = api("api/services/" + id + "/source");
   };
-  $("#svc").onchange = () => {
-    $("#svcDlMsg").innerHTML = `쓰시던 AI 도구로 직접 고치실 때 받아 가세요. 비밀값(.env)은 빼고 담습니다.`;
-  };
   $("#eGo").onclick = runEdit;
 }
 
 async function runEdit(){
-  const id = $("#svc").value, ask = $("#ask").value.trim(), btn = $("#eGo");
+  const id = PICKED, ask = $("#ask").value.trim(), btn = $("#eGo");
   if(!id){ $("#svcDlMsg").innerHTML = `<span class="need">먼저 고칠 서비스를 골라 주세요.</span>`; return; }
   if(ask.length < 5){ $("#eout").innerHTML = err("무엇을 고칠지 한 줄로 적어 주세요."); return; }
   btn.disabled = true; btn.textContent = "AI 가 고치는 중… (1~3분)";
