@@ -86,17 +86,10 @@ class OpenAIProvider(Provider):
         # tool_calls 가 있을 때 content 는 None 이어야 하는 게이트웨이가 있다
         raw = {"role": "assistant", "content": msg.content or (None if msg.tool_calls else "")}
         if msg.tool_calls:
-            raw["tool_calls"] = [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments,
-                    },
-                }
-                for tc in msg.tool_calls
-            ]
+            # 받은 tool_call 을 통째로 돌려준다. 필드를 골라 다시 만들면
+            # Gemini 3 가 붙여 보낸 extra_content.google.thought_signature 가 빠져
+            # 다음 요청이 400 (missing a thought_signature) 으로 실패한다.
+            raw["tool_calls"] = [tc.model_dump(exclude_none=True) for tc in msg.tool_calls]
 
         u = getattr(resp, "usage", None)
         tokens = (getattr(u, "prompt_tokens", 0) or 0,
