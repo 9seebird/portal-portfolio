@@ -447,6 +447,54 @@ def get_preview(filename: str, request: Request):
         "topUsers": json.loads(top_users.to_json(orient='records', force_ascii=False)),
     }
 
+# ── 원본 로그(게이트웨이 stat 시트) 맞추기 ─────────────────────────
+# 화면(index.html)은 원본 로그를 email 기준으로 묶고, 이름은 화면에 박힌
+# DEFAULT_NAME_MAP 으로 붙이며, 부서는 departmentFullName 을 쓴다.
+# 그런데 이 API 는 예전 형식(name·departmentCode 가 채워진 엑셀)만 알아서,
+# 원본 로그를 받으면 departmentCode 가 없어 500 이 났고(챗의 get_ai_usage 실패),
+# name 이 비어 있으니 사용자 순위도 통째로 빠졌다.
+# 이름표를 여기 따로 적으면 화면과 챗이 다른 이름을 말하게 되므로
+# index.html 의 것을 그대로 읽어 쓴다 (한 곳에서만 관리).
+_NAME_MAP = None
+
+def _name_map() -> dict:
+    global _NAME_MAP
+    if _NAME_MAP is None:
+        _NAME_MAP = {}
+        try:
+            import re as _re
+            html = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html"),
+                        encoding="utf-8").read()
+            m = _re.search(r"const DEFAULT_NAME_MAP\s*=\s*(\{.*?\});", html, _re.S)
+            if m:
+                _NAME_MAP = {k.lower(): v for k, v in json.loads(m.group(1)).items()}
+        except Exception:  # noqa: BLE001 — 이름표가 없으면 이메일로 보여 주면 된다
+            _NAME_MAP = {}
+    return _NAME_MAP
+
+
+def _normalize(df: "pd.DataFrame") -> "pd.DataFrame":
+    """원본 로그든 예전 형식이든 아래 집계가 기대하는 열을 갖추게 한다."""
+    if "email" in df.columns:
+        df = df[df["email"].notna()].copy()
+        email = df["email"].astype(str).str.strip()
+        mapped = email.str.lower().map(_name_map())
+        name = df["name"] if "name" in df.columns else pd.Series(index=df.index, dtype=object)
+        df["name"] = name.where(name.notna() & (name.astype(str).str.strip() != ""), mapped).fillna(email)
+    if "departmentCode" not in df.columns:
+        df["departmentCode"] = df["departmentFullName"] if "departmentFullName" in df.columns else "-"
+    df["departmentCode"] = df["departmentCode"].fillna("-")
+    for c in ("model", "toolName"):
+        if c not in df.columns:
+            df[c] = "(없음)"
+        df[c] = df[c].fillna("(없음)")
+    for c in ("usageCount", "inputToken", "outputToken", "inputCharge", "outputCharge"):
+        if c not in df.columns:
+            df[c] = 0
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    return df
+
+
 @app.get("/api/data/{filename}")
 def get_data(filename: str, request: Request):
     require_access(request)
@@ -455,7 +503,7 @@ def get_data(filename: str, request: Request):
     if not os.path.exists(filepath):
         return {"error": "File not found"}
     
-    df = pd.read_excel(filepath)
+    df = _normalize(pd.read_excel(filepath))
     
     # Parse date
     df['date'] = pd.to_datetime(df['date'])
